@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=80", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "toolkit-meteorology"
+version = "0.1.0"
+description = "Provenance-aware HRRR weather, daylight, lunar and atmospheric H3 products"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = [
+  "branca>=0.7", "folium>=0.20", "geopandas>=1", "h3>=4", "numpy>=1.26", "pandas>=2.1",
+  "pyarrow>=14", "pydantic>=2", "pyproj>=3.6", "PyYAML>=6",
+  "scikit-learn>=1.4", "shapely>=2", "xarray>=2024.1",
+]
+
+[project.optional-dependencies]
+acquisition = ["herbie-data>=2024.3", "cfgrib>=0.9", "eccodes>=2.35"]
+test = ["pytest>=8"]
+
+[project.scripts]
+meteorology = "meteorology.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+meteorology = ["resources/**/*", "**/*.md", "**/*.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --import-mode=importlib"

@@ -1,0 +1,1760 @@
+products:
+  meteorological_spatial_support:
+    common_name: Atmospheric model-area H3 support
+    metric_family: meteorological
+    metric_subfamily: spatial_support
+    category: spatial_support
+    collection:
+      paths:
+        4: data/processed/domain/environmental_layer/meteorological/spatial_support/H3_MODEL_AREA_SUPPORT_RES_4.parquet
+        5: data/processed/domain/environmental_layer/meteorological/spatial_support/H3_MODEL_AREA_SUPPORT_RES_5.parquet
+        6: data/processed/domain/environmental_layer/meteorological/spatial_support/H3_MODEL_AREA_SUPPORT_RES_6.parquet
+      index_columns:
+      - H3_INDEX
+      partition_keys: []
+      resolutions:
+      - 4
+      - 5
+      - 6
+      materialized:
+        4: false
+        5: false
+        6: false
+      materialization_state: pending_acquisition_or_build
+      schema_source: declared_producer_schema_pending_materialization
+    producer: meteorology.spatial_support.build
+    dependencies: []
+    grain: one row per full-bbox atmospheric-support H3 cell
+    feature_count: 4
+    variable_kind_counts:
+      feature_variable: 0
+      metadata: 4
+    features:
+      CENTROID_LAT:
+        common_name: Centroid Lat
+        metric_family: meteorological
+        metric_subfamily: spatial_support
+        column: CENTROID_LAT
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/spatial_support/H3_MODEL_AREA_SUPPORT_RES_4.parquet
+          5: data/processed/domain/environmental_layer/meteorological/spatial_support/H3_MODEL_AREA_SUPPORT_RES_5.parquet
+          6: data/processed/domain/environmental_layer/meteorological/spatial_support/H3_MODEL_AREA_SUPPORT_RES_6.parquet
+        unit: decimal degrees
+        arrow_type: double
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: CENTROID_LAT
+        available_resolutions:
+        - 4
+        - 5
+        - 6
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      CENTROID_LON:
+        common_name: Centroid Lon
+        metric_family: meteorological
+        metric_subfamily: spatial_support
+        column: CENTROID_LON
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/spatial_support/H3_MODEL_AREA_SUPPORT_RES_4.parquet
+          5: data/processed/domain/environmental_layer/meteorological/spatial_support/H3_MODEL_AREA_SUPPORT_RES_5.parquet
+          6: data/processed/domain/environmental_layer/meteorological/spatial_support/H3_MODEL_AREA_SUPPORT_RES_6.parquet
+        unit: decimal degrees
+        arrow_type: double
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: CENTROID_LON
+        available_resolutions:
+        - 4
+        - 5
+        - 6
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      H3_RESOLUTION:
+        common_name: H3 Resolution
+        metric_family: meteorological
+        metric_subfamily: spatial_support
+        column: H3_RESOLUTION
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/spatial_support/H3_MODEL_AREA_SUPPORT_RES_4.parquet
+          5: data/processed/domain/environmental_layer/meteorological/spatial_support/H3_MODEL_AREA_SUPPORT_RES_5.parquet
+          6: data/processed/domain/environmental_layer/meteorological/spatial_support/H3_MODEL_AREA_SUPPORT_RES_6.parquet
+        unit: unitless
+        arrow_type: int8
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: H3_RESOLUTION
+        available_resolutions:
+        - 4
+        - 5
+        - 6
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      SUPPORT_STATE:
+        common_name: Support State
+        metric_family: meteorological
+        metric_subfamily: spatial_support
+        column: SUPPORT_STATE
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/spatial_support/H3_MODEL_AREA_SUPPORT_RES_4.parquet
+          5: data/processed/domain/environmental_layer/meteorological/spatial_support/H3_MODEL_AREA_SUPPORT_RES_5.parquet
+          6: data/processed/domain/environmental_layer/meteorological/spatial_support/H3_MODEL_AREA_SUPPORT_RES_6.parquet
+        unit: categorical
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SUPPORT_STATE
+        available_resolutions:
+        - 4
+        - 5
+        - 6
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+  surface_weather_daily:
+    common_name: Daily HRRR surface weather
+    metric_family: meteorological
+    metric_subfamily: surface_weather
+    category: surface_weather
+    collection:
+      paths:
+        5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+      index_columns:
+      - H3_INDEX
+      - DATE
+      partition_keys:
+      - YEAR
+      - DATE
+      resolutions:
+      - 5
+      materialized:
+        5: false
+      materialization_state: pending_acquisition_or_build
+      schema_source: declared_producer_schema_pending_materialization
+    producer: meteorology.surface_weather.build
+    dependencies:
+    - hrrr_source_inventory
+    - meteorological_spatial_support
+    grain: one row per H3 cell and local date
+    feature_count: 21
+    variable_kind_counts:
+      feature_variable: 12
+      metadata: 9
+    features:
+      EXPECTED_SAMPLE_COUNT:
+        common_name: Expected Sample Count
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: EXPECTED_SAMPLE_COUNT
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: unitless
+        arrow_type: int16
+        role: coverage
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: EXPECTED_SAMPLE_COUNT
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      FIRST_VALID_TIME_UTC:
+        common_name: First Valid Time Utc
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: FIRST_VALID_TIME_UTC
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: UTC timestamp
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: FIRST_VALID_TIME_UTC
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      LAST_VALID_TIME_UTC:
+        common_name: Last Valid Time Utc
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: LAST_VALID_TIME_UTC
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: UTC timestamp
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: LAST_VALID_TIME_UTC
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      LATEST_AVAILABLE_AT_UTC:
+        common_name: Latest Available At Utc
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: LATEST_AVAILABLE_AT_UTC
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: UTC timestamp
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: LATEST_AVAILABLE_AT_UTC
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN:
+        common_name: Mean Sea Level Pressure Hpa Mean
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: hectopascals
+        arrow_type: double
+        role: physical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      MEAN_SEA_LEVEL_PRESSURE_HPA_MIN:
+        common_name: Mean Sea Level Pressure Hpa Min
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: MEAN_SEA_LEVEL_PRESSURE_HPA_MIN
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: hectopascals
+        arrow_type: double
+        role: physical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: MEAN_SEA_LEVEL_PRESSURE_HPA_MIN
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      PRECIP_MM_DAY_ESTIMATE:
+        common_name: Precip Mm Day Estimate
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: PRECIP_MM_DAY_ESTIMATE
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: millimetres
+        arrow_type: double
+        role: physical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: PRECIP_MM_DAY_ESTIMATE
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      QC_STATE:
+        common_name: Qc State
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: QC_STATE
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: categorical
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: QC_STATE
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      RELATIVE_HUMIDITY_2M_PCT_MEAN:
+        common_name: Relative Humidity 2M Pct Mean
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: RELATIVE_HUMIDITY_2M_PCT_MEAN
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: percent
+        arrow_type: double
+        role: physical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: RELATIVE_HUMIDITY_2M_PCT_MEAN
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      SAMPLE_COUNT:
+        common_name: Sample Count
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: SAMPLE_COUNT
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: unitless
+        arrow_type: int16
+        role: coverage
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SAMPLE_COUNT
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      SAMPLE_COVERAGE_FRAC:
+        common_name: Sample Coverage Frac
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: SAMPLE_COVERAGE_FRAC
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: fraction [0,1]
+        arrow_type: double
+        role: coverage
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SAMPLE_COVERAGE_FRAC
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      SOURCE_GRID_DISTANCE_M_MAX:
+        common_name: Source Grid Distance M Max
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: SOURCE_GRID_DISTANCE_M_MAX
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: metres
+        arrow_type: double
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SOURCE_GRID_DISTANCE_M_MAX
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      SOURCE_GRID_DISTANCE_M_MEAN:
+        common_name: Source Grid Distance M Mean
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: SOURCE_GRID_DISTANCE_M_MEAN
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: metres
+        arrow_type: double
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SOURCE_GRID_DISTANCE_M_MEAN
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      TEMPERATURE_2M_C_MEAN:
+        common_name: Temperature 2M C Mean
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: TEMPERATURE_2M_C_MEAN
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: degrees Celsius
+        arrow_type: double
+        role: physical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: TEMPERATURE_2M_C_MEAN
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      TOTAL_CLOUD_COVER_PCT_MEAN:
+        common_name: Total Cloud Cover Pct Mean
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: TOTAL_CLOUD_COVER_PCT_MEAN
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: percent
+        arrow_type: double
+        role: physical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: TOTAL_CLOUD_COVER_PCT_MEAN
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      VISIBILITY_KM_MEAN:
+        common_name: Visibility Km Mean
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: VISIBILITY_KM_MEAN
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: kilometres
+        arrow_type: double
+        role: physical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: VISIBILITY_KM_MEAN
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      VISIBILITY_KM_MIN:
+        common_name: Visibility Km Min
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: VISIBILITY_KM_MIN
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: kilometres
+        arrow_type: double
+        role: physical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: VISIBILITY_KM_MIN
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      WIND_GUST_SURFACE_MS_MAX:
+        common_name: Wind Gust Surface Ms Max
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: WIND_GUST_SURFACE_MS_MAX
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: metres per second
+        arrow_type: double
+        role: physical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: WIND_GUST_SURFACE_MS_MAX
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      WIND_GUST_SURFACE_MS_MEAN:
+        common_name: Wind Gust Surface Ms Mean
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: WIND_GUST_SURFACE_MS_MEAN
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: metres per second
+        arrow_type: double
+        role: physical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: WIND_GUST_SURFACE_MS_MEAN
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      WIND_SPEED_10M_MS_MAX:
+        common_name: Wind Speed 10M Ms Max
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: WIND_SPEED_10M_MS_MAX
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: metres per second
+        arrow_type: double
+        role: physical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: WIND_SPEED_10M_MS_MAX
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      WIND_SPEED_10M_MS_MEAN:
+        common_name: Wind Speed 10M Ms Mean
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: WIND_SPEED_10M_MS_MEAN
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: metres per second
+        arrow_type: double
+        role: physical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: WIND_SPEED_10M_MS_MEAN
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+  daylight_daily:
+    common_name: Daily daylight and solar profile
+    metric_family: meteorological
+    metric_subfamily: daylight
+    category: daylight
+    collection:
+      paths:
+        4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DAILY_RES_4
+      index_columns:
+      - H3_INDEX
+      - DATE
+      partition_keys:
+      - YEAR
+      resolutions:
+      - 4
+      materialized:
+        4: false
+      materialization_state: pending_acquisition_or_build
+      schema_source: declared_producer_schema_pending_materialization
+    producer: meteorology.daylight.build
+    dependencies:
+    - meteorological_spatial_support
+    grain: one row per H3 cell and local date
+    feature_count: 17
+    variable_kind_counts:
+      feature_variable: 8
+      metadata: 9
+    features:
+      CENTROID_LAT:
+        common_name: Centroid Lat
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: CENTROID_LAT
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DAILY_RES_4
+        unit: decimal degrees
+        arrow_type: double
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: CENTROID_LAT
+        available_resolutions:
+        - 4
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      CENTROID_LON:
+        common_name: Centroid Lon
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: CENTROID_LON
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DAILY_RES_4
+        unit: decimal degrees
+        arrow_type: double
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: CENTROID_LON
+        available_resolutions:
+        - 4
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      DAY:
+        common_name: Day
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: DAY
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DAILY_RES_4
+        unit: unitless
+        arrow_type: int8
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: DAY
+        available_resolutions:
+        - 4
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      DAYLIGHT_FRACTION:
+        common_name: Daylight Fraction
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: DAYLIGHT_FRACTION
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DAILY_RES_4
+        unit: fraction [0,1]
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: DAYLIGHT_FRACTION
+        available_resolutions:
+        - 4
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      DAYLIGHT_HOURS:
+        common_name: Daylight Hours
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: DAYLIGHT_HOURS
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DAILY_RES_4
+        unit: hours
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: DAYLIGHT_HOURS
+        available_resolutions:
+        - 4
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      DAYLIGHT_WEIGHT:
+        common_name: Daylight Weight
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: DAYLIGHT_WEIGHT
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DAILY_RES_4
+        unit: unitless
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: DAYLIGHT_WEIGHT
+        available_resolutions:
+        - 4
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      DAYLIGHT_WEIGHT_CELL_NORM:
+        common_name: Daylight Weight Cell Norm
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: DAYLIGHT_WEIGHT_CELL_NORM
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DAILY_RES_4
+        unit: unitless
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: DAYLIGHT_WEIGHT_CELL_NORM
+        available_resolutions:
+        - 4
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      DAYLIGHT_WEIGHT_GLOBAL_NORM:
+        common_name: Daylight Weight Global Norm
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: DAYLIGHT_WEIGHT_GLOBAL_NORM
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DAILY_RES_4
+        unit: unitless
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: DAYLIGHT_WEIGHT_GLOBAL_NORM
+        available_resolutions:
+        - 4
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      DAY_OF_YEAR:
+        common_name: Day Of Year
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: DAY_OF_YEAR
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DAILY_RES_4
+        unit: unitless
+        arrow_type: int16
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: DAY_OF_YEAR
+        available_resolutions:
+        - 4
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      IS_LEAP_DAY:
+        common_name: Is Leap Day
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: IS_LEAP_DAY
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DAILY_RES_4
+        unit: unitless
+        arrow_type: bool
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: IS_LEAP_DAY
+        available_resolutions:
+        - 4
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      LOW_SUN_DAYLIGHT_HOURS:
+        common_name: Low Sun Daylight Hours
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: LOW_SUN_DAYLIGHT_HOURS
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DAILY_RES_4
+        unit: hours
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: LOW_SUN_DAYLIGHT_HOURS
+        available_resolutions:
+        - 4
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      MONTH:
+        common_name: Month
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: MONTH
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DAILY_RES_4
+        unit: unitless
+        arrow_type: int8
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: MONTH
+        available_resolutions:
+        - 4
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      MONTH_DAY:
+        common_name: Month Day
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: MONTH_DAY
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DAILY_RES_4
+        unit: unitless
+        arrow_type: string
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: MONTH_DAY
+        available_resolutions:
+        - 4
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      SOLAR_DAY_365:
+        common_name: Solar Day 365
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: SOLAR_DAY_365
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DAILY_RES_4
+        unit: unitless
+        arrow_type: int16
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SOLAR_DAY_365
+        available_resolutions:
+        - 4
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG:
+        common_name: Solar Elevation Daylight Mean Deg
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DAILY_RES_4
+        unit: degrees
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG
+        available_resolutions:
+        - 4
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      SOLAR_ELEVATION_MAX_DEG:
+        common_name: Solar Elevation Max Deg
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: SOLAR_ELEVATION_MAX_DEG
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DAILY_RES_4
+        unit: degrees
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: SOLAR_ELEVATION_MAX_DEG
+        available_resolutions:
+        - 4
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      YEAR:
+        common_name: Year
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: YEAR
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DAILY_RES_4
+        unit: unitless
+        arrow_type: int16
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: YEAR
+        available_resolutions:
+        - 4
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+  daylight_day_of_year:
+    common_name: Compact daylight day-of-year lookup
+    metric_family: meteorological
+    metric_subfamily: daylight
+    category: daylight
+    collection:
+      paths:
+        4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DOY_RES_4.parquet
+      index_columns:
+      - H3_INDEX
+      - DAY_OF_YEAR
+      partition_keys: []
+      resolutions:
+      - 4
+      materialized:
+        4: false
+      materialization_state: pending_acquisition_or_build
+      schema_source: declared_producer_schema_pending_materialization
+    producer: meteorology.daylight.build
+    dependencies:
+    - daylight_daily
+    grain: one row per H3 cell and day of year
+    feature_count: 2
+    variable_kind_counts:
+      feature_variable: 1
+      metadata: 1
+    features:
+      DAY_OF_YEAR:
+        common_name: Day Of Year
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: DAY_OF_YEAR
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DOY_RES_4.parquet
+        unit: unitless
+        arrow_type: int16
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: DAY_OF_YEAR
+        available_resolutions:
+        - 4
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      WEIGHT_DAYLIGHT:
+        common_name: Weight Daylight
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: WEIGHT_DAYLIGHT
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DOY_RES_4.parquet
+        unit: unitless
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: WEIGHT_DAYLIGHT
+        available_resolutions:
+        - 4
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+  lunar_daily:
+    common_name: Daily lunar phase and moonlight exposure
+    metric_family: meteorological
+    metric_subfamily: lunar
+    category: lunar
+    collection:
+      paths:
+        5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+      index_columns:
+      - H3_INDEX
+      - DATE
+      partition_keys:
+      - YEAR
+      resolutions:
+      - 5
+      materialized:
+        5: false
+      materialization_state: pending_acquisition_or_build
+      schema_source: declared_producer_schema_pending_materialization
+    producer: meteorology.lunar.build
+    dependencies:
+    - meteorological_spatial_support
+    grain: one row per H3 cell and local date
+    feature_count: 20
+    variable_kind_counts:
+      feature_variable: 12
+      metadata: 8
+    features:
+      CENTROID_LAT:
+        common_name: Centroid Lat
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: CENTROID_LAT
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: decimal degrees
+        arrow_type: double
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: CENTROID_LAT
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      CENTROID_LON:
+        common_name: Centroid Lon
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: CENTROID_LON
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: decimal degrees
+        arrow_type: double
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: CENTROID_LON
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      DAY:
+        common_name: Day
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: DAY
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: unitless
+        arrow_type: int8
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: DAY
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      DAY_OF_YEAR:
+        common_name: Day Of Year
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: DAY_OF_YEAR
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: unitless
+        arrow_type: int16
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: DAY_OF_YEAR
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      IS_LEAP_DAY:
+        common_name: Is Leap Day
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: IS_LEAP_DAY
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: unitless
+        arrow_type: bool
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: IS_LEAP_DAY
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      LUNAR_AGE_DAYS:
+        common_name: Lunar Age Days
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: LUNAR_AGE_DAYS
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: days
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: LUNAR_AGE_DAYS
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      LUNAR_ILLUMINATION_FRACTION:
+        common_name: Lunar Illumination Fraction
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: LUNAR_ILLUMINATION_FRACTION
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: fraction [0,1]
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: LUNAR_ILLUMINATION_FRACTION
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      LUNAR_PHASE_ANGLE_DEG:
+        common_name: Lunar Phase Angle Deg
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: LUNAR_PHASE_ANGLE_DEG
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: degrees
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: LUNAR_PHASE_ANGLE_DEG
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      MONTH:
+        common_name: Month
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: MONTH
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: unitless
+        arrow_type: int8
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: MONTH
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      MONTH_DAY:
+        common_name: Month Day
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: MONTH_DAY
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: unitless
+        arrow_type: string
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: MONTH_DAY
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      MOONLIT_DARK_FRACTION:
+        common_name: Moonlit Dark Fraction
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: MOONLIT_DARK_FRACTION
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: fraction [0,1]
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: MOONLIT_DARK_FRACTION
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      MOONLIT_DARK_HOURS:
+        common_name: Moonlit Dark Hours
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: MOONLIT_DARK_HOURS
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: hours
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: MOONLIT_DARK_HOURS
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      MOON_PHASE_NAME:
+        common_name: Moon Phase Name
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: MOON_PHASE_NAME
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: categorical
+        arrow_type: string
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: MOON_PHASE_NAME
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      MOON_VISIBLE_DARK_FRACTION:
+        common_name: Moon Visible Dark Fraction
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: MOON_VISIBLE_DARK_FRACTION
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: fraction [0,1]
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: MOON_VISIBLE_DARK_FRACTION
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      MOON_VISIBLE_DARK_HOURS:
+        common_name: Moon Visible Dark Hours
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: MOON_VISIBLE_DARK_HOURS
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: hours
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: MOON_VISIBLE_DARK_HOURS
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      MOON_VISIBLE_HOURS:
+        common_name: Moon Visible Hours
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: MOON_VISIBLE_HOURS
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: hours
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: MOON_VISIBLE_HOURS
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      NIGHT_HOURS:
+        common_name: Night Hours
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: NIGHT_HOURS
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: hours
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: NIGHT_HOURS
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      WEIGHT_LUNAR_ILLUMINATION:
+        common_name: Weight Lunar Illumination
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: WEIGHT_LUNAR_ILLUMINATION
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: unitless
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: WEIGHT_LUNAR_ILLUMINATION
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      WEIGHT_MOONLIT_DARK_HOURS:
+        common_name: Weight Moonlit Dark Hours
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: WEIGHT_MOONLIT_DARK_HOURS
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: hours
+        arrow_type: double
+        role: astronomical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: WEIGHT_MOONLIT_DARK_HOURS
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      YEAR:
+        common_name: Year
+        metric_family: meteorological
+        metric_subfamily: lunar
+        column: YEAR
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+        unit: unitless
+        arrow_type: int16
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: YEAR
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+  hrrr_nearest_grid_crosswalk:
+    common_name: H3 to HRRR nearest-grid crosswalk
+    metric_family: meteorological
+    metric_subfamily: spatial_support
+    category: spatial_support
+    collection:
+      paths:
+        5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_HRRR_NEAREST_GRID_RES_5
+      index_columns:
+      - H3_INDEX
+      - SOURCE_GRID_HASH
+      partition_keys:
+      - SOURCE_GRID_HASH
+      resolutions:
+      - 5
+      materialized:
+        5: false
+      materialization_state: pending_acquisition_or_build
+      schema_source: declared_producer_schema_pending_materialization
+    producer: meteorology.surface_weather.build
+    dependencies:
+    - meteorological_spatial_support
+    grain: one row per H3 cell and HRRR source-grid hash
+    feature_count: 3
+    variable_kind_counts:
+      feature_variable: 0
+      metadata: 3
+    features:
+      SOURCE_GRID_DISTANCE_M:
+        common_name: Source Grid Distance M
+        metric_family: meteorological
+        metric_subfamily: spatial_support
+        column: SOURCE_GRID_DISTANCE_M
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_HRRR_NEAREST_GRID_RES_5
+        unit: metres
+        arrow_type: double
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SOURCE_GRID_DISTANCE_M
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      SOURCE_GRID_HASH:
+        common_name: Source Grid Hash
+        metric_family: meteorological
+        metric_subfamily: spatial_support
+        column: SOURCE_GRID_HASH
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_HRRR_NEAREST_GRID_RES_5
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SOURCE_GRID_HASH
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      SOURCE_GRID_INDEX:
+        common_name: Source Grid Index
+        metric_family: meteorological
+        metric_subfamily: spatial_support
+        column: SOURCE_GRID_INDEX
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_HRRR_NEAREST_GRID_RES_5
+        unit: unitless index
+        arrow_type: int32
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SOURCE_GRID_INDEX
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+  hrrr_source_inventory:
+    common_name: HRRR acquisition inventory
+    metric_family: meteorological
+    metric_subfamily: source_inventory
+    category: source_inventory
+    collection:
+      paths:
+        5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+      index_columns:
+      - VALID_TIME_UTC
+      partition_keys: []
+      resolutions:
+      - 5
+      materialized:
+        5: false
+      materialization_state: pending_acquisition_or_build
+      schema_source: declared_producer_schema_pending_materialization
+    producer: meteorology.surface_weather.download
+    dependencies: []
+    grain: one row per expected HRRR valid time
+    feature_count: 21
+    variable_kind_counts:
+      feature_variable: 0
+      metadata: 21
+    features:
+      AVAILABLE_AT_UTC:
+        common_name: Available At Utc
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: AVAILABLE_AT_UTC
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: UTC timestamp
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: AVAILABLE_AT_UTC
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      CHECKSUM:
+        common_name: Checksum
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: CHECKSUM
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: CHECKSUM
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      CROSSWALK_CHECKSUM:
+        common_name: Crosswalk Checksum
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: CROSSWALK_CHECKSUM
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: CROSSWALK_CHECKSUM
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      CROSSWALK_RELATIVE_PATH:
+        common_name: Crosswalk Relative Path
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: CROSSWALK_RELATIVE_PATH
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: CROSSWALK_RELATIVE_PATH
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      FAILURE_REASON:
+        common_name: Failure Reason
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: FAILURE_REASON
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: categorical
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: FAILURE_REASON
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      H3_CELL_COUNT:
+        common_name: H3 Cell Count
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: H3_CELL_COUNT
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: int32
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: H3_CELL_COUNT
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      H3_RESOLUTION:
+        common_name: H3 Resolution
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: H3_RESOLUTION
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: int8
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: H3_RESOLUTION
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      INIT_TIME_UTC:
+        common_name: Init Time Utc
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: INIT_TIME_UTC
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: UTC timestamp
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: INIT_TIME_UTC
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      LOCAL_DATE:
+        common_name: Local Date
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: LOCAL_DATE
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: LOCAL_DATE
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      PRECIP_FORECAST_HOUR:
+        common_name: Precip Forecast Hour
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: PRECIP_FORECAST_HOUR
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: int16
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: PRECIP_FORECAST_HOUR
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      PRECIP_INIT_TIME_UTC:
+        common_name: Precip Init Time Utc
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: PRECIP_INIT_TIME_UTC
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: UTC timestamp
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: PRECIP_INIT_TIME_UTC
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      PRECIP_SOURCE_URI:
+        common_name: Precip Source Uri
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: PRECIP_SOURCE_URI
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: PRECIP_SOURCE_URI
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      PRECISION_QC_STATE:
+        common_name: Precision Qc State
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: PRECISION_QC_STATE
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: categorical
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: PRECISION_QC_STATE
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      RELATIVE_PATH:
+        common_name: Relative Path
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: RELATIVE_PATH
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: RELATIVE_PATH
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      SOURCE_BACKEND:
+        common_name: Source Backend
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: SOURCE_BACKEND
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SOURCE_BACKEND
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      SOURCE_FORMAT:
+        common_name: Source Format
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: SOURCE_FORMAT
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SOURCE_FORMAT
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      SOURCE_GRID_HASH:
+        common_name: Source Grid Hash
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: SOURCE_GRID_HASH
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SOURCE_GRID_HASH
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      SOURCE_URI:
+        common_name: Source Uri
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: SOURCE_URI
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SOURCE_URI
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      STATUS:
+        common_name: Status
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: STATUS
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: STATUS
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      VALID_TIME_UTC:
+        common_name: Valid Time Utc
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: VALID_TIME_UTC
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: UTC timestamp
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: VALID_TIME_UTC
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      VARIABLE_COUNT:
+        common_name: Variable Count
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: VARIABLE_COUNT
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: int16
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: VARIABLE_COUNT
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+feature_entry_count: 88
+supporting_products: {}
+superseded_products: {}
+catalog_contract:
+  collection_lookup: Collection paths identify Parquet products; column identifies the field.
+  common_name_lookup: Use products.<product>.features.<column>.common_name.
+  metric_family_vocabulary:
+  - meteorological
+  roles:
+    physical_metric: Measured or physically derived atmospheric metric.
+    astronomical_metric: Deterministic solar or lunar metric.
+    storm_metric: Operational storm metric, not an authoritative classification.
+    categorical_metric: Substantive categorical environmental value.
+    provenance_or_qc: Source lineage, availability, support, or QC metadata.
+    bookkeeping: Calendar, coordinate, distance, or deterministic bookkeeping metadata.
+  metric_subfamily_vocabulary:
+  - daylight
+  - lunar
+  - source_inventory
+  - spatial_support
+  - surface_weather
+  variable_kinds:
+    feature_variable: Substantive physical or astronomical metric.
+    metadata: Coverage, provenance, QC, support, identity or bookkeeping.
+  scope: Every non-key column in the canonical materialized meteorological products listed below; all
+    meteorological partitions must share one Arrow schema.
+  metric_taxonomy: metric_family identifies the environment family; metric_subfamily groups mechanisms
+    within meteorological products.
+  excluded_key_columns:
+  - DATE
+  - H3_INDEX
+  - H3_RESOLUTION
+  materialization_policy: Materialized meteorological products are generated from and checked across every
+    Parquet partition. Products awaiting acquisition/build remain cataloged from the fixed producer schema
+    and are explicitly marked pending; release requires an empty pending list.
+schema_version: 4
+catalog_id: environment
+product_count: 7
+unique_column_count: 75
+family_counts:
+  meteorological: 7
+generated_from_materialized_schemas: false
+pending_materialization_products:
+- daylight_daily
+- daylight_day_of_year
+- hrrr_nearest_grid_crosswalk
+- hrrr_source_inventory
+- lunar_daily
+- meteorological_spatial_support
+- surface_weather_daily

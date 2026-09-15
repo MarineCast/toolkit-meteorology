@@ -1,0 +1,373 @@
+{
+  "source_repository": "OrcaCast",
+  "source_revision": "577d19f7a9b742340e8a694b03354a04ec85b93b",
+  "files": [
+    {
+      "source": "src/orcacast/domains/environment/meteorological/DATA_SOURCES.md",
+      "destination": "src/meteorology/DATA_SOURCES.md",
+      "source_sha256": "2eb250531e9577010699b4e69963538b9baa5f3a626e7fa6d1bec8d56bfb6d61",
+      "destination_sha256": "9e2bc3d1ac1bec8a15243acddeebb450e5e690f1ea70411332565137e5d89412"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/README.md",
+      "destination": "docs/CONTRACTS.md",
+      "source_sha256": "89cb857370e2066c05ff4fd901103f18231c5ba9878973de03830dc07a746f5c",
+      "destination_sha256": "8ae52dc7c8c6ea571d0182742cf76b54bdb9321c1e9c4ddd1ea0fc35ca4f50c8"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/TODO.txt",
+      "destination": "src/meteorology/TODO.txt",
+      "source_sha256": "fb8e7ab1c755b69aebb996a7b96ebc40e64ec6a60aa7441bf2667dfadc3d6af2",
+      "destination_sha256": "fb8e7ab1c755b69aebb996a7b96ebc40e64ec6a60aa7441bf2667dfadc3d6af2"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/__init__.py",
+      "destination": "src/meteorology/__init__.py",
+      "source_sha256": "83a991a0e4802ed56ded043d1ee49e69fb1e947eab32ba9c4aa0ae1deb6b8fa9",
+      "destination_sha256": "45039dde5cfc2852ea3b9cec11c5179d9f303c19208237c25730ac09284d820d"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/artifacts.py",
+      "destination": "src/meteorology/artifacts.py",
+      "source_sha256": "e64c1a09ad9ea6a84d6744c5ef54bde73295913564a122317ae48f8f8449ccbf",
+      "destination_sha256": "1f0c371be02dcef209d827e1f52b9a554735f5c388e24ac627481b7f91ce7497"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/astronomy.py",
+      "destination": "src/meteorology/astronomy.py",
+      "source_sha256": "fd82b8fa5040ddd3d7915792190e7691f849bc11277eeb374a65f5cc847acc9b",
+      "destination_sha256": "fd82b8fa5040ddd3d7915792190e7691f849bc11277eeb374a65f5cc847acc9b"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/config.py",
+      "destination": "src/meteorology/config.py",
+      "source_sha256": "8e5f382733f630fa5d2b13bf90f3facac4ab1ae9792d05fbc328f41b2116a3eb",
+      "destination_sha256": "8c75e24a83fe5070db5f0390f79ed18689fd48a6d7a88b2af09a6484659bf5e4"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/daylight/__init__.py",
+      "destination": "src/meteorology/daylight/__init__.py",
+      "source_sha256": "db694d0c21ea5612b8360a603bc6a8140d2a229daa59ede362a1f02aa338c72a",
+      "destination_sha256": "db694d0c21ea5612b8360a603bc6a8140d2a229daa59ede362a1f02aa338c72a"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/daylight/build.py",
+      "destination": "src/meteorology/daylight/build.py",
+      "source_sha256": "f1626a0bf2e43d83a1ea2f2d4aed65ee37db5d9b60cae557c73295d57d3208aa",
+      "destination_sha256": "82636995b906e0172156c2c5655b72aaff035da8f043349a3ff1370cd1ab44d8"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/daylight/compute.py",
+      "destination": "src/meteorology/daylight/compute.py",
+      "source_sha256": "06fe51adb9050c78f844d72c49391bdb9b0c5cb4ab6ca28846361e3c0c6068e1",
+      "destination_sha256": "06fe51adb9050c78f844d72c49391bdb9b0c5cb4ab6ca28846361e3c0c6068e1"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/daylight/features.py",
+      "destination": "src/meteorology/daylight/features.py",
+      "source_sha256": "3bf6a6fdeb1f393ffa3b9d424554940a4896cc33b89bd86dc284f3d69ab132fa",
+      "destination_sha256": "3bf6a6fdeb1f393ffa3b9d424554940a4896cc33b89bd86dc284f3d69ab132fa"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/daylight/inspect.py",
+      "destination": "src/meteorology/daylight/inspect.py",
+      "source_sha256": "35d547875c96fd2ef2167ec17da431779babcc59430d8cdcfc7de7bd2e88b00b",
+      "destination_sha256": "868c7e4c61c69b85c847e7143a426ed1806c09eab72b6ffa926aa5c586757e44"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/daylight/validation.py",
+      "destination": "src/meteorology/daylight/validation.py",
+      "source_sha256": "489f57c3a97226fc1f53da9c20224248163ef2b2638ce68c4fdde7c4b71771df",
+      "destination_sha256": "489f57c3a97226fc1f53da9c20224248163ef2b2638ce68c4fdde7c4b71771df"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/inspection.py",
+      "destination": "src/meteorology/inspection.py",
+      "source_sha256": "5e7ccd88979627529975c67511f18761eae73204a3767e351ab457a24dc42abb",
+      "destination_sha256": "d79e0d72f18123e50b9743cda8db534a54a1faa4a1378fd752ad49c32ba43927"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/lunar/__init__.py",
+      "destination": "src/meteorology/lunar/__init__.py",
+      "source_sha256": "62627f9ffe494a764b4864b0772204cde5018d45be151ce029d21a054ff3014d",
+      "destination_sha256": "62627f9ffe494a764b4864b0772204cde5018d45be151ce029d21a054ff3014d"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/lunar/build.py",
+      "destination": "src/meteorology/lunar/build.py",
+      "source_sha256": "07dd3061cadf8ecb6538cdb81f92fbe5a135d3f779f5dc7db646acd117d22af5",
+      "destination_sha256": "b42ea30bfb2b75be09c85ff3e3f7a5a6c1d93daf3016d8a3acb861bf61952923"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/lunar/compute.py",
+      "destination": "src/meteorology/lunar/compute.py",
+      "source_sha256": "776507df01141f55209455db86de5a41274f382aa5129920d2e0d474fa918c6a",
+      "destination_sha256": "776507df01141f55209455db86de5a41274f382aa5129920d2e0d474fa918c6a"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/lunar/inspect.py",
+      "destination": "src/meteorology/lunar/inspect.py",
+      "source_sha256": "7baea912434bc17d22ca5a456ade197579654212cb6b5a879b9431ffcdca62f0",
+      "destination_sha256": "6824cea7c2aa5e22af38a45e2c243f404555e89e4f29eb6c9b58d6462bbd92ca"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/lunar/validation.py",
+      "destination": "src/meteorology/lunar/validation.py",
+      "source_sha256": "35e25a8db45b4d6560f474019e06ed55dac14441d9bb19386036dc628bb9040f",
+      "destination_sha256": "35e25a8db45b4d6560f474019e06ed55dac14441d9bb19386036dc628bb9040f"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/migration.py",
+      "destination": "src/meteorology/migration.py",
+      "source_sha256": "3e317dd4fa09e6bee683612eea43814eccd4efc8bc4b754c3a2e9982e9d0afc9",
+      "destination_sha256": "d3f00545f976e348eda12a128546cc884b18cf7c685ab34da3294257c0a9e1ec"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/model_feature_policy.yaml",
+      "destination": "config/model_feature_policy.yaml",
+      "source_sha256": "b5b460d797f20708bf65996a21853a9484e376aabbbdc8e75f962278e51567f6",
+      "destination_sha256": "72351332e8a4146b22c9f3ecf8afcbbf4906734fe549cd8321badb36b3e1ea5f"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/modeling/__init__.py",
+      "destination": "src/meteorology/modeling/__init__.py",
+      "source_sha256": "c6855f6ca964faeb5c589ea21d48c219416d815bed7c490e8d3fa973e4702258",
+      "destination_sha256": "c6855f6ca964faeb5c589ea21d48c219416d815bed7c490e8d3fa973e4702258"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/modeling/feature_policy.py",
+      "destination": "src/meteorology/modeling/feature_policy.py",
+      "source_sha256": "53abb512408ddd37b6ae7dd175400dd908c17f17a344e9b75a48b6b79a6e67ec",
+      "destination_sha256": "a6f433b103e982ed3e7de84550c66a28cdce33cab9b399addd930bbedfd3a8a6"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/spatial_support/__init__.py",
+      "destination": "src/meteorology/spatial_support/__init__.py",
+      "source_sha256": "49a4a5a8bd62476d56e278effcd412d7b5b8a4b944d35fbf843f36122fa4538c",
+      "destination_sha256": "49a4a5a8bd62476d56e278effcd412d7b5b8a4b944d35fbf843f36122fa4538c"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/spatial_support/build.py",
+      "destination": "src/meteorology/spatial_support/build.py",
+      "source_sha256": "6e3a34c2ab9d861b009fa716dc18a81c939b69c34353a74a0ce8b5cbd1121b7f",
+      "destination_sha256": "41fc077d2954453f9ee41e1695bc1e64de003f66f0094fc52f075a23e50ae513"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/spatial_support/inspect.py",
+      "destination": "src/meteorology/spatial_support/inspect.py",
+      "source_sha256": "23c625edac0c764fe74f8b033e8961b5cf0a748e79fd762b46eb4f87ec62840d",
+      "destination_sha256": "77c3ff50c5b31235c6e28bf9bca42e2e590834520084c3ede8c2b38ac52134bc"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/surface_weather/__init__.py",
+      "destination": "src/meteorology/surface_weather/__init__.py",
+      "source_sha256": "34ffc512e25f32a5f5c957103d3f6d002fd3381d4568fce7514370d8dc7e9e70",
+      "destination_sha256": "34ffc512e25f32a5f5c957103d3f6d002fd3381d4568fce7514370d8dc7e9e70"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/surface_weather/build.py",
+      "destination": "src/meteorology/surface_weather/build.py",
+      "source_sha256": "45b649f7c1f975cc6ee05e93e92058c6834d60df731dca7e03cc5dde7f5dadb6",
+      "destination_sha256": "c0e86549c4ef6ddae5daeb56906b952c055657771c8895ff47ad6914f458c92c"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/surface_weather/download.py",
+      "destination": "src/meteorology/surface_weather/download.py",
+      "source_sha256": "280c71a7254d55cdf6e55622eef425d3124091000625434466fbeaaf46adbf97",
+      "destination_sha256": "a6030e260614760a3e42a04756296b498d025c97680a39c4ef85c020c5bcbb3e"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/surface_weather/inspect.py",
+      "destination": "src/meteorology/surface_weather/inspect.py",
+      "source_sha256": "19f23815decf218b52c9e57f7fa4dd344a7e1d6d10764e2b2a4bb080a32ff6ba",
+      "destination_sha256": "d09e6c6fba57bb6de03dacaf2248dd63b140440415e45442a77deecb4b7e45ce"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/surface_weather/sampling.py",
+      "destination": "src/meteorology/surface_weather/sampling.py",
+      "source_sha256": "e867896643120f2f8a1905ee93c6d4d16a533e979e2903f93290eda400cd4b1f",
+      "destination_sha256": "99794e0b9f82c2e38ebc02fa3d4f2744bc81da0b6674b5cb23091f3e9be4ae11"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/surface_weather/source.py",
+      "destination": "src/meteorology/surface_weather/source.py",
+      "source_sha256": "90380588f49a76c71a03b244a80e2f0304dd95cbf3f5286d980e2efc530e27b9",
+      "destination_sha256": "5cf7d98f65e94e9d6e2912415f94a81c747e200e382abada6b089a7d2572af53"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/surface_weather/source_validation.py",
+      "destination": "src/meteorology/surface_weather/source_validation.py",
+      "source_sha256": "d1aff108a667b355d3e1909fecc9f66ac5ad98f349460756ad0839a766d859c6",
+      "destination_sha256": "d1aff108a667b355d3e1909fecc9f66ac5ad98f349460756ad0839a766d859c6"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/surface_weather/time_series_map.py",
+      "destination": "src/meteorology/surface_weather/time_series_map.py",
+      "source_sha256": "05df12a6508dc86cec33a1ce41eba41b146a127bf3203e8dc4eed94f855c9fff",
+      "destination_sha256": "65a1a215d26452971959d536d68e2d303f37bcbf1793131e1fe36dbf797ba20b"
+    },
+    {
+      "source": "src/orcacast/domains/environment/meteorological/surface_weather/verify.py",
+      "destination": "src/meteorology/surface_weather/verify.py",
+      "source_sha256": "56ff1b874924bf5bb2803187facd8ce1c0bda0b965555131e6e06745794ad7ef",
+      "destination_sha256": "82571190f3f5811b92cb4fa4e88486f9052ecffee07127d468f0116443d02771"
+    },
+    {
+      "source": "config/common.yaml",
+      "destination": "config/common.yaml",
+      "source_sha256": "1b36892849b329f1b58961ab25d0cda6d615e9f01c9411a0e92c2bb9b023f352",
+      "destination_sha256": "1b36892849b329f1b58961ab25d0cda6d615e9f01c9411a0e92c2bb9b023f352"
+    },
+    {
+      "source": "config/data/environment_meteorological.yaml",
+      "destination": "config/data/environment_meteorological.yaml",
+      "source_sha256": "246a04a7ecbde6480ce2c9fc92afd87ea438f755f4ed32d7dd77115cd7fdc1c3",
+      "destination_sha256": "246a04a7ecbde6480ce2c9fc92afd87ea438f755f4ed32d7dd77115cd7fdc1c3"
+    },
+    {
+      "source": "config/data/presentation_settings.yaml",
+      "destination": "config/data/presentation_settings.yaml",
+      "source_sha256": "04ddaeb6342ff317f82d2c3bfb6bb97ffec01d733d1f150a826b239773b3a50c",
+      "destination_sha256": "04ddaeb6342ff317f82d2c3bfb6bb97ffec01d733d1f150a826b239773b3a50c"
+    },
+    {
+      "source": "src/orcacast/domains/environment/feature_catalog.yaml",
+      "destination": "config/feature_catalog.yaml",
+      "source_sha256": "443f5be53166297aa9ad9d9724b79dd468aa98a5b1d537655058f8be92885df3",
+      "destination_sha256": "c78658c32fe899d7e27d0dcdcc0ba3fe08ea740e1c4cc51a0fa1ca8299ddf2a8"
+    },
+    {
+      "source": "src/orcacast/core/config/document.py",
+      "destination": "src/meteorology/core/config/document.py",
+      "source_sha256": "bc4973072f5473d54b596928895cc248fac26a0d15e19250a6689ae2c3e73726",
+      "destination_sha256": "bc4973072f5473d54b596928895cc248fac26a0d15e19250a6689ae2c3e73726"
+    },
+    {
+      "source": "src/orcacast/core/config/paths.py",
+      "destination": "src/meteorology/core/config/paths.py",
+      "source_sha256": "e13801efea5baaa399498c138e2eba449a5a23447182cccf716b622d58f13f54",
+      "destination_sha256": "a0ac8684de7e14a0bfed0cc04b998eeee2071a2066cacff57ef891e4ad58bea0"
+    },
+    {
+      "source": "src/orcacast/core/config/data.py",
+      "destination": "src/meteorology/core/config/data.py",
+      "source_sha256": "11b21d98ef952d0fda4450eca4bee5bf0fd10e2d98a9fcfe68bfe74543610af0",
+      "destination_sha256": "0cde4412ba5efb095ea4626c48acf166f4e4161c2a54905b87a9594aa0d50f71"
+    },
+    {
+      "source": "src/orcacast/core/config/common_areas.py",
+      "destination": "src/meteorology/core/config/common_areas.py",
+      "source_sha256": "3814045f05a32ee79a30c5f7b7f746c60173e72c9c42f43f87aa4a5113229bb0",
+      "destination_sha256": "cc5a08d3fae186293d108b6ba5c68778cc0be777a0d7869e62e1ba0abe5c681b"
+    },
+    {
+      "source": "src/orcacast/core/config/presentation.py",
+      "destination": "src/meteorology/core/config/presentation.py",
+      "source_sha256": "2b9470fd6e6351bc3ce89b9e7eebcac84bce78cd684a4c321579ea469b48f6dc",
+      "destination_sha256": "a9d7dd36b5997033401e7639a6f961fa289b40d9cc6215031c370813b3318163"
+    },
+    {
+      "source": "src/orcacast/core/artifacts/checksums.py",
+      "destination": "src/meteorology/core/artifacts/checksums.py",
+      "source_sha256": "07323b1a86dd54af727ffd914dd6420347ad4fa8663b35e505ceef1bae5d2935",
+      "destination_sha256": "07323b1a86dd54af727ffd914dd6420347ad4fa8663b35e505ceef1bae5d2935"
+    },
+    {
+      "source": "src/orcacast/core/artifacts/contracts.py",
+      "destination": "src/meteorology/core/artifacts/contracts.py",
+      "source_sha256": "85e0044f966d9504ef00f041459ffccc6179643972c1c2bb33f2030b5e1c6155",
+      "destination_sha256": "85e0044f966d9504ef00f041459ffccc6179643972c1c2bb33f2030b5e1c6155"
+    },
+    {
+      "source": "src/orcacast/core/artifacts/publication.py",
+      "destination": "src/meteorology/core/artifacts/publication.py",
+      "source_sha256": "8ed326d360cf1d1d4bcffc174effe806290ed2707a8aa393e92bae068e05103d",
+      "destination_sha256": "8ed326d360cf1d1d4bcffc174effe806290ed2707a8aa393e92bae068e05103d"
+    },
+    {
+      "source": "src/orcacast/core/geo/h3.py",
+      "destination": "src/meteorology/core/geo/h3.py",
+      "source_sha256": "8accef3d9db2f9482e0745902130408b029e947f7ad940cdda01c14be4a113c4",
+      "destination_sha256": "8accef3d9db2f9482e0745902130408b029e947f7ad940cdda01c14be4a113c4"
+    },
+    {
+      "source": "src/orcacast/core/data/contracts.py",
+      "destination": "src/meteorology/core/data/contracts.py",
+      "source_sha256": "07431c650031fec609efc29a2b78779ab5b3aba9c0d74a8e3af455059c735415",
+      "destination_sha256": "851ba82e83b48042d7ae0c62f027b7f366e54b2c5ead2e825f34e1a0ef22bbb1"
+    },
+    {
+      "source": "src/orcacast/core/data/registry.py",
+      "destination": "src/meteorology/core/data/registry.py",
+      "source_sha256": "afef0fa7c30d587e39bdacd7d613d7bf81f500ebca049df25c15451ecb824fc7",
+      "destination_sha256": "afef0fa7c30d587e39bdacd7d613d7bf81f500ebca049df25c15451ecb824fc7"
+    },
+    {
+      "source": "src/orcacast/core/data/meteorological_schemas.py",
+      "destination": "src/meteorology/core/data/meteorological_schemas.py",
+      "source_sha256": "7cddfb309566e16aab818f06a3999b71e0c387d45933458e69ebc05c3c095c18",
+      "destination_sha256": "7cddfb309566e16aab818f06a3999b71e0c387d45933458e69ebc05c3c095c18"
+    },
+    {
+      "source": "tests/domains/environment/meteorological/test_surface_weather_time_series_map.py",
+      "destination": "tests/test_surface_weather_time_series_map.py",
+      "source_sha256": "b3e504b8a78131456fa6dec2255c3f3dbe6d140f2016b1705ae406181e6f6f98",
+      "destination_sha256": "bab731ca5f66b13e48adc1c64da9a760e1a7f22364eddcb0fc68e30bb489fbd2"
+    },
+    {
+      "source": "tests/domains/environment/meteorological/test_source_and_catalog.py",
+      "destination": "tests/test_source_and_catalog.py",
+      "source_sha256": "6ebe0e22f81e6697961994046e34688a5f9a61dce8a0c253d101d066e821a2ae",
+      "destination_sha256": "fd3b3ebfad18c7bbbc7b5881bebdb52cdb020a2b789182978cdd05416d8e1dfa"
+    },
+    {
+      "source": "tests/domains/environment/meteorological/test_weather_aggregation_parity.py",
+      "destination": "tests/test_weather_aggregation_parity.py",
+      "source_sha256": "50baf6644d58eb13b54a303cf0cba256510206732c1c37e748e8bc74b7effae9",
+      "destination_sha256": "5655ef88ed56aaca425ba9fd1709300673b3336fe9b557222f7f321778689b52"
+    },
+    {
+      "source": "tests/domains/environment/meteorological/test_offline_weather_fixture.py",
+      "destination": "tests/test_offline_weather_fixture.py",
+      "source_sha256": "e392d69a13623c03857e50e97f6b5878ee42bea88c4612acd9b5fbd5fcf77c59",
+      "destination_sha256": "d4c7d6caded101cb5aae809c141b94a127527f69bf04bdb8d76f94094d3e58dd"
+    },
+    {
+      "source": "tests/domains/environment/meteorological/test_config_and_astronomy.py",
+      "destination": "tests/test_config_and_astronomy.py",
+      "source_sha256": "5fb657044b0b715eea1ce64df911df9e338d535e5b88e25e16bdfac130259008",
+      "destination_sha256": "3e5ea29a5df1212e44a8af9f2716a3c8233661850d2f382385c73e16fa3ebc32"
+    },
+    {
+      "source": "tests/domains/environment/meteorological/test_manifests.py",
+      "destination": "tests/test_manifests.py",
+      "source_sha256": "05aaa7d6b4d4d568686fd95a63967027ea30a671cb1e44107b9ee1c6b45a3630",
+      "destination_sha256": "50ca9924f8b9f3c96cc42eaa474e4f803bffdccac7a73cfb68cd3b7e8162ddaa"
+    },
+    {
+      "source": "tests/domains/environment/meteorological/test_meteorological_model_feature_policy.py",
+      "destination": "tests/test_meteorological_model_feature_policy.py",
+      "source_sha256": "de3ce16fef9e8d83bd2207a0eafe53e93494d69d2355f15f339486dc1caa408d",
+      "destination_sha256": "b8f8cb4672899f4d8094472bf36a7f996f503a6ae4f0fd14be07bab80c838719"
+    },
+    {
+      "source": "scripts/update_environment_feature_catalog.py",
+      "destination": "src/meteorology/maintenance/update_environment_feature_catalog.py",
+      "source_sha256": "bbb0c0b4e38f5560cc0d7a5151c8aa894c112dde732065e9facbbc254d5bc943",
+      "destination_sha256": "9ae31c0cc8c2b91ca435a949405eb77d29bf23b1a0667851d4362d4961d653d6"
+    },
+    {
+      "source": "scripts/benchmark_hrrr_r5_acquisition.py",
+      "destination": "src/meteorology/maintenance/benchmark_hrrr_r5_acquisition.py",
+      "source_sha256": "4e98b445456b0ed38fe3331fd7433afcfd7fca04cbad5959240e2236f1c94456",
+      "destination_sha256": "0135a0ca5ce25e3df664d43046145d2a5b4ca9df2af5f82266f7929475252246"
+    }
+  ],
+  "additional_extractions": [
+    {
+      "source": "src/orcacast/core/data/catalog.py",
+      "destination": "src/meteorology/core/data/catalog.py",
+      "scope": "10 meteorological registrations and generic register helper"
+    }
+  ]
+}

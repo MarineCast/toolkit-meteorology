@@ -4,8 +4,8 @@
 
 Historical and forecast meteorological data products.
 
-This is an initial repository as inspected on 2026-09-15. No package, executable pipeline, or test
-suite is established yet. Inspect the checkout before assuming this snapshot is still current.
+This repository contains the installable `meteorology` package extracted on 2026-09-15.
+Read README.md and docs/MIGRATION.md for execution, ownership and validation boundaries.
 Preserve unrelated changes and read deeper instructions before editing a subdirectory.
 
 ## Shared MarineCast context
@@ -45,6 +45,7 @@ Weather measurements are not sighting probabilities.
 ## Validation and completion
 
 For documentation-only work, inspect `git status --short` and the diff, verify references, and run
-`git diff --check` from this repository. There are currently no established package tests to run.
+`git diff --check` from this repository. Run `python -m pytest -q` after installing `.[test]`. Verify regular wheel installation
+from outside the checkout. Keep config/ and packaged configuration resources synchronized.
 When adding executable behavior, add appropriate checks and document their exact commands here.
 Report tests actually run, unverified source acquisition, and any unrun integration paths.

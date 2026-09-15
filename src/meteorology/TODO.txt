@@ -1,0 +1,39 @@
+Meteorological roadmap
+======================
+
+Completed internal remediation
+------------------------------
+
+- [x] Stream surface-weather builds by local date with bounded memory.
+- [x] Enforce support, acquisition, and product manifests plus input/output checksums.
+- [x] Add crash-recoverable product-family publication and dirty-source build identity.
+- [x] Add the offline `data build meteorological` workflow and separate network collection.
+- [x] Correct catalog roles/units, register partition keys and the HRRR R5 crosswalk, and add the
+      meteorological model-feature policy.
+- [x] Add source/limitation/QC inspector panels and migrate exploration notebooks to canonical
+      paths and uppercase schemas.
+- [x] Retire duplicate daylight publication/H3 infrastructure and consolidate astronomy helpers.
+- [x] Replace cropped-grid retention with direct R5 sampling and atomic, checksum-validated resume.
+
+Release-gated migration
+-----------------------
+
+- [x] Benchmark representative old, middle, and recent direct-HRRR dates and require the four-worker
+      R5 sampler to outperform the one-worker cropped-grid baseline.
+- [ ] Acquire the complete frozen direct-HRRR R5 range and require a complete canonical inventory.
+- [ ] Run the full historical build and old-versus-candidate shared-core comparison gates.
+- [ ] Rebuild affected model artifacts, then run matched model comparisons for every changed
+      feature hash.
+- [ ] Execute the recoverable legacy-artifact migration only after every replacement manifest,
+      inspector, consumer, and catalog check passes.
+
+Later candidates
+----------------
+
+- [ ] Evaluate whether higher-frequency HRRR sampling adds useful information without understating
+      availability or changing the retrospective analysis contract.
+- [ ] Characterize approximation error against an ephemeris library before considering a more
+      precise optional astronomy backend.
+
+Cloud cover is already present in the canonical HRRR contract. The former `FOX-PROXY` text was an
+obsolete typo, not a requested feature, and neither item remains an implementation task.

@@ -1,0 +1,59 @@
+schema_version: 3
+
+spatial_support:
+  bbox:
+    area: model_area
+  resolutions: [4, 5, 6]
+  output:
+    root_dir: data/processed/domain/environmental_layer/meteorological/spatial_support
+    manifest_path: data/processed/domain/environmental_layer/meteorological/spatial_support/MANIFEST.json
+
+surface_weather:
+  source:
+    model: hrrr
+    product: sfc
+    forecast_hour: 0
+    precipitation_forecast_hour: 1
+  sampling:
+    h3_resolution: 5
+    interval_hours: 4
+  time:
+    start_date: "2020-01-01"
+    end_date: latest_complete
+    timezone: America/Los_Angeles
+    availability_lag_hours: 6
+  bbox_padding_degrees: 0.2
+  raw:
+    root_dir: data/raw/environment/meteorological/surface_weather/hrrr
+    working_inventory_path: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_WORKING_INVENTORY.parquet
+    inventory_path: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+    manifest_path: data/raw/environment/meteorological/surface_weather/hrrr/R5_DOWNLOAD_MANIFEST.json
+  output:
+    daily_dir: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+    manifest_path: data/processed/domain/environmental_layer/meteorological/surface_weather/MANIFEST.json
+
+daylight:
+  h3_resolution: 4
+  start_date: "2020-01-01"
+  end_date: "2026-12-31"
+  timezone: America/Los_Angeles
+  timestep_minutes: 30
+  low_sun_max_degrees: 10.0
+  default_weight: fraction
+  output:
+    daily_dir: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DAILY_RES_4
+    day_of_year_path: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DOY_RES_4.parquet
+    manifest_path: data/processed/domain/environmental_layer/meteorological/daylight/MANIFEST.json
+
+lunar:
+  h3_resolution: 5
+  start_date: "2020-01-01"
+  end_date: "2026-12-31"
+  sample_hour_utc: 12
+  timezone: America/Los_Angeles
+  timestep_minutes: 30
+  dark_sun_altitude_deg: -6.0
+  moon_altitude_min_deg: 0.0
+  output:
+    daily_dir: data/processed/domain/environmental_layer/meteorological/lunar/H3_LUNAR_DAILY_RES_5
+    manifest_path: data/processed/domain/environmental_layer/meteorological/lunar/MANIFEST.json
