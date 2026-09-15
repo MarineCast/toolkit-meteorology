@@ -9,3 +9,6 @@ dist/
 /outputs/
 .staging/
 .DS_Store
+
+# Graphify generated code graph and local caches
+/graphify-out/
