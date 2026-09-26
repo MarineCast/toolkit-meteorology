@@ -83,3 +83,5 @@ it never changes scientific products and is not a universal recommendation for e
 Offline fixtures exercise strict acquisition identity, aggregation, missingness, failure recovery,
 manifest checksums, astronomy and HTML generation. Live acquisition, regional rebuilds, visual map
 QA, remote CI and OrcaCast model integration are separate checks. No source datasets are bundled.
+
+See [combined daily H3 export](docs/daily-matrix.md) for a single native-resolution product.

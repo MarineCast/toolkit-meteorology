@@ -90,3 +90,6 @@ prose semantically. Graphs/caches are disposable local-only files: never commit 
 Any future sharing requires an explicit policy covering destination, revision, freshness and review.
 Global skill defaults do not override repository scope or code-only extraction. Do not run
 `graphify codex install` over maintained instructions or enable hooks/merge drivers implicitly.
+
+Daily matrix behavior: `PYTHONPATH=src python -m pytest tests/test_daily_matrix.py -q`.
+Contract and CLI are documented in `docs/daily-matrix.md`.

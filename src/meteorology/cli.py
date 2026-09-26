@@ -55,6 +55,9 @@ def main(argv: list[str] | None = None) -> int:
     for action in ("verify", "catalog", "feature-policy", "benchmark", "migrate-legacy"):
         sub = commands.add_parser(action, add_help=False)
         sub.add_argument("arguments", nargs=argparse.REMAINDER)
+    matrix = commands.add_parser("export-daily-matrix", help="Combine native daily weather and astronomy.")
+    matrix.add_argument("--manifest", type=Path, action="append", required=True)
+    matrix.add_argument("--output", type=Path, required=True)
     args, extra = parser.parse_known_args(argv)
     if extra:
         # Forward --help and other flags for commands with no family argument.
@@ -67,6 +70,10 @@ def main(argv: list[str] | None = None) -> int:
         os.environ["METEOROLOGY_WORKSPACE"] = str(args.workspace.expanduser().resolve())
     try:
         from .core.config.paths import project_root
+        if args.command == "export-daily-matrix":
+            from .daily_matrix import export
+            print(export(args.manifest, args.output))
+            return 0
         if args.command == "init":
             created = initialize_workspace(project_root())
             print(f"Initialized {project_root()}: {len(created)} files created")

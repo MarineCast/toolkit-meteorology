@@ -96,3 +96,9 @@ explicit attention when generating metadata; it does not read the producer confi
 `meteorology benchmark` performs live acquisition comparisons. `meteorology migrate-legacy`
 defaults to planning; `--execute` moves legacy artifacts after replacement validation. Neither is a
 required setup step. The toolkit does not provide a whole-domain candidate release command.
+
+## Combined daily export
+
+After all three dated families are built over the same interval, use the
+[daily matrix exporter](daily-matrix.md). It preserves date and native resolution,
+checks complete manifest provenance, and produces a single H3/date × variable Parquet.
