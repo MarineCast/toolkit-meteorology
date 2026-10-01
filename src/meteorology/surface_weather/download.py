@@ -37,16 +37,19 @@ from ..artifacts import (
     write_table,
 )
 from ..config import DEFAULT_CONFIG_PATH, load_meteorological_config
+from ..field_contracts import FIELD_CONTRACT_VERSION, validate_fields
 from ..spatial_support.build import load_meteorological_support
 from .sampling import (
     AVAILABILITY_POLICY,
     CROSSWALK_SCHEMA,
     PRE_F01_SAMPLE_SCHEMA,
     SAMPLE_SCHEMA,
+    SPATIAL_ACCEPTANCE_POLICY,
     build_nearest_grid_crosswalk,
     make_sample_times_for_local_date,
     replace_sample_precipitation,
     sample_source_grid,
+    validate_crosswalk_distance,
 )
 from .source import (
     FORECAST_HOUR,
@@ -207,8 +210,11 @@ def _valid_sample(
         precip_init = valid - pd.Timedelta(hours=1)
         if set(frame["PRECIP_INIT_TIME_UTC"].astype(str)) != {precip_init.isoformat()}:
             return False
-    numeric = frame.select_dtypes(include=[np.number]).to_numpy(dtype=float)
-    return not frame.isna().any().any() and np.isfinite(numeric).all()
+    try:
+        validate_fields(frame, SAMPLE_SCHEMA, context="HRRR acquisition sample")
+    except ValueError:
+        return False
+    return True
 
 
 def _reusable_core_sample(
@@ -251,14 +257,11 @@ def _reusable_core_sample(
     ).isoformat()
     if set(frame["AVAILABLE_AT_UTC"].astype(str)) != {expected_available}:
         return None
-    core_numeric = [
-        column
-        for column in PRE_F01_SAMPLE_SCHEMA.names
-        if pa.types.is_floating(PRE_F01_SAMPLE_SCHEMA.field(column).type)
-        or pa.types.is_integer(PRE_F01_SAMPLE_SCHEMA.field(column).type)
-    ]
-    values = frame[core_numeric].to_numpy(dtype=float)
-    return frame if not frame.isna().any().any() and np.isfinite(values).all() else None
+    try:
+        validate_fields(frame, schema, context="Reusable HRRR core sample")
+    except ValueError:
+        return None
+    return frame
 
 
 def _atomic_table_write(frame: pd.DataFrame, destination: Path, schema: pa.Schema) -> None:
@@ -446,6 +449,7 @@ def _publish_complete_acquisition(
             run_id=run_id,
             config_path=config_path,
             resolved_config={
+                "field_contract_version": FIELD_CONTRACT_VERSION,
                 "start_date": start,
                 "end_date": end,
                 "timezone": weather.timezone,
@@ -453,6 +457,7 @@ def _publish_complete_acquisition(
                 "h3_resolution": weather.h3_resolution,
                 "availability_lag_hours": weather.availability_lag_hours,
                 "availability_policy": AVAILABILITY_POLICY,
+                "spatial_acceptance_policy": SPATIAL_ACCEPTANCE_POLICY,
                 "source": {
                     "model": HRRR_MODEL,
                     "product": HRRR_PRODUCT,
@@ -593,6 +598,38 @@ def _download_surface_weather_locked(
     manifest_destination = Path(manifest_path or weather.acquisition_manifest_path)
     seed_path = working_destination if working_destination.exists() else inventory_destination
     existing_rows = _load_inventory(seed_path)
+    policy_marker = weather.raw_dir / "SPATIAL_ACCEPTANCE_POLICY.json"
+    previous_manifest = (
+        json.loads(manifest_destination.read_text(encoding="utf-8"))
+        if manifest_destination.exists() else None
+    )
+    canonical_policy = (
+        previous_manifest.get("resolved_config", {}).get("spatial_acceptance_policy")
+        if previous_manifest else None
+    )
+    marker_policy = (
+        json.loads(policy_marker.read_text(encoding="utf-8")).get("policy")
+        if policy_marker.exists() else None
+    )
+    legacy_rows = bool(existing_rows) and (
+        (previous_manifest is not None and canonical_policy != SPATIAL_ACCEPTANCE_POLICY)
+        or marker_policy != SPATIAL_ACCEPTANCE_POLICY
+    )
+    if legacy_rows:
+        if not overwrite:
+            raise ValueError(
+                "Existing HRRR rows predate spatial acceptance. Reacquire the frozen range "
+                "with --overwrite before publishing a spatially validated inventory."
+            )
+        if previous_manifest is not None:
+            old_range = previous_manifest.get("temporal_coverage", {})
+            if (start, end) != (old_range.get("start_date"), old_range.get("end_date")):
+                raise ValueError("Spatial-policy migration requires --overwrite of the full frozen range.")
+        existing_rows = []
+    if marker_policy != SPATIAL_ACCEPTANCE_POLICY:
+        atomic_write_json(
+            policy_marker, {"policy": SPATIAL_ACCEPTANCE_POLICY}, overwrite=policy_marker.exists()
+        )
     existing_by_time = {str(row["VALID_TIME_UTC"]): row for row in existing_rows}
     crosswalk_cache: dict[str, tuple[pd.DataFrame, Path, str]] = {}
     crosswalk_validation_cache: dict[tuple[str, str], bool] = {}
@@ -801,6 +838,7 @@ def _download_surface_weather_locked(
                         validate=lambda path: _valid_crosswalk(path, support, grid_hash),
                     )
                 crosswalk_cache[grid_hash] = (crosswalk, crosswalk_destination, crosswalk_checksum)
+            validate_crosswalk_distance(crosswalk, source_grid, support)
             sampled = sample_source_grid(
                 source_grid,
                 crosswalk,

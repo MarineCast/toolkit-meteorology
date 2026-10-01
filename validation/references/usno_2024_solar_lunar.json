@@ -1,0 +1,719 @@
+{
+  "source": "U.S. Naval Observatory one-day Sun/Moon data service",
+  "documentation_url": "https://aa.usno.navy.mil/data/api.html",
+  "retrieved_at_utc": "2026-10-01T20:08:38.289434+00:00",
+  "cases": [
+    {
+      "date": "2024-01-02",
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "timezone": "America/Los_Angeles",
+      "url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2024-01-02&coords=48.275%2C-123.7&tz=-8&dst=true",
+      "response": {
+        "apiversion": "4.0.1",
+        "geometry": {
+          "coordinates": [
+            -123.7,
+            48.275
+          ],
+          "type": "Point"
+        },
+        "properties": {
+          "data": {
+            "closestphase": {
+              "day": 3,
+              "month": 1,
+              "phase": "Last Quarter",
+              "time": "19:30  ST",
+              "year": 2024
+            },
+            "curphase": "Waning Gibbous",
+            "day": 2,
+            "day_of_week": "Tuesday",
+            "fracillum": "62%",
+            "isdst": false,
+            "label": null,
+            "month": 1,
+            "moondata": [
+              {
+                "phen": "Upper Transit",
+                "time": "05:11  ST"
+              },
+              {
+                "phen": "Set",
+                "time": "11:33  ST"
+              },
+              {
+                "phen": "Rise",
+                "time": "23:40  ST"
+              }
+            ],
+            "sundata": [
+              {
+                "phen": "Begin Civil Twilight",
+                "time": "07:29  ST"
+              },
+              {
+                "phen": "Rise",
+                "time": "08:06  ST"
+              },
+              {
+                "phen": "Upper Transit",
+                "time": "12:19  ST"
+              },
+              {
+                "phen": "Set",
+                "time": "16:32  ST"
+              },
+              {
+                "phen": "End Civil Twilight",
+                "time": "17:08  ST"
+              }
+            ],
+            "tz": -8.0,
+            "year": 2024
+          }
+        },
+        "type": "Feature"
+      }
+    },
+    {
+      "date": "2024-02-29",
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "timezone": "America/Los_Angeles",
+      "url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2024-02-29&coords=48.275%2C-123.7&tz=-8&dst=true",
+      "response": {
+        "apiversion": "4.0.1",
+        "geometry": {
+          "coordinates": [
+            -123.7,
+            48.275
+          ],
+          "type": "Point"
+        },
+        "properties": {
+          "data": {
+            "closestphase": {
+              "day": 3,
+              "month": 3,
+              "phase": "Last Quarter",
+              "time": "07:23  ST",
+              "year": 2024
+            },
+            "curphase": "Waning Gibbous",
+            "day": 29,
+            "day_of_week": "Thursday",
+            "fracillum": "77%",
+            "isdst": false,
+            "label": null,
+            "month": 2,
+            "moondata": [
+              {
+                "phen": "Upper Transit",
+                "time": "03:46  ST"
+              },
+              {
+                "phen": "Set",
+                "time": "08:41  ST"
+              },
+              {
+                "phen": "Rise",
+                "time": "23:50  ST"
+              }
+            ],
+            "sundata": [
+              {
+                "phen": "Begin Civil Twilight",
+                "time": "06:25  ST"
+              },
+              {
+                "phen": "Rise",
+                "time": "06:57  ST"
+              },
+              {
+                "phen": "Upper Transit",
+                "time": "12:27  ST"
+              },
+              {
+                "phen": "Set",
+                "time": "17:58  ST"
+              },
+              {
+                "phen": "End Civil Twilight",
+                "time": "18:30  ST"
+              }
+            ],
+            "tz": -8.0,
+            "year": 2024
+          }
+        },
+        "type": "Feature"
+      }
+    },
+    {
+      "date": "2024-03-10",
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "timezone": "America/Los_Angeles",
+      "url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2024-03-10&coords=48.275%2C-123.7&tz=-8&dst=true",
+      "response": {
+        "apiversion": "4.0.1",
+        "geometry": {
+          "coordinates": [
+            -123.7,
+            48.275
+          ],
+          "type": "Point"
+        },
+        "properties": {
+          "data": {
+            "closestphase": {
+              "day": 10,
+              "month": 3,
+              "phase": "New Moon",
+              "time": "01:00  ST",
+              "year": 2024
+            },
+            "curphase": "New Moon",
+            "day": 10,
+            "day_of_week": "Sunday",
+            "fracillum": "0%",
+            "isdst": true,
+            "label": null,
+            "month": 3,
+            "moondata": [
+              {
+                "phen": "Rise",
+                "time": "08:01  DT"
+              },
+              {
+                "phen": "Upper Transit",
+                "time": "13:53  DT"
+              },
+              {
+                "phen": "Set",
+                "time": "20:03  DT"
+              }
+            ],
+            "sundata": [
+              {
+                "phen": "Begin Civil Twilight",
+                "time": "07:06  DT"
+              },
+              {
+                "phen": "Rise",
+                "time": "07:37  DT"
+              },
+              {
+                "phen": "Upper Transit",
+                "time": "13:25  DT"
+              },
+              {
+                "phen": "Set",
+                "time": "19:14  DT"
+              },
+              {
+                "phen": "End Civil Twilight",
+                "time": "19:45  DT"
+              }
+            ],
+            "tz": -8.0,
+            "year": 2024
+          }
+        },
+        "type": "Feature"
+      }
+    },
+    {
+      "date": "2024-03-20",
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "timezone": "America/Los_Angeles",
+      "url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2024-03-20&coords=48.275%2C-123.7&tz=-8&dst=true",
+      "response": {
+        "apiversion": "4.0.1",
+        "geometry": {
+          "coordinates": [
+            -123.7,
+            48.275
+          ],
+          "type": "Point"
+        },
+        "properties": {
+          "data": {
+            "closestphase": {
+              "day": 16,
+              "month": 3,
+              "phase": "First Quarter",
+              "time": "21:11  DT",
+              "year": 2024
+            },
+            "curphase": "Waxing Gibbous",
+            "day": 20,
+            "day_of_week": "Wednesday",
+            "fracillum": "83%",
+            "isdst": true,
+            "label": null,
+            "month": 3,
+            "moondata": [
+              {
+                "phen": "Set",
+                "time": "06:02  DT"
+              },
+              {
+                "phen": "Rise",
+                "time": "14:44  DT"
+              },
+              {
+                "phen": "Upper Transit",
+                "time": "22:42  DT"
+              }
+            ],
+            "sundata": [
+              {
+                "phen": "Begin Civil Twilight",
+                "time": "06:45  DT"
+              },
+              {
+                "phen": "Rise",
+                "time": "07:16  DT"
+              },
+              {
+                "phen": "Upper Transit",
+                "time": "13:22  DT"
+              },
+              {
+                "phen": "Set",
+                "time": "19:29  DT"
+              },
+              {
+                "phen": "End Civil Twilight",
+                "time": "20:00  DT"
+              }
+            ],
+            "tz": -8.0,
+            "year": 2024
+          }
+        },
+        "type": "Feature"
+      }
+    },
+    {
+      "date": "2024-06-20",
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "timezone": "America/Los_Angeles",
+      "url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2024-06-20&coords=48.275%2C-123.7&tz=-8&dst=true",
+      "response": {
+        "apiversion": "4.0.1",
+        "geometry": {
+          "coordinates": [
+            -123.7,
+            48.275
+          ],
+          "type": "Point"
+        },
+        "properties": {
+          "data": {
+            "closestphase": {
+              "day": 21,
+              "month": 6,
+              "phase": "Full Moon",
+              "time": "18:08  DT",
+              "year": 2024
+            },
+            "curphase": "Waxing Gibbous",
+            "day": 20,
+            "day_of_week": "Thursday",
+            "fracillum": "98%",
+            "isdst": true,
+            "label": null,
+            "month": 6,
+            "moondata": [
+              {
+                "phen": "Set",
+                "time": "03:34  DT"
+              },
+              {
+                "phen": "Rise",
+                "time": "20:51  DT"
+              }
+            ],
+            "sundata": [
+              {
+                "phen": "Begin Civil Twilight",
+                "time": "04:32  DT"
+              },
+              {
+                "phen": "Rise",
+                "time": "05:14  DT"
+              },
+              {
+                "phen": "Upper Transit",
+                "time": "13:17  DT"
+              },
+              {
+                "phen": "Set",
+                "time": "21:19  DT"
+              },
+              {
+                "phen": "End Civil Twilight",
+                "time": "22:01  DT"
+              }
+            ],
+            "tz": -8.0,
+            "year": 2024
+          }
+        },
+        "type": "Feature"
+      }
+    },
+    {
+      "date": "2024-09-22",
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "timezone": "America/Los_Angeles",
+      "url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2024-09-22&coords=48.275%2C-123.7&tz=-8&dst=true",
+      "response": {
+        "apiversion": "4.0.1",
+        "geometry": {
+          "coordinates": [
+            -123.7,
+            48.275
+          ],
+          "type": "Point"
+        },
+        "properties": {
+          "data": {
+            "closestphase": {
+              "day": 24,
+              "month": 9,
+              "phase": "Last Quarter",
+              "time": "11:50  DT",
+              "year": 2024
+            },
+            "curphase": "Waning Gibbous",
+            "day": 22,
+            "day_of_week": "Sunday",
+            "fracillum": "71%",
+            "isdst": true,
+            "label": null,
+            "month": 9,
+            "moondata": [
+              {
+                "phen": "Upper Transit",
+                "time": "04:59  DT"
+              },
+              {
+                "phen": "Set",
+                "time": "13:29  DT"
+              },
+              {
+                "phen": "Rise",
+                "time": "21:21  DT"
+              }
+            ],
+            "sundata": [
+              {
+                "phen": "Begin Civil Twilight",
+                "time": "06:31  DT"
+              },
+              {
+                "phen": "Rise",
+                "time": "07:02  DT"
+              },
+              {
+                "phen": "Upper Transit",
+                "time": "13:07  DT"
+              },
+              {
+                "phen": "Set",
+                "time": "19:11  DT"
+              },
+              {
+                "phen": "End Civil Twilight",
+                "time": "19:42  DT"
+              }
+            ],
+            "tz": -8.0,
+            "year": 2024
+          }
+        },
+        "type": "Feature"
+      }
+    },
+    {
+      "date": "2024-11-03",
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "timezone": "America/Los_Angeles",
+      "url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2024-11-03&coords=48.275%2C-123.7&tz=-8&dst=true",
+      "response": {
+        "apiversion": "4.0.1",
+        "geometry": {
+          "coordinates": [
+            -123.7,
+            48.275
+          ],
+          "type": "Point"
+        },
+        "properties": {
+          "data": {
+            "closestphase": {
+              "day": 1,
+              "month": 11,
+              "phase": "New Moon",
+              "time": "04:47  ST",
+              "year": 2024
+            },
+            "curphase": "Waxing Crescent",
+            "day": 3,
+            "day_of_week": "Sunday",
+            "fracillum": "5%",
+            "isdst": true,
+            "label": null,
+            "month": 11,
+            "moondata": [
+              {
+                "phen": "Rise",
+                "time": "09:48  ST"
+              },
+              {
+                "phen": "Upper Transit",
+                "time": "13:44  ST"
+              },
+              {
+                "phen": "Set",
+                "time": "17:34  ST"
+              }
+            ],
+            "sundata": [
+              {
+                "phen": "Begin Civil Twilight",
+                "time": "06:32  ST"
+              },
+              {
+                "phen": "Rise",
+                "time": "07:05  ST"
+              },
+              {
+                "phen": "Upper Transit",
+                "time": "11:58  ST"
+              },
+              {
+                "phen": "Set",
+                "time": "16:52  ST"
+              },
+              {
+                "phen": "End Civil Twilight",
+                "time": "17:24  ST"
+              }
+            ],
+            "tz": -8.0,
+            "year": 2024
+          }
+        },
+        "type": "Feature"
+      }
+    },
+    {
+      "date": "2024-12-21",
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "timezone": "America/Los_Angeles",
+      "url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2024-12-21&coords=48.275%2C-123.7&tz=-8&dst=true",
+      "response": {
+        "apiversion": "4.0.1",
+        "geometry": {
+          "coordinates": [
+            -123.7,
+            48.275
+          ],
+          "type": "Point"
+        },
+        "properties": {
+          "data": {
+            "closestphase": {
+              "day": 22,
+              "month": 12,
+              "phase": "Last Quarter",
+              "time": "14:18  ST",
+              "year": 2024
+            },
+            "curphase": "Waning Gibbous",
+            "day": 21,
+            "day_of_week": "Saturday",
+            "fracillum": "60%",
+            "isdst": false,
+            "label": null,
+            "month": 12,
+            "moondata": [
+              {
+                "phen": "Upper Transit",
+                "time": "05:20  ST"
+              },
+              {
+                "phen": "Set",
+                "time": "11:56  ST"
+              },
+              {
+                "phen": "Rise",
+                "time": "23:37  ST"
+              }
+            ],
+            "sundata": [
+              {
+                "phen": "Begin Civil Twilight",
+                "time": "07:27  ST"
+              },
+              {
+                "phen": "Rise",
+                "time": "08:03  ST"
+              },
+              {
+                "phen": "Upper Transit",
+                "time": "12:13  ST"
+              },
+              {
+                "phen": "Set",
+                "time": "16:23  ST"
+              },
+              {
+                "phen": "End Civil Twilight",
+                "time": "17:00  ST"
+              }
+            ],
+            "tz": -8.0,
+            "year": 2024
+          }
+        },
+        "type": "Feature"
+      }
+    },
+    {
+      "date": "2024-06-20",
+      "latitude": 70.0,
+      "longitude": -150.0,
+      "timezone": "America/Anchorage",
+      "url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2024-06-20&coords=70.0%2C-150.0&tz=-9&dst=true",
+      "response": {
+        "apiversion": "4.0.1",
+        "geometry": {
+          "coordinates": [
+            -150.0,
+            70.0
+          ],
+          "type": "Point"
+        },
+        "properties": {
+          "data": {
+            "closestphase": {
+              "day": 21,
+              "month": 6,
+              "phase": "Full Moon",
+              "time": "17:08  DT",
+              "year": 2024
+            },
+            "curphase": "Waxing Gibbous",
+            "day": 20,
+            "day_of_week": "Thursday",
+            "fracillum": "98%",
+            "isdst": true,
+            "label": null,
+            "month": 6,
+            "moondata": [
+              {
+                "phen": "Object continuously below the Horizon",
+                "time": null
+              }
+            ],
+            "sundata": [
+              {
+                "phen": "Object continuously above the Horizon",
+                "time": null
+              },
+              {
+                "phen": "Object continuously above the Twilight Limit",
+                "time": null
+              },
+              {
+                "phen": "Lower Transit",
+                "time": "02:02  DT"
+              },
+              {
+                "phen": "Upper Transit",
+                "time": "14:02  DT"
+              }
+            ],
+            "tz": -9.0,
+            "year": 2024
+          }
+        },
+        "type": "Feature"
+      }
+    },
+    {
+      "date": "2024-12-21",
+      "latitude": 70.0,
+      "longitude": -150.0,
+      "timezone": "America/Anchorage",
+      "url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2024-12-21&coords=70.0%2C-150.0&tz=-9&dst=true",
+      "response": {
+        "apiversion": "4.0.1",
+        "geometry": {
+          "coordinates": [
+            -150.0,
+            70.0
+          ],
+          "type": "Point"
+        },
+        "properties": {
+          "data": {
+            "closestphase": {
+              "day": 22,
+              "month": 12,
+              "phase": "Last Quarter",
+              "time": "13:18  ST",
+              "year": 2024
+            },
+            "curphase": "Waning Gibbous",
+            "day": 21,
+            "day_of_week": "Saturday",
+            "fracillum": "60%",
+            "isdst": false,
+            "label": null,
+            "month": 12,
+            "moondata": [
+              {
+                "phen": "Upper Transit",
+                "time": "06:08  ST"
+              },
+              {
+                "phen": "Set",
+                "time": "13:15  ST"
+              }
+            ],
+            "sundata": [
+              {
+                "phen": "Object continuously below the Horizon",
+                "time": null
+              },
+              {
+                "phen": "Begin Civil Twilight",
+                "time": "10:55  ST"
+              },
+              {
+                "phen": "End Civil Twilight",
+                "time": "15:02  ST"
+              }
+            ],
+            "tz": -9.0,
+            "year": 2024
+          }
+        },
+        "type": "Feature"
+      }
+    }
+  ]
+}

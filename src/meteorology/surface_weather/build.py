@@ -25,10 +25,17 @@ from ..artifacts import (
     write_table,
 )
 from ..config import DEFAULT_CONFIG_PATH, load_meteorological_config
+from ..field_contracts import FIELD_CONTRACT_VERSION, validate_fields
 from ..spatial_support.build import load_meteorological_support
 from .download import INVENTORY_SCHEMA
-from .sampling import AVAILABILITY_POLICY, CROSSWALK_SCHEMA, SAMPLE_SCHEMA, make_sample_times_for_local_date
-from .storage import acquisition_lock
+from .sampling import (
+    AVAILABILITY_POLICY, CROSSWALK_SCHEMA, SAMPLE_SCHEMA, SPATIAL_ACCEPTANCE_POLICY,
+    make_sample_times_for_local_date,
+)
+from .storage import (
+    acquisition_read_locks, resolve_raw_relative, snapshot_acquisition_metadata,
+    snapshot_support_inputs,
+)
 from .wind import validate_daily_wind_vectors
 
 
@@ -70,7 +77,7 @@ def _read_validated_sample(
         raise ValueError(f"HRRR inventory is incomplete for {expected_time.isoformat()}.")
     if not inventory_row.RELATIVE_PATH or not inventory_row.CHECKSUM:
         raise ValueError(f"HRRR inventory lacks sample provenance for {expected_time.isoformat()}.")
-    path = raw_dir / str(inventory_row.RELATIVE_PATH)
+    path = resolve_raw_relative(raw_dir, str(inventory_row.RELATIVE_PATH))
     if not path.exists() or checksum_path(path) != str(inventory_row.CHECKSUM):
         raise ValueError(f"HRRR sample is missing or has a checksum mismatch: {path}")
     parquet = pq.ParquetFile(path)
@@ -109,23 +116,7 @@ def _read_validated_sample(
         raise ValueError(f"HRRR sample wind basis is not earth relative: {path}")
     if not set(frame["SOURCE_WIND_BASIS"].astype(str)).issubset({"grid_relative", "earth_relative"}):
         raise ValueError(f"HRRR sample source wind basis is invalid: {path}")
-    numeric = frame.select_dtypes(include=[np.number]).to_numpy(dtype=float)
-    if frame.isna().any().any() or not np.isfinite(numeric).all():
-        raise ValueError(f"HRRR sample contains missing or non-finite values: {path}")
-    bounds = {
-        "TEMPERATURE_2M_C": (-100.0, 70.0),
-        "RELATIVE_HUMIDITY_2M_PCT": (0.0, 100.0),
-        "WIND_SPEED_10M_MS": (0.0, None),
-        "WIND_GUST_SURFACE_MS": (0.0, None),
-        "VISIBILITY_KM": (0.0, None),
-        "TOTAL_CLOUD_COVER_PCT": (0.0, 100.0),
-        "PRECIP_RATE_MM_HR": (0.0, None),
-        "MEAN_SEA_LEVEL_PRESSURE_HPA": (700.0, 1200.0),
-    }
-    for column, (minimum, maximum) in bounds.items():
-        values = frame[column].to_numpy(dtype=float)
-        if (values < minimum).any() or (maximum is not None and (values > maximum).any()):
-            raise ValueError(f"HRRR sample {column} is outside its physical validation range: {path}")
+    validate_fields(frame, SAMPLE_SCHEMA, context=f"HRRR sample {path}")
     if set(frame["SOURCE_GRID_HASH"].astype(str)) != {str(inventory_row.SOURCE_GRID_HASH)}:
         raise ValueError(f"HRRR sample grid hash disagrees with inventory: {path}")
     return frame
@@ -233,12 +224,7 @@ def validate_surface_weather_daily(
     for date, group in daily.groupby("DATE"):
         if set(group["H3_INDEX"].astype(str)) != support_cells:
             raise ValueError(f"Daily R5 weather support mismatch for {date}.")
-    required = daily.drop(columns=["WIND_DIRECTION_FROM_10M_DEG"])
-    if required.isna().any().any():
-        raise ValueError("Daily R5 weather contains null values.")
-    numeric = required.select_dtypes(include=[np.number]).to_numpy(dtype=float)
-    if not np.isfinite(numeric).all():
-        raise ValueError("Daily R5 weather contains non-finite values.")
+    validate_fields(daily, DAILY_SCHEMA, context="Daily R5 weather")
     validate_daily_wind_vectors(daily)
     if set(daily["QC_STATE"].astype(str)) != {"COMPLETE"}:
         raise ValueError("Daily R5 weather contains a non-complete QC state.")
@@ -265,9 +251,31 @@ def build_surface_weather(
     acquisition_manifest_source = Path(
         acquisition_manifest_path or weather.acquisition_manifest_path
     )
-    with acquisition_lock(weather.raw_dir, writer=False):
-        acquisition_manifest = load_manifest(acquisition_manifest_source, verify_artifacts=True)
-        inventory = _load_inventory(inventory_source)
+    source_raw_dir = inventory_source.resolve().parent
+    support_source = config.support_path(weather.h3_resolution)
+    support_manifest_source = config.support_manifest_path
+    with TransactionalFamilyPublisher.read_locks([config.support_output_dir.parent]):
+        support = load_meteorological_support(weather.h3_resolution, config_path)
+        pinned_support, pinned_support_manifest = snapshot_support_inputs(
+            raw_dir=source_raw_dir,
+            support_path=support_source,
+            support_manifest_path=support_manifest_source,
+        )
+        with acquisition_read_locks(
+            weather.raw_dir, inventory_source.parent, acquisition_manifest_source.parent
+        ):
+            acquisition_manifest = load_manifest(acquisition_manifest_source, verify_artifacts=True)
+            inventory_source, acquisition_manifest_source = snapshot_acquisition_metadata(
+                raw_dir=source_raw_dir,
+                inventory_path=inventory_source,
+                manifest_path=acquisition_manifest_source,
+                manifest=acquisition_manifest,
+                pinned_inputs={
+                    support_source.resolve(): pinned_support,
+                    support_manifest_source.resolve(): pinned_support_manifest,
+                },
+            )
+            inventory = _load_inventory(inventory_source)
     if acquisition_manifest["product"] != "meteorological.surface_weather.download":
         raise ValueError(
             f"Unexpected HRRR acquisition manifest product: {acquisition_manifest['product']}"
@@ -279,8 +287,9 @@ def build_surface_weather(
     if source_model == "hrrr" and (
         acquisition_settings.get("availability_lag_hours") != weather.availability_lag_hours
         or acquisition_settings.get("availability_policy") != AVAILABILITY_POLICY
+        or acquisition_settings.get("spatial_acceptance_policy") != SPATIAL_ACCEPTANCE_POLICY
     ):
-        raise ValueError("HRRR acquisition release availability policy differs from the build configuration.")
+        raise ValueError("HRRR acquisition release policy differs from the build configuration.")
     frozen = acquisition_manifest.get("temporal_coverage", {})
     frozen_start = str(frozen.get("start_date") or "")
     frozen_end = str(frozen.get("end_date") or "")
@@ -305,7 +314,6 @@ def build_surface_weather(
         pd.Timestamp(row.VALID_TIME_UTC).tz_convert("UTC"): row
         for row in inventory.itertuples(index=False)
     }
-    support = load_meteorological_support(weather.h3_resolution, config_path)
     support_cells = set(support["H3_INDEX"].astype(str))
     expected_samples = weather.expected_samples_per_standard_day
     crosswalk_sources: dict[str, tuple[Path, str]] = {}
@@ -324,7 +332,7 @@ def build_surface_weather(
                 valid = pd.Timestamp(valid).tz_convert("UTC")
                 row = inventory_by_time.get(valid)
                 sample = _read_validated_sample(
-                    raw_dir=weather.raw_dir,
+                    raw_dir=source_raw_dir,
                     inventory_row=row,
                     expected_time=valid,
                     support_cells=support_cells,
@@ -334,7 +342,7 @@ def build_surface_weather(
                 if not row.CROSSWALK_RELATIVE_PATH or not row.CROSSWALK_CHECKSUM:
                     raise ValueError(f"HRRR inventory lacks crosswalk provenance for {valid}.")
                 crosswalk_sources[str(row.SOURCE_GRID_HASH)] = (
-                    weather.raw_dir / str(row.CROSSWALK_RELATIVE_PATH),
+                    resolve_raw_relative(source_raw_dir, str(row.CROSSWALK_RELATIVE_PATH)),
                     str(row.CROSSWALK_CHECKSUM),
                 )
             daily = aggregate_surface_weather_daily(
@@ -369,6 +377,11 @@ def build_surface_weather(
             run_id=run_id,
             config_path=config.path,
             resolved_config={
+                "field_contract_version": FIELD_CONTRACT_VERSION,
+                "source_model": source_model,
+                "spatial_acceptance_policy": (
+                    SPATIAL_ACCEPTANCE_POLICY if source_model == "hrrr" else "synthetic_fixture"
+                ),
                 "start_date": start,
                 "end_date": end,
                 "timezone": weather.timezone,
@@ -385,12 +398,12 @@ def build_surface_weather(
                     "checksum": checksum_path(acquisition_manifest_source),
                 },
                 {
-                    "path": str(config.support_path(weather.h3_resolution)),
-                    "checksum": checksum_path(config.support_path(weather.h3_resolution)),
+                    "path": str(pinned_support),
+                    "checksum": checksum_path(pinned_support),
                 },
                 {
-                    "path": str(config.support_manifest_path),
-                    "checksum": checksum_path(config.support_manifest_path),
+                    "path": str(pinned_support_manifest),
+                    "checksum": checksum_path(pinned_support_manifest),
                 },
             ],
             sources=acquisition_manifest["sources"],

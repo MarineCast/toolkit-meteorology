@@ -1,0 +1,707 @@
+{
+  "date_utc": "2024-01-02",
+  "expected_hours": 24,
+  "limitations": [
+    "NDBC is a point buoy; HRRR is the nearest 3 km grid point, not an H3 cell mean.",
+    "Buoy wind is measured at the documented 3.8 m sensor height; HRRR wind is 10 m and is not height-adjusted here.",
+    "Buoy air temperature is measured at the documented 3.4 m sensor height; HRRR temperature is 2 m.",
+    "NDBC wind represents a measurement period; HRRR fields are analysis valid-time snapshots.",
+    "One buoy on one day is a diagnostic pilot, not regional or seasonal validation.",
+    "Raw HRRR GRIB bytes are not retained by this pilot; source object URIs are retained with scalar samples."
+  ],
+  "matched_hours": 24,
+  "matched_records": [
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T00:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1022.41,
+          "reference": 1023.2
+        },
+        "temperature_2m_c": {
+          "model": 6.769616699218773,
+          "reference": 6.4
+        },
+        "wind_gust_ms": {
+          "model": 3.055584669113159,
+          "reference": 2.3
+        },
+        "wind_speed_ms": {
+          "model": 1.0073351809213567,
+          "reference": 0.8
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T01:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1022.39,
+          "reference": 1022.9
+        },
+        "temperature_2m_c": {
+          "model": 6.200982666015648,
+          "reference": 6.5
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 47.58183006597375,
+          "model": 71.41816993402624,
+          "reference": 119.0
+        },
+        "wind_gust_ms": {
+          "model": 2.3064961433410645,
+          "reference": 2.1
+        },
+        "wind_speed_ms": {
+          "model": 1.0137240838363502,
+          "reference": 1.2
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T02:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1021.92,
+          "reference": 1022.3
+        },
+        "temperature_2m_c": {
+          "model": 6.226953125000023,
+          "reference": 6.5
+        },
+        "wind_gust_ms": {
+          "model": 1.737455129623413,
+          "reference": 2.2
+        },
+        "wind_speed_ms": {
+          "model": 0.7732680069315222,
+          "reference": 1.3
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T03:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1021.34,
+          "reference": 1021.9
+        },
+        "temperature_2m_c": {
+          "model": 6.312829589843773,
+          "reference": 6.6
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 16.669943674641274,
+          "model": 63.33005632535873,
+          "reference": 80.0
+        },
+        "wind_gust_ms": {
+          "model": 1.947750210762024,
+          "reference": 3.4
+        },
+        "wind_speed_ms": {
+          "model": 1.1519629494006147,
+          "reference": 2.6
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T04:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1021.21,
+          "reference": 1021.7
+        },
+        "temperature_2m_c": {
+          "model": 6.708459472656273,
+          "reference": 6.8
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 36.59520556619043,
+          "model": 57.404794433809585,
+          "reference": 94.0
+        },
+        "wind_gust_ms": {
+          "model": 3.967196464538574,
+          "reference": 3.3
+        },
+        "wind_speed_ms": {
+          "model": 1.9864014195294604,
+          "reference": 2.2
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T05:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1020.43,
+          "reference": 1020.9
+        },
+        "temperature_2m_c": {
+          "model": 7.375756835937523,
+          "reference": 6.9
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 7.16743852862345,
+          "model": 57.832561471376536,
+          "reference": 65.0
+        },
+        "wind_gust_ms": {
+          "model": 4.67789363861084,
+          "reference": 3.3
+        },
+        "wind_speed_ms": {
+          "model": 2.9722098387628244,
+          "reference": 2.5
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T06:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1019.79,
+          "reference": 1020.4
+        },
+        "temperature_2m_c": {
+          "model": 7.531335449218773,
+          "reference": 7.0
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 53.61813914370117,
+          "model": 78.61813914370117,
+          "reference": 25.0
+        },
+        "wind_gust_ms": {
+          "model": 4.418550968170166,
+          "reference": 5.0
+        },
+        "wind_speed_ms": {
+          "model": 3.180562080525018,
+          "reference": 3.9
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T07:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1019.72,
+          "reference": 1020.4
+        },
+        "temperature_2m_c": {
+          "model": 7.447106933593773,
+          "reference": 6.9
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 27.759558810297392,
+          "model": 62.759558810297406,
+          "reference": 35.0
+        },
+        "wind_gust_ms": {
+          "model": 3.7928574085235596,
+          "reference": 5.1
+        },
+        "wind_speed_ms": {
+          "model": 3.4170644742317253,
+          "reference": 4.1
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T08:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1019.42,
+          "reference": 1019.9
+        },
+        "temperature_2m_c": {
+          "model": 7.701959228515648,
+          "reference": 7.5
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 11.812470949502483,
+          "model": 68.18752905049752,
+          "reference": 80.0
+        },
+        "wind_gust_ms": {
+          "model": 4.780473709106445,
+          "reference": 6.2
+        },
+        "wind_speed_ms": {
+          "model": 3.773393347507674,
+          "reference": 5.0
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T09:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1018.75,
+          "reference": 1019.4
+        },
+        "temperature_2m_c": {
+          "model": 8.060083007812523,
+          "reference": 7.4
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 0.7403631327310904,
+          "model": 73.2596368672689,
+          "reference": 74.0
+        },
+        "wind_gust_ms": {
+          "model": 5.3459391593933105,
+          "reference": 6.4
+        },
+        "wind_speed_ms": {
+          "model": 5.057845143106527,
+          "reference": 5.1
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T10:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1018.58,
+          "reference": 1019.1
+        },
+        "temperature_2m_c": {
+          "model": 8.011041259765648,
+          "reference": 7.6
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 17.148071013891183,
+          "model": 93.14807101389117,
+          "reference": 76.0
+        },
+        "wind_gust_ms": {
+          "model": 4.656223773956299,
+          "reference": 6.9
+        },
+        "wind_speed_ms": {
+          "model": 4.670294665121724,
+          "reference": 5.7
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T11:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1017.87,
+          "reference": 1018.3
+        },
+        "temperature_2m_c": {
+          "model": 8.499414062500023,
+          "reference": 7.8
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 5.47133730471927,
+          "model": 91.47133730471927,
+          "reference": 86.0
+        },
+        "wind_gust_ms": {
+          "model": 6.168602466583252,
+          "reference": 7.4
+        },
+        "wind_speed_ms": {
+          "model": 4.903615944097693,
+          "reference": 6.3
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T12:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1016.76,
+          "reference": 1017.2
+        },
+        "temperature_2m_c": {
+          "model": 8.684472656250023,
+          "reference": 8.1
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 6.880142088218008,
+          "model": 78.88014208821801,
+          "reference": 72.0
+        },
+        "wind_gust_ms": {
+          "model": 7.426734924316406,
+          "reference": 7.4
+        },
+        "wind_speed_ms": {
+          "model": 5.491140411633655,
+          "reference": 6.0
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T13:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1015.93,
+          "reference": 1016.3
+        },
+        "temperature_2m_c": {
+          "model": 9.081079101562523,
+          "reference": 8.2
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 11.143892636079727,
+          "model": 81.14389263607974,
+          "reference": 70.0
+        },
+        "wind_gust_ms": {
+          "model": 8.225175857543945,
+          "reference": 6.9
+        },
+        "wind_speed_ms": {
+          "model": 5.825043342470544,
+          "reference": 5.5
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T14:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1015.49,
+          "reference": 1016.0
+        },
+        "temperature_2m_c": {
+          "model": 9.124963378906273,
+          "reference": 7.9
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 20.62558855963502,
+          "model": 69.62558855963502,
+          "reference": 49.0
+        },
+        "wind_gust_ms": {
+          "model": 6.715643882751465,
+          "reference": 5.9
+        },
+        "wind_speed_ms": {
+          "model": 6.151930197469969,
+          "reference": 4.8
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T15:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1014.92,
+          "reference": 1015.4
+        },
+        "temperature_2m_c": {
+          "model": 9.254724121093773,
+          "reference": 8.2
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 23.319961972254646,
+          "model": 70.31996197225466,
+          "reference": 47.0
+        },
+        "wind_gust_ms": {
+          "model": 5.976226329803467,
+          "reference": 6.4
+        },
+        "wind_speed_ms": {
+          "model": 5.030314181877862,
+          "reference": 5.3
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T16:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1014.8,
+          "reference": 1015.0
+        },
+        "temperature_2m_c": {
+          "model": 8.869409179687523,
+          "reference": 8.4
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 22.692426441321288,
+          "model": 71.69242644132129,
+          "reference": 49.0
+        },
+        "wind_gust_ms": {
+          "model": 6.729360580444336,
+          "reference": 8.2
+        },
+        "wind_speed_ms": {
+          "model": 5.097612790500069,
+          "reference": 6.5
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T17:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1014.99,
+          "reference": 1014.9
+        },
+        "temperature_2m_c": {
+          "model": 9.184777832031273,
+          "reference": 8.5
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 15.786240027515504,
+          "model": 86.7862400275155,
+          "reference": 71.0
+        },
+        "wind_gust_ms": {
+          "model": 8.800201416015625,
+          "reference": 10.2
+        },
+        "wind_speed_ms": {
+          "model": 7.942545198539176,
+          "reference": 8.0
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T18:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1014.7,
+          "reference": 1014.9
+        },
+        "temperature_2m_c": {
+          "model": 9.198449707031273,
+          "reference": 8.6
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 16.713105713903616,
+          "model": 97.71310571390362,
+          "reference": 81.0
+        },
+        "wind_gust_ms": {
+          "model": 10.680624008178711,
+          "reference": 9.4
+        },
+        "wind_speed_ms": {
+          "model": 8.182582381932292,
+          "reference": 8.0
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T19:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1014.34,
+          "reference": 1014.0
+        },
+        "temperature_2m_c": {
+          "model": 8.665185546875023,
+          "reference": 9.0
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 5.669970661265523,
+          "model": 106.66997066126552,
+          "reference": 101.0
+        },
+        "wind_gust_ms": {
+          "model": 14.247802734375,
+          "reference": 13.6
+        },
+        "wind_speed_ms": {
+          "model": 11.596907252017845,
+          "reference": 10.9
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T20:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1013.26,
+          "reference": 1012.8
+        },
+        "temperature_2m_c": {
+          "model": 8.604821777343773,
+          "reference": 8.9
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 1.859597914258245,
+          "model": 107.85959791425825,
+          "reference": 106.0
+        },
+        "wind_gust_ms": {
+          "model": 14.316245079040527,
+          "reference": 14.3
+        },
+        "wind_speed_ms": {
+          "model": 10.793138255302532,
+          "reference": 11.9
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T21:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1012.51,
+          "reference": 1012.2
+        },
+        "temperature_2m_c": {
+          "model": 8.389154052734398,
+          "reference": 8.9
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 3.7344632079582993,
+          "model": 111.73446320795831,
+          "reference": 108.0
+        },
+        "wind_gust_ms": {
+          "model": 15.656718254089355,
+          "reference": 13.3
+        },
+        "wind_speed_ms": {
+          "model": 11.696778204327524,
+          "reference": 10.7
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T22:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1011.86,
+          "reference": 1011.7
+        },
+        "temperature_2m_c": {
+          "model": 8.940362548828148,
+          "reference": 9.2
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 4.322514441240713,
+          "model": 120.67748555875929,
+          "reference": 125.0
+        },
+        "wind_gust_ms": {
+          "model": 18.055551528930664,
+          "reference": 14.7
+        },
+        "wind_speed_ms": {
+          "model": 10.567106209262343,
+          "reference": 12.3
+        }
+      }
+    },
+    {
+      "source_grid_distance_m": 1584.2733511556119,
+      "valid_time_utc": "2024-01-02T23:00:00+00:00",
+      "values": {
+        "mean_sea_level_pressure_hpa": {
+          "model": 1011.42,
+          "reference": 1011.3
+        },
+        "temperature_2m_c": {
+          "model": 8.944604492187523,
+          "reference": 9.0
+        },
+        "wind_direction_deg": {
+          "absolute_circular_error": 1.5243149153134254,
+          "model": 115.52431491531344,
+          "reference": 114.0
+        },
+        "wind_gust_ms": {
+          "model": 16.167997360229492,
+          "reference": 13.9
+        },
+        "wind_speed_ms": {
+          "model": 10.301968741482792,
+          "reference": 11.0
+        }
+      }
+    }
+  ],
+  "metrics": {
+    "mean_sea_level_pressure_hpa": {
+      "bias": -0.30374999999999847,
+      "count": 24,
+      "mae": 0.4270833333333333,
+      "rmse": 0.4618035296530345
+    },
+    "temperature_2m_c": {
+      "bias": 0.2911476135254134,
+      "count": 24,
+      "mae": 0.49170150756836506,
+      "rmse": 0.5643218030768882
+    },
+    "wind_direction_absolute_error_deg": {
+      "calm_cutoff_ms": 1.0,
+      "count": 22,
+      "max": 53.61813914370117,
+      "mean": 16.310753489510706
+    },
+    "wind_gust_ms": {
+      "bias": 0.08555440406004584,
+      "count": 24,
+      "mae": 1.1727509746948879,
+      "rmse": 1.410457874568901
+    },
+    "wind_speed_ms": {
+      "bias": -0.3756356541337878,
+      "count": 24,
+      "mae": 0.7283678539589841,
+      "rmse": 0.8823261731786224
+    }
+  },
+  "model_hours": 24,
+  "model_sample_sha256": "8301892d7be82cce42d7ebda2cd4bdeedc878fba641d0660c1a933029d1eb104",
+  "observation_hours": 24,
+  "observation_slice_sha256": "e4cdab9abc502f0b2c3ee2fa5289cb8c1343573fd6ebd4da0f3f4ca70eb97bf5",
+  "station": "46088",
+  "station_metadata": {
+    "measurement_description_url": "https://www.ndbc.noaa.gov/faq/measdes.shtml",
+    "reported_air_temperature_height_m": 3.4,
+    "reported_anemometer_height_m": 3.8,
+    "reported_barometer_elevation_m": 2.4,
+    "reported_coordinates": [
+      48.332,
+      -123.179
+    ],
+    "retrieved_at_utc": "2026-10-01T20:16:15.596618+00:00",
+    "selected_records": 144,
+    "source_archive_sha256": "1f1aeb24aff4ad6c425fda59e54b2efdbe2de5179a48e17a2ef9dd66421d6813",
+    "source_url": "https://www.ndbc.noaa.gov/data/historical/stdmet/46088h2024.txt.gz",
+    "station": "46088",
+    "station_metadata_url": "https://www.ndbc.noaa.gov/station_page.php?station=46088"
+  },
+  "threshold_decision": "not_set_for_one_station_day"
+}

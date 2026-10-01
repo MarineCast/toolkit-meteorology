@@ -139,6 +139,15 @@ def resolve_portable_path(path: str | Path, *, base: str | Path | None = None) -
     return roots[0] / candidate
 
 
+def family_publication_parent(manifest_path: Path, payload: Mapping[str, Any]) -> Path:
+    """Locate the producer lock from its published artifact, including custom manifests."""
+
+    artifact = resolve_portable_path(payload["artifacts"][0]["path"], base=manifest_path.parent)
+    if payload.get("product") == "meteorological.spatial_support":
+        return artifact.parent.parent
+    return artifact.parent
+
+
 def parquet_contract(
     path: str | Path,
     *,

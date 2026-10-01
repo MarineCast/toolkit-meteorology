@@ -2,6 +2,69 @@
 
 This is a local implementation review for proposed software version `0.1.0` on 2026-09-30. It does not certify a live NOAA data release, a deployed documentation site, or a published Python package.
 
+## October 1 geographic acceptance and independent pilot candidate
+
+This candidate also addresses roadmap PR-03 and PR-04. Live
+HRRR decoding checks the configured study box against the native grid-edge
+polygon, the selected crop against grid-derived spacing, and every H3 support
+centroid against that polygon and a nearest-point allowance. Acquisition v4
+and weather v5 record this new spatial policy. Existing rows from an earlier
+policy require a full frozen-range `--overwrite` reacquisition before a current
+HRRR release can claim it.
+
+The former example northwest corner at 50.00°N, 125.80°W failed that gate on
+the decoded 2024-01-02 08 UTC NOAA cycle. The example now ends at 49.70°N;
+all 450 R5 cells map within 1.95 km of a source point, against a 4.25 km
+grid-derived allowance. This was a bounded source check, not a canonical
+acquisition or release build.
+
+Frozen independent references and rerunnable comparators are in
+[`validation/`](validation/). Ten USNO cases passed the prespecified daylight
+and matched-noon lunar illumination limits. Another 288 JPL Horizons hourly
+altitudes passed the prespecified solar/lunar altitude limits, and all six
+sampled UTC days agreed on dark-and-moon-visible hour counts. Twenty-four exact
+UTC hours at NDBC buoy
+46088 produced descriptive temperature, pressure, wind and gust errors. The
+weather pilot has one buoy and one day, no sensor-height correction, and no
+regional acceptance threshold. The [scientific validation plan](docs/scientific-validation-plan.md)
+gives the numbers, source links and remaining coverage work. PR-05 through
+PR-09 and full regional accuracy validation remain open.
+
+Final local checks: 167 offline tests passed and one opt-in live test was
+skipped; that live NOAA/Herbie test passed separately. Ruff, catalog and
+feature-policy freshness, generated variable docs, strict MkDocs,
+`git diff --check`, package build and Twine checks passed. An installed-wheel
+synthetic run outside the checkout deeply validated acquisition, weather,
+daylight, lunar and a 514-row native daily matrix. The local wheel check used
+an existing dependency environment, so it is not a fresh resolver test.
+
+## October 1 consumer snapshot and field-contract checkpoint
+
+This earlier checkpoint started from `f5f2b1c08240c811bbdbba57e3e71e793245ebda` on `main`.
+At that point, its changes were uncommitted and had no remote CI result.
+The changes address roadmap PR-01 and PR-02: weather builds retain consumed acquisition and
+support metadata, matrix export and release freezing pin source product generations, custom
+acquisition manifest names use the same reader rule, and all current product readers/producers
+share one hard field-limit registry. Pressure 700–1200 hPa is a hard range, while 800–1100 hPa
+is a reported regional diagnostic. Current acquisition/weather manifests and daily matrices
+declare `meteorology-field-contract-v1`; earlier metadata remains checksum-readable but needs
+its historical deep validator.
+
+The local macOS arm64 / Python 3.12 offline suite passed with 158 tests; the opt-in live NOAA
+test was skipped. New tests force an acquisition refresh during weather build and matrix export,
+attempt a weather rebuild during freezing, exercise custom acquisition metadata, and validate
+pressure values in the diagnostic band through build, validation and freeze. Ruff, catalog and
+model-policy freshness, generated variable docs, strict MkDocs, `git diff --check`, non-isolated
+sdist/wheel build, Twine checks, and an outside-checkout wheel-target synthetic workflow passed.
+That wheel target reused an existing dependency environment; it was not a fresh resolver test.
+The initial isolated build could not reach the package index in the sandbox; the non-isolated
+build used locally installed `setuptools` and `wheel`.
+
+At this earlier checkpoint, roadmap PR-03 through PR-09 remained open. No native-footprint domain report, retained real-GRIB
+reference, station/buoy comparison, independent astronomy benchmark, hourly field-era evidence,
+interval-accumulation source, or regional resource budget was produced in this working tree.
+No historical backfill, real-data mutation, release, PyPI upload or live provider check was run.
+
 ## October 1 acquisition publication patch (build ID `pr1-acquisition-20261001`)
 
 This PR 1 candidate is based on `origin/main` at

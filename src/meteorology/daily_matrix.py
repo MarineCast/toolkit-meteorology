@@ -13,11 +13,15 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from .artifacts import load_manifest, resolve_portable_path, checksum_path, code_state, stable_hash
+from .artifacts import (
+    load_manifest, resolve_portable_path, checksum_path, code_state, family_publication_parent,
+    stable_hash,
+)
 from .core.artifacts import TransactionalFamilyPublisher, atomic_write_json
 from ._version import __version__
 from .components import NATIVE_RESOLUTIONS
 from .methods import method_version
+from .field_contracts import FIELD_CONTRACT_VERSION
 
 KEYS = ["DATE", "H3_INDEX", "H3_RESOLUTION"]
 RESOLUTIONS = NATIVE_RESOLUTIONS
@@ -112,6 +116,19 @@ def export(manifest_paths: list[Path], output: Path) -> Path:
     """Verify complete native manifests, export one Parquet with yearly row groups."""
     if output.exists():
         raise FileExistsError(output)
+    parents = []
+    for path in manifest_paths:
+        source = Path(path).resolve()
+        preview = json.loads(source.read_text(encoding="utf-8"))
+        parent = family_publication_parent(source, preview)
+        if (parent / ".publication.lock").exists():
+            parents.append(parent)
+    with TransactionalFamilyPublisher.read_locks(parents):
+        return _export_locked(manifest_paths, output)
+
+
+def _export_locked(manifest_paths: list[Path], output: Path) -> Path:
+    """Read native products while their publication generations are pinned."""
     manifests, roots, coverage, timezone = {}, {}, None, None
     for path in manifest_paths:
         manifest = load_manifest(path, verify_artifacts=True)
@@ -173,6 +190,7 @@ def export(manifest_paths: list[Path], output: Path) -> Path:
                 ]
             metadata = {
                 "schema_version": 2,
+                "field_contract_version": FIELD_CONTRACT_VERSION,
                 "software_version": __version__,
                 "method_version": method_version("meteorological.daily_matrix"),
                 "release_id": stable_hash(

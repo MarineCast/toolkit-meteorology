@@ -45,6 +45,16 @@ sample, crosswalk, provenance field and configured availability lag, including r
 requests. A disjoint request, stale earlier lag, or unrelated failed working row leaves canonical
 metadata unchanged; request the missing or stale dates explicitly to complete the range.
 
+Each live HRRR decode checks the configured box against the decoded native grid-edge
+polygon and checks that the crop contains nearby source points at every box corner.
+The crosswalk checks every H3 centroid against that polygon and uses a nearest-point
+distance allowance calculated from the decoded grid's 99th-percentile adjacent
+spacing times √2. Reused crosswalks receive the same checks when source data are
+fetched. The manifest records `decoded-native-footprint-and-spacing-v1`; legacy
+rows must be reacquired with `--overwrite` for the complete frozen range before
+they can be published under this policy. An in-progress acquisition retains a
+policy marker so it can resume without redownloading its validated rows.
+
 One writer owns the raw workspace from seed read through publication. A second writer or a
 reader seeking a canonical metadata snapshot receives an explicit busy error. Readers also
 refuse an unfinished metadata journal until recovery. The existing family publisher promotes
@@ -83,6 +93,13 @@ meteorology build surface-weather \
   --config config/data/environment_meteorological.yaml
 ```
 
+The build pins a checksum-backed metadata snapshot before reading samples. A later acquisition
+refresh can publish a new canonical inventory without changing the build's input generation.
+Weather manifests cite the consumed snapshot; validation and freezing copy the referenced
+inventory and immutable sample objects. Matrix export pins each source family while reading, and
+freezing pins its source family while copying. Metadata snapshots are retained under the raw
+workspace for reuse and need an explicit retention policy before cleanup.
+
 Every published date contains the exact configured support, all six four-hourly `f00` core-weather
 analyses, and six matched `f01` precipitation rates initialized one hour earlier and valid at the
 same timestamps. Missing, ambiguous, non-finite, or unsupported inputs
@@ -101,7 +118,7 @@ rebuilding support before acquisition or product builds.
 `AVAILABLE_AT_UTC` is a versioned assumed fixed-lag policy, not a measured provider
 publication timestamp. A changed lag invalidates cached samples; acquisition and build
 check every retained sample timestamp against the current policy and inventory. The current
-acquisition, weather and daylight method IDs are v3, v4 and v3 respectively; old releases retain
+acquisition, weather and daylight method IDs are v4, v5 and v3 respectively; old releases retain
 their original method IDs and require new generation to gain these contracts.
 
 Before recoverably archiving legacy weather artifacts, run the complete-range and shared-core
@@ -132,6 +149,16 @@ The meteorological feature catalog assigns every field both `role` and `variable
 Coverage, availability, lineage, sampling distance, calendar bookkeeping, and QC are metadata.
 The retired atmospheric-viewability, event-hour, storm, and lightning products are not part of the
 canonical meteorological family.
+
+The current field acceptance policy is `meteorology-field-contract-v1`. Arrow schemas define
+ordinary nullability; shared hard limits apply during acquisition, weather build, deep validation
+and matrix validation. Mean sea-level pressure has a hard 700–1200 hPa range. Values outside
+800–1100 hPa are regional diagnostics to investigate, not automatic failures. The latter range
+has no independent physical justification as a universal reject threshold. Conditional calm and
+astronomy null rules remain explicit paired checks. Manifests and matrices from before this
+policy remain checksum-readable, but require the validator pinned to their earlier revision for
+deep scientific certification. Deep validation reports counts under
+`regional_warning_counts`; a warning count is not a validation failure.
 
 ## Versioned output contract
 

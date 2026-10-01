@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from pyproj import Geod
+from shapely.geometry import Point, Polygon
 
 LOGGER = logging.getLogger(__name__)
 
@@ -23,6 +24,57 @@ class BoundingBox:
     max_lat: float
     min_lon: float
     max_lon: float
+
+
+@dataclass(frozen=True)
+class GridCoverage:
+    max_nearest_distance_m: float
+    native_footprint: Polygon
+
+
+def validate_grid_coverage(
+    lat: np.ndarray, lon: np.ndarray, cropped: pd.DataFrame, bbox: BoundingBox
+) -> GridCoverage:
+    """Check the decoded native footprint and the selected crop before sampling.
+
+    The boundary follows the decoded grid edges, rather than a latitude/longitude
+    bounding box. The returned distance allowance comes from the decoded grid's
+    own adjacent-point spacing, so it also catches a sparse or truncated crop.
+    """
+
+    if lat.shape != lon.shape or lat.ndim != 2 or min(lat.shape) < 2:
+        raise ValueError("HRRR native grid must have two spatial dimensions.")
+    boundary_lat = np.concatenate((lat[0, :], lat[1:, -1], lat[-1, -2::-1], lat[-2:0:-1, 0]))
+    boundary_lon = np.concatenate((lon[0, :], lon[1:, -1], lon[-1, -2::-1], lon[-2:0:-1, 0]))
+    footprint = Polygon(zip(boundary_lon, boundary_lat, strict=True))
+    if not footprint.is_valid or footprint.is_empty:
+        raise ValueError("HRRR native grid footprint is invalid.")
+    corners = (
+        (bbox.min_lon, bbox.min_lat), (bbox.min_lon, bbox.max_lat),
+        (bbox.max_lon, bbox.min_lat), (bbox.max_lon, bbox.max_lat),
+    )
+    if not all(footprint.covers(Point(lon_value, lat_value)) for lon_value, lat_value in corners):
+        raise ValueError("Requested bounds extend beyond the decoded HRRR native footprint.")
+    geod = Geod(ellps="WGS84")
+    _, _, horizontal = geod.inv(lon[:, :-1], lat[:, :-1], lon[:, 1:], lat[:, 1:])
+    _, _, vertical = geod.inv(lon[:-1, :], lat[:-1, :], lon[1:, :], lat[1:, :])
+    spacing = np.concatenate((horizontal.ravel(), vertical.ravel()))
+    if not np.isfinite(spacing).all() or (spacing <= 0).any():
+        raise ValueError("HRRR native grid spacing is invalid.")
+    allowance_m = float(np.quantile(spacing, 0.99) * np.sqrt(2.0))
+    if cropped.empty:
+        raise ValueError("HRRR geographic crop is empty.")
+    from sklearn.neighbors import BallTree
+
+    cropped_coordinates = cropped[["hrrr_lat", "hrrr_lon"]].to_numpy(dtype=float)
+    if not np.isfinite(cropped_coordinates).all():
+        raise ValueError("HRRR geographic crop contains invalid coordinates.")
+    tree = BallTree(np.deg2rad(cropped_coordinates), metric="haversine")
+    corner_coordinates = np.array([(latitude, longitude) for longitude, latitude in corners])
+    distances, _ = tree.query(np.deg2rad(corner_coordinates), k=1)
+    if (distances[:, 0] * 6_371_008.8 > allowance_m).any():
+        raise ValueError("HRRR geographic crop is insufficient for requested bounds.")
+    return GridCoverage(allowance_m, footprint)
 
 
 _COORD_NAMES = {"latitude", "longitude", "lat", "lon", "time", "step", "valid_time"}

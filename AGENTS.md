@@ -93,3 +93,9 @@ Global skill defaults do not override repository scope or code-only extraction. 
 
 Daily matrix behavior: `PYTHONPATH=src python -m pytest tests/test_daily_matrix.py -q`.
 Contract and CLI are documented in `docs/daily-matrix.md`.
+
+Roadmap PR-01 through PR-04 checks: `python -m pytest -q
+tests/test_field_contracts.py tests/test_independent_validation.py
+tests/test_source_and_catalog.py tests/test_production_contracts.py` and then
+`python -m pytest -q`. The bounded NOAA compatibility test is opt-in:
+`METEOROLOGY_LIVE_HRRR=1 python -m pytest -q tests/test_live_hrrr.py`.

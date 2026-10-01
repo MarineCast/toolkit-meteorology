@@ -20,7 +20,7 @@ Missingness: not applicable to complete deterministic output. Limitation: Centro
 
 ## Hrrr Sample
 
-Method: `hrrr_f00_f01_earth_wind_sample_v3`. Support: R5; one UTC valid time.
+Method: `hrrr_f00_f01_earth_wind_sample_v4`. Support: R5; one UTC valid time.
 
 | Field | Source field | Unit | Processing | Range | Kind | Predictor? |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -58,7 +58,7 @@ Missingness: reject incomplete source/support; no zero fill. Limitation: Retrosp
 
 ## Hrrr Inventory
 
-Method: `hrrr_f00_f01_earth_wind_sample_v3`. Support: R5; one UTC valid time.
+Method: `hrrr_f00_f01_earth_wind_sample_v4`. Support: R5; one UTC valid time.
 
 | Field | Source field | Unit | Processing | Range | Kind | Predictor? |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -92,7 +92,7 @@ Missingness: not applicable to complete deterministic output. Nullable exception
 
 ## Hrrr Crosswalk
 
-Method: `hrrr_f00_f01_earth_wind_sample_v3`. Support: R5; one source grid.
+Method: `hrrr_f00_f01_earth_wind_sample_v4`. Support: R5; one source grid.
 
 | Field | Source field | Unit | Processing | Range | Kind | Predictor? |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -105,7 +105,7 @@ Missingness: not applicable to complete deterministic output. Limitation: Centro
 
 ## Surface Weather
 
-Method: `hrrr_surface_daily_earth_wind_v4`. Support: R5; local date.
+Method: `hrrr_surface_daily_earth_wind_v5`. Support: R5; local date.
 
 | Field | Source field | Unit | Processing | Range | Kind | Predictor? |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -133,8 +133,8 @@ Method: `hrrr_surface_daily_earth_wind_v4`. Support: R5; local date.
 | FIRST_VALID_TIME_UTC | earliest included core valid time in UTC | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | LAST_VALID_TIME_UTC | latest included core valid time in UTC | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | LATEST_AVAILABLE_AT_UTC | latest declared availability among included fields | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
-| SOURCE_GRID_DISTANCE_M_MEAN | mean of six nearest-source distances | m | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
-| SOURCE_GRID_DISTANCE_M_MAX | maximum of six nearest-source distances | m | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_GRID_DISTANCE_M_MEAN | mean of six nearest-source distances | m | copied from validated input or deterministically derived as documented by the producer | 0..inf | metadata | False |
+| SOURCE_GRID_DISTANCE_M_MAX | maximum of six nearest-source distances | m | copied from validated input or deterministically derived as documented by the producer | 0..inf | metadata | False |
 | QC_STATE | daily completeness and quality state | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 
 Missingness: reject incomplete source/support; no zero fill. Nullable exceptions: `WIND_DIRECTION_FROM_10M_DEG`: null when mean wind vector is calm. Limitation: Retrospective model samples; local conditions can differ.
@@ -163,7 +163,7 @@ Method: `daylight_astronomy_v3`. Support: R4; local date.
 | DAYLIGHT_WEIGHT | configured daylight weight | fraction | selected fraction/cell/global normalization | 0..1 | continuous | False |
 | SOLAR_ELEVATION_MAX_DEG | approximate solar geometry | degrees | maximum of local-day sample altitudes | -90..90 | continuous | True |
 | SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG | approximate solar geometry | degrees | mean positive sampled altitude | 0..90 or null | continuous | True |
-| LOW_SUN_DAYLIGHT_HOURS | approximate solar geometry | h | count of daylight samples under configured low-sun threshold * timestep | 0..25 | continuous | True |
+| LOW_SUN_DAYLIGHT_HOURS | approximate solar geometry | h | count of daylight samples under configured low-sun threshold * timestep | 0..local civil-day hours (23/24/25) | continuous | True |
 
 Missingness: not applicable to complete deterministic output. Nullable exceptions: `SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG`: null when no sampled daylight. Limitation: Approximate geometry; excludes weather and terrain.
 
@@ -199,13 +199,13 @@ Method: `lunar_illumination_v2`. Support: R5; local date.
 | CENTROID_LAT | H3 WGS84 cell-centroid latitude | WGS84 degrees | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | CENTROID_LON | H3 WGS84 cell-centroid longitude | WGS84 degrees | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | LUNAR_AGE_DAYS | approximate synodic cycle | days | elapsed days modulo synodic month at configured UTC hour | 0..29.54 | continuous | True |
-| LUNAR_PHASE_ANGLE_DEG | LUNAR_AGE_DAYS | degrees | age / synodic month * 360 | 0..<360 | continuous | True |
+| LUNAR_PHASE_ANGLE_DEG | LUNAR_AGE_DAYS | degrees | age / synodic month * 360 | 0..360 | continuous | True |
 | LUNAR_ILLUMINATION_FRACTION | LUNAR_PHASE_ANGLE_DEG | fraction | (1 - cos(phase angle)) / 2 | 0..1 | continuous | True |
 | MOON_PHASE_NAME | LUNAR_AGE_DAYS | category | age-bin label | named phases | categorical | True |
-| NIGHT_HOURS | solar altitude | h | count of local-day dark samples * timestep | 0..25 | continuous | True |
-| MOON_VISIBLE_HOURS | lunar altitude | h | count of above-horizon samples * timestep | 0..25 | continuous | True |
-| MOON_VISIBLE_DARK_HOURS | solar and lunar altitude | h | count of dark and moon-above-horizon samples * timestep | 0..25 | continuous | True |
-| MOONLIT_DARK_HOURS | MOON_VISIBLE_DARK_HOURS, lunar illumination | equivalent h | sum(illumination fraction * timestep) when dark and moon visible | 0..25 | continuous | True |
+| NIGHT_HOURS | solar altitude | h | count of local-day dark samples * timestep | 0..local civil-day hours (23/24/25) | continuous | True |
+| MOON_VISIBLE_HOURS | lunar altitude | h | count of above-horizon samples * timestep | 0..local civil-day hours (23/24/25) | continuous | True |
+| MOON_VISIBLE_DARK_HOURS | solar and lunar altitude | h | count of dark and moon-above-horizon samples * timestep | 0..local civil-day hours (23/24/25) | continuous | True |
+| MOONLIT_DARK_HOURS | MOON_VISIBLE_DARK_HOURS, lunar illumination | equivalent h | sum(illumination fraction * timestep) when dark and moon visible | 0..local civil-day hours (23/24/25) | continuous | True |
 | MOON_VISIBLE_DARK_FRACTION | MOON_VISIBLE_DARK_HOURS, NIGHT_HOURS | fraction | visible-dark hours / night hours; null if no night | 0..1 or null | continuous | True |
 | MOONLIT_DARK_FRACTION | MOONLIT_DARK_HOURS, NIGHT_HOURS | fraction | moonlit equivalent hours / night hours; null if no night | 0..1 or null | continuous | True |
 | WEIGHT_LUNAR_ILLUMINATION | LUNAR_ILLUMINATION_FRACTION | fraction | deterministic alias | 0..1 | continuous | False |

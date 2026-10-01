@@ -44,7 +44,7 @@ def test_every_declared_arrow_field_has_catalog_metadata() -> None:
         assert {item["method_version"] for item in inventory[family]} == {method_version(product)}
         for item in inventory[family]:
             assert all(item[key] for key in ("source", "source_variable", "units", "processing_and_aggregation", "missing_value_policy", "interpretation", "limitations"))
-    assert method_version("meteorological.surface_weather") == "hrrr_surface_daily_earth_wind_v4"
+    assert method_version("meteorological.surface_weather") == "hrrr_surface_daily_earth_wind_v5"
     assert set(METHOD_VERSIONS) == {product for _, product, _ in PRODUCTS.values()} | {"meteorological.daily_matrix"}
 
 
