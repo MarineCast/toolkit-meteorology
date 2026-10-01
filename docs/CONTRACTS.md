@@ -30,14 +30,31 @@ meteorology download surface-weather \
   --workers 4
 ```
 
-The acquisition retains one checksum-addressed region-sized sample per timestamp plus the source-grid
-crosswalk. Successful samples and a working inventory survive failures for resumption; the
+The acquisition retains one region-sized sample per timestamp plus the source-grid
+crosswalk. New files use immutable serialized-SHA-256 paths under `raw/objects/samples/`
+and `raw/objects/crosswalks/`; the inventory stores the relative path and checksum of each.
+Older timestamp paths remain readable and are never overwritten by a refresh. The
+`resolved_config.sample_storage` value `immutable-sha256-objects-v1` identifies this storage
+layout without changing the meteorological method or Arrow schema. Successful candidate objects,
+`raw/runs/<token>/WORKING_INVENTORY.parquet`, and the ordinary working inventory survive failures
+for resumption; the
 canonical acquisition inventory and manifest are published only when the frozen requested range
 is complete. Publication checks the exact six-instant schedule for every local date from the
 declared start through end, with no duplicate or missing instants. It rechecks every retained
 sample, crosswalk, provenance field and configured availability lag, including rows from earlier
 requests. A disjoint request, stale earlier lag, or unrelated failed working row leaves canonical
 metadata unchanged; request the missing or stale dates explicitly to complete the range.
+
+One writer owns the raw workspace from seed read through publication. A second writer or a
+reader seeking a canonical metadata snapshot receives an explicit busy error. Readers also
+refuse an unfinished metadata journal until recovery. The existing family publisher promotes
+the inventory and then the terminal manifest under a durable journal; its `committed` journal
+checkpoint is the authoritative commit. Recovery rolls back an interrupted `promoting` phase
+and retains a `committed` generation. The next acquisition or snapshot run performs recovery
+before reading its seed. Immutable sample and crosswalk references remain valid on either side
+of that decision. A killed process can leave `ACQUIRING` run state and unreferenced objects;
+these are retained for inspection. There is no automatic garbage collection or retention
+policy in this patch.
 
 The inventory separates the logical `noaa-hrrr://` object identity from the actual `SOURCE_URI`
 and `PRECIP_SOURCE_URI` retrieval URLs and their retrieval times. HTTPS/S3 retrieval URLs

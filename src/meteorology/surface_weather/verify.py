@@ -22,6 +22,7 @@ from .build import DAILY_SCHEMA
 from .download import INVENTORY_SCHEMA, _expected_times, retrieval_matches_object, valid_retrieval_time
 from .source import hrrr_logical_object_uri
 from .wind import validate_daily_wind_vectors
+from .storage import acquisition_lock
 
 LEGACY_DEFAULT = Path(
     "data/processed/domain/environmental_layer/meteorological/surface_weather/hrrr"
@@ -413,7 +414,12 @@ def verify_hrrr_r5_rebuild(
     weather = config.surface_weather
     errors: list[str] = []
 
-    acquisition_manifest = load_manifest(weather.acquisition_manifest_path, verify_artifacts=True)
+    with acquisition_lock(weather.raw_dir, writer=False):
+        acquisition_manifest = load_manifest(weather.acquisition_manifest_path, verify_artifacts=True)
+        inventory_file = pq.ParquetFile(weather.inventory_path)
+        inventory_schema_ok = inventory_file.schema_arrow.equals(INVENTORY_SCHEMA, check_metadata=False)
+        inventory = inventory_file.read().to_pandas()
+        acquisition_manifest_checksum = sha256_file(weather.acquisition_manifest_path)
     weather_manifest = load_manifest(weather.manifest_path, verify_artifacts=True)
     if acquisition_manifest.get("product") != "meteorological.surface_weather.download":
         errors.append("Acquisition manifest product is incorrect.")
@@ -433,10 +439,8 @@ def verify_hrrr_r5_rebuild(
     support = load_meteorological_support(weather.h3_resolution, config_path)
     support_cells = set(support["H3_INDEX"].astype(str))
 
-    inventory_file = pq.ParquetFile(weather.inventory_path)
-    if not inventory_file.schema_arrow.equals(INVENTORY_SCHEMA, check_metadata=False):
+    if not inventory_schema_ok:
         errors.append("Canonical acquisition inventory schema is incorrect.")
-    inventory = inventory_file.read().to_pandas()
     observed_time_keys = set(inventory["VALID_TIME_UTC"].astype(str))
     if len(inventory) != len(expected_times) or observed_time_keys != expected_time_keys:
         errors.append("Canonical acquisition inventory does not cover the frozen valid times.")
@@ -639,7 +643,7 @@ def verify_hrrr_r5_rebuild(
         "weather_manifest_path": str(weather.manifest_path),
         "weather_manifest_checksum": sha256_file(weather.manifest_path),
         "acquisition_manifest_path": str(weather.acquisition_manifest_path),
-        "acquisition_manifest_checksum": sha256_file(weather.acquisition_manifest_path),
+        "acquisition_manifest_checksum": acquisition_manifest_checksum,
         "errors": errors,
     }
     destination = Path(output_path) if output_path else verification_report_path(config_path)

@@ -28,6 +28,7 @@ from ..config import DEFAULT_CONFIG_PATH, load_meteorological_config
 from ..spatial_support.build import load_meteorological_support
 from .download import INVENTORY_SCHEMA
 from .sampling import AVAILABILITY_POLICY, CROSSWALK_SCHEMA, SAMPLE_SCHEMA, make_sample_times_for_local_date
+from .storage import acquisition_lock
 from .wind import validate_daily_wind_vectors
 
 
@@ -264,7 +265,9 @@ def build_surface_weather(
     acquisition_manifest_source = Path(
         acquisition_manifest_path or weather.acquisition_manifest_path
     )
-    acquisition_manifest = load_manifest(acquisition_manifest_source, verify_artifacts=True)
+    with acquisition_lock(weather.raw_dir, writer=False):
+        acquisition_manifest = load_manifest(acquisition_manifest_source, verify_artifacts=True)
+        inventory = _load_inventory(inventory_source)
     if acquisition_manifest["product"] != "meteorological.surface_weather.download":
         raise ValueError(
             f"Unexpected HRRR acquisition manifest product: {acquisition_manifest['product']}"
@@ -291,7 +294,6 @@ def build_surface_weather(
     dates = [value.strftime("%Y-%m-%d") for value in pd.date_range(start, end, freq="D")]
     if not dates:
         raise ValueError("Surface-weather build date range is empty.")
-    inventory = _load_inventory(inventory_source)
     for row in inventory.itertuples(index=False):
         valid = pd.Timestamp(row.VALID_TIME_UTC)
         expected_available = (

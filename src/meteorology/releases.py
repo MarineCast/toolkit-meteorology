@@ -13,6 +13,7 @@ import pyarrow.parquet as pq
 
 from .artifacts import checksum_path, resolve_portable_path, stable_hash, write_manifest
 from .validation import validate_product
+from .surface_weather.storage import resolve_raw_relative
 
 
 def _copy_verified(source: Path, destination: Path, checksum: str) -> None:
@@ -51,14 +52,19 @@ def freeze_release(manifest_path: str | Path, output_root: str | Path) -> Path:
     staging = root / f".staging-{release_id[:12]}-{uuid.uuid4().hex[:8]}"
     staging.mkdir()
     try:
+        inventory_source: Path | None = None
+        inventory_archive: Path | None = None
         for index, item in enumerate(payload["artifacts"]):
             source = resolve_portable_path(item["path"], base=source_manifest.parent)
             target = staging / "artifacts" / f"{index:02d}_{source.name}"
             _copy_verified(source, target, item["checksum"])
+            if (payload["product"] == "meteorological.surface_weather.download"
+                    and source.name.endswith("SOURCE_INVENTORY.parquet")):
+                inventory_source = source
+                inventory_archive = target.parent
             item["path"] = target.relative_to(staging).as_posix()
             item["contract_hash"] = stable_hash({key: value for key, value in item.items() if key != "contract_hash"})
         copied: dict[Path, Path] = {}
-        inventory_source: Path | None = None
         for index, item in enumerate(payload["inputs"]):
             source = resolve_portable_path(item["path"], base=source_manifest.parent)
             if source in copied:
@@ -73,7 +79,9 @@ def freeze_release(manifest_path: str | Path, output_root: str | Path) -> Path:
             item["path"] = target.relative_to(staging).as_posix()
             if payload["product"] == "meteorological.surface_weather" and source.name.endswith("SOURCE_INVENTORY.parquet"):
                 inventory_source = source
+                inventory_archive = staging / "inputs" / "hrrr_samples"
         if inventory_source is not None:
+            assert inventory_archive is not None
             inventory = pq.read_table(inventory_source).to_pandas()
             raw_root = inventory_source.parent
             count = 0
@@ -81,16 +89,16 @@ def freeze_release(manifest_path: str | Path, output_root: str | Path) -> Path:
                 for relative_field, checksum_field in (("RELATIVE_PATH", "CHECKSUM"), ("CROSSWALK_RELATIVE_PATH", "CROSSWALK_CHECKSUM")):
                     relative = _safe_relative(str(getattr(row, relative_field)))
                     checksum = str(getattr(row, checksum_field))
-                    target = staging / "inputs" / "hrrr_samples" / relative
+                    target = inventory_archive / relative
                     if target.exists():
                         if checksum_path(target) != checksum:
                             raise ValueError(f"Conflicting HRRR sample identity: {relative}")
                         continue
-                    _copy_verified(raw_root / relative, target, checksum)
+                    _copy_verified(resolve_raw_relative(raw_root, str(relative)), target, checksum)
                     count += 1
             payload["archived_hrrr_samples"] = {
-                "path": "inputs/hrrr_samples",
-                "checksum": checksum_path(staging / "inputs" / "hrrr_samples"),
+                "path": inventory_archive.relative_to(staging).as_posix(),
+                "checksum": checksum_path(inventory_archive),
                 "file_count": count,
             }
         write_manifest(staging / "MANIFEST.json", payload)

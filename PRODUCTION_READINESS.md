@@ -2,6 +2,43 @@
 
 This is a local implementation review for proposed software version `0.1.0` on 2026-09-30. It does not certify a live NOAA data release, a deployed documentation site, or a published Python package.
 
+## October 1 acquisition publication patch (build ID `pr1-acquisition-20261001`)
+
+This PR 1 candidate is based on `origin/main` at
+`7ed661953acaba41efc980dac4caa51928514451`; the PR head commit identifies the exact
+source tested at handoff. The previous scientific corrections remain in the base. Before the
+fix, two real-package synthetic-provider regressions reproduced N02: a rejected overlapping
+six-to-eight-hour lag refresh changed six previously referenced January 3 sample files, and a
+later provider failure during `overwrite=True` changed five. Canonical inventory and manifest
+bytes stayed old, leaving their references invalid.
+
+The candidate uses serialized-SHA-256 sample and crosswalk paths, a writer lock for the full
+raw-workspace lifecycle, per-run working inventory/state, and the existing recoverable two-file
+metadata publisher. `phase=committed` in its durable journal is the commit checkpoint. A
+pre-commit interruption rolls back to old metadata; an interruption after that checkpoint
+retains the new complete metadata. Canonical readers obtain a shared metadata snapshot or
+report busy/recovery required. Frozen acquisition and weather releases copy all referenced
+objects and validate after relocation. Old timestamp-addressed inventory paths remain readable.
+No old referenced object is renamed or replaced by a refresh, and unreferenced candidates are
+retained for manual inspection; no automatic object deletion is implemented.
+
+| Gate | Local result on macOS arm64 / Python 3.12 |
+| --- | --- |
+| Full offline suite | PASS: 151 passed, one opt-in live NOAA test skipped |
+| Acquisition publication cases | PASS: overlapping lag, late overwrite failure, candidate corruption, cancellation, hard process exits before and during promotion, concurrent writers, resume, full refresh and frozen relocation |
+| Ruff; catalog/policy freshness; variable documentation diff; `git diff --check` | PASS |
+| `mkdocs build --strict` | PASS; Material emitted its upstream MkDocs 2.0 advisory |
+| Isolated `python -m build`; `python -m twine check dist/*` | PASS; build dependencies resolved from the package index |
+| Fresh wheel environment outside the checkout | PASS: declared dependencies freshly resolved, `pip check`, CLI help/init, synthetic offline example, deep acquisition/weather validation, native matrix validation and policy selection (569 rows, 33 columns, R4/R5) |
+| Live NOAA/Herbie, real-data workspace, release publication | NOT RUN |
+
+Software version `0.1.0`, Arrow schemas, and acquisition/weather scientific method IDs stay
+unchanged because the meteorological formulas and interpretation did not change. New acquisition
+manifests declare `sample_storage=immutable-sha256-objects-v1`; content and configuration hashes
+produce new release IDs. Existing releases keep their identities and must be interpreted with
+their recorded method and storage paths. PR 2 geographic acceptance and PR 3 independent
+scientific comparison remain separate work; this patch does not close those evidence gates.
+
 ## October 1 rereview correction (base `5dde17996021498e45750e7811f5b3aff24ef0d2`)
 
 This section records the correction branch's local evidence. The exact candidate revision is
