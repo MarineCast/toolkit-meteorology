@@ -93,3 +93,7 @@ Global skill defaults do not override repository scope or code-only extraction. 
 
 Daily matrix behavior: `PYTHONPATH=src python -m pytest tests/test_daily_matrix.py -q`.
 Contract and CLI are documented in `docs/daily-matrix.md`.
+
+Scientific comparison software gate: `PYTHONPATH=src python -m pytest -q tests/test_scientific_validation.py`.
+Its synthetic references test pairing, exclusion, report and frozen relocation behavior only;
+`docs/scientific-validation-workflow.md` records the independent reference contract.

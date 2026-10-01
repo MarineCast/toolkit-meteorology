@@ -2,6 +2,38 @@
 
 This is a local implementation review for proposed software version `0.1.0` on 2026-09-30. It does not certify a live NOAA data release, a deployed documentation site, or a published Python package.
 
+## October 1 scientific comparison patch (build ID `pr3-science-20261001`)
+
+This PR 3 candidate is stacked on PR 2 commit
+`f17df6d5e4b20c7307b833318b8e6d4fb4fd0a9e`; the PR head commit identifies the exact
+reviewed source. `meteorology validate-science` reads frozen weather/daylight/lunar releases,
+checksum-verified reference files and a separately locked threshold/holdout protocol. It writes
+paired and excluded Parquet rows plus JSON and Markdown evidence into a new directory. Point
+weather comparisons use R5 timestamp samples. Precipitation is explicitly a four-hour
+sampling-sensitivity comparison, and derived wind direction uses a non-calm circular error.
+Daily astronomy comparisons use frozen release rows; instantaneous altitude comparisons are
+labeled production-function evaluations. Reference independence, licensing and assimilation
+overlap remain source declarations pending review.
+
+| Gate | Local result on macOS arm64 / Python 3.12 |
+| --- | --- |
+| Comparison software (Gate A) | **PASS**: package synthetic producer fixture, frozen relocation, weather/daylight/lunar pairs, unit/convention/interval exclusions, calm wind, threshold failure, checksum refusal and atomic new-directory output; focused tests 4 passed |
+| Full offline package suite | **PASS**: 165 passed, one opt-in live NOAA/Herbie test skipped |
+| Ruff; catalog and policy freshness; generated-variable drift; strict MkDocs; `git diff --check` | **PASS**; Material emitted its upstream MkDocs 2.0 advisory |
+| Isolated `python -m build`; `twine check` | **PASS**: fresh isolated build dependencies, sdist and wheel built; both distributions checked |
+| Fresh wheel install outside checkout | **PASS**: declared dependencies freshly resolved in a new Python 3.12 environment; `pip check`, CLI help/init, synthetic one-day example, deep acquisition/weather/daylight/lunar and matrix validation, native policy selection (569 rows), and installed `validate-science` one-pair report |
+| Bounded acquisition preview | **PASS**: installed CLI dry run for 2024-01-02 in a new disposable workspace reported six R5 HRRR valid times for packaged example bounds 46.85–50.00 N, 125.80–121.60 W; no network request |
+| Independent reference comparisons (Gate B), bounded live NOAA/GRIB, station/buoy and ephemeris runs, F20 closure, release publication | **NOT RUN**: no reviewed independent reference bundle or declared product/date/region network budget was supplied |
+
+The report contract is `meteorology.scientific_validation.v1`. Existing Arrow schemas,
+producer scientific method IDs and software version remain unchanged because this patch does
+not alter producer calculations or release interpretation. The software fixture and wheel smoke
+are synthetic and establish no weather or astronomy accuracy claim. The current retrospective
+f00 product has not been tested for as-issued forecast skill. The
+[comparison workflow](docs/scientific-validation-workflow.md) records the exact reference
+contracts and bounded acquisition recipe; [the validation plan](docs/scientific-validation-plan.md)
+retains the independent scientific evidence gate.
+
 ## October 1 geographic acceptance patch (build ID `pr2-spatial-20261001`)
 
 This PR 2 candidate is stacked on PR 1 commit

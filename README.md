@@ -71,6 +71,7 @@ The root API also provides `build_surface_weather`, `build_daylight`, `build_lun
 
 - [Methodology](docs/methodology.md) explains source identity, local dates and DST, nearest-grid sampling, daily reductions, vector wind, precipitation and astronomical approximations.
 - [Product contracts](docs/CONTRACTS.md) and [Arrow-backed variable inventory](docs/reference/variables.md) define keys, units, missingness, schemas and scientific method versions.
+- [Scientific validation plan](docs/scientific-validation-plan.md) and [offline comparison workflow](docs/scientific-validation-workflow.md) distinguish tested comparison software from independent accuracy evidence.
 - Every family manifest records software version, method version, run ID, content-derived release ID, configuration, input/output checksums, source attribution and limitations. `meteorology validate` checks a release; `meteorology freeze-release` copies it to a checksum-backed release-ID directory and refuses to replace an existing one.
 - The package's [modeling guidance](docs/guides/downstream-modeling.md) calls out temporal/spatial leakage and availability at prediction time. Its optional feature policy is a downstream selection aid, not a universal ecological recommendation.
 

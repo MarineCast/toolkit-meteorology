@@ -95,6 +95,14 @@ potentially substantial disk use.
 legacy archive is recorded as unavailable; it is not evidence of parity. Use its `--help` to select
 the legacy root and report destination.
 
+`meteorology validate-science` compares selected frozen weather/daylight/lunar releases with
+checksum-verified reference files under a locked protocol. It writes paired and excluded
+Parquet records plus JSON/Markdown evidence into a new output directory. See the
+[scientific validation plan](scientific-validation-plan.md) and
+[input and command contract](scientific-validation-workflow.md). The command is offline; a
+synthetic run checks the software only, and a declared real reference still requires human
+review of independence, rights and assimilation overlap.
+
 ## 5. Refresh metadata
 
 ```sh
