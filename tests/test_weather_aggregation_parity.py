@@ -8,6 +8,7 @@ from meteorology.surface_weather.build import (
     DAILY_SCHEMA,
     aggregate_surface_weather_daily,
 )
+from meteorology.surface_weather.wind import validate_daily_wind_vectors
 
 METRICS = {
     "TEMPERATURE_2M_C": ("mean",),
@@ -138,6 +139,30 @@ def test_wind_direction_wraparound_and_calm_are_not_arithmetic_angles() -> None:
     calm = aggregate_surface_weather_daily(samples, 4).iloc[0]
     assert calm.WIND_VECTOR_SPEED_10M_MS == 0.0
     assert pd.isna(calm.WIND_DIRECTION_FROM_10M_DEG)
+
+
+def test_shared_daily_wind_rule_pairs_calm_and_noncalm_nulls() -> None:
+    samples = _samples().query("H3_INDEX == 'a' and DATE == '2024-03-10'").copy()
+    active = aggregate_surface_weather_daily(samples, 4)
+    validate_daily_wind_vectors(active)
+    missing = active.copy()
+    missing["WIND_DIRECTION_FROM_10M_DEG"] = np.nan
+    with pytest.raises(ValueError, match="null exactly for calm"):
+        validate_daily_wind_vectors(missing)
+    wrong_angle = active.copy()
+    wrong_angle["WIND_DIRECTION_FROM_10M_DEG"] = (
+        wrong_angle["WIND_DIRECTION_FROM_10M_DEG"] + 10.0
+    ) % 360.0
+    with pytest.raises(ValueError, match="differs from its mean components"):
+        validate_daily_wind_vectors(wrong_angle)
+    samples["U_WIND_10M_MS"] = [1.0, -1.0] * 3
+    samples["V_WIND_10M_MS"] = 0.0
+    calm = aggregate_surface_weather_daily(samples, 4)
+    validate_daily_wind_vectors(calm)
+    invented = calm.copy()
+    invented["WIND_DIRECTION_FROM_10M_DEG"] = 0.0
+    with pytest.raises(ValueError, match="null exactly for calm"):
+        validate_daily_wind_vectors(invented)
 
 
 def test_precipitation_uses_each_snapshot_once() -> None:

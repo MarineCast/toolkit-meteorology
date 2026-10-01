@@ -27,6 +27,7 @@ from meteorology.daily_matrix import export as export_daily_matrix
 from meteorology.daylight.inspect import inspect_daylight
 from meteorology.lunar.build import build_lunar
 from meteorology.lunar.inspect import inspect_lunar
+from meteorology.modeling.feature_policy import apply_feature_policy, load_feature_policy
 from meteorology.spatial_support.build import (
     build_meteorological_spatial_support,
     load_meteorological_support,
@@ -53,6 +54,7 @@ from meteorology.surface_weather.sampling import (
 from meteorology.surface_weather.source import (
     RAW_COLUMNS,
     hrrr_aws_archive_uri,
+    hrrr_logical_object_uri,
 )
 from meteorology.surface_weather.verify import (
     SHARED_LEGACY_FIELDS,
@@ -211,6 +213,125 @@ def test_changed_availability_lag_invalidates_cached_samples(tmp_path: Path, mon
         assert set(frame["AVAILABLE_AT_UTC"]) == {row.AVAILABLE_AT_UTC}
 
 
+def test_incremental_lag_change_rejects_stale_retained_rows(tmp_path: Path, monkeypatch) -> None:
+    config_path = _fixture_config(tmp_path, end_date="2024-01-03")
+    build_meteorological_spatial_support(config_path, run_id="support")
+    _patch_fetch(monkeypatch, [])
+    download_surface_weather(
+        config_path, start_date="2024-01-02", end_date="2024-01-02", run_id="first"
+    )
+    config = load_meteorological_config(config_path)
+    original = sha256_file(config.surface_weather.inventory_path)
+    raw = yaml.safe_load(config_path.read_text())
+    raw["surface_weather"]["time"]["availability_lag_hours"] = 8
+    config_path.write_text(yaml.safe_dump(raw, sort_keys=False))
+    _patch_fetch(monkeypatch, [], availability_lag_hours=8)
+    with pytest.raises(ValueError, match="Retained HRRR row has incompatible release policy"):
+        download_surface_weather(
+            config_path, start_date="2024-01-03", end_date="2024-01-03", run_id="extension"
+        )
+    assert sha256_file(config.surface_weather.inventory_path) == original
+    download_surface_weather(
+        config_path, start_date="2024-01-02", end_date="2024-01-03", run_id="rebuilt"
+    )
+    inventory = pq.read_table(config.surface_weather.inventory_path).to_pandas()
+    assert len(inventory) == 12
+    assert all(
+        pd.Timestamp(row.AVAILABLE_AT_UTC)
+        == pd.Timestamp(row.VALID_TIME_UTC) + pd.Timedelta(hours=8)
+        for row in inventory.itertuples(index=False)
+    )
+
+
+def test_disjoint_acquisitions_do_not_claim_a_complete_interval(tmp_path: Path, monkeypatch) -> None:
+    config_path = _fixture_config(tmp_path, end_date="2024-01-04")
+    build_meteorological_spatial_support(config_path, run_id="support")
+    _patch_fetch(monkeypatch, [])
+    download_surface_weather(
+        config_path, start_date="2024-01-02", end_date="2024-01-02", run_id="first"
+    )
+    config = load_meteorological_config(config_path)
+    original = sha256_file(config.surface_weather.inventory_path)
+    with pytest.raises(ValueError, match="continuous declared interval"):
+        download_surface_weather(
+            config_path, start_date="2024-01-04", end_date="2024-01-04", run_id="gap"
+        )
+    assert sha256_file(config.surface_weather.inventory_path) == original
+    working = pq.read_table(config.surface_weather.working_inventory_path).to_pandas()
+    assert len(working) == 12
+    download_surface_weather(
+        config_path, start_date="2024-01-03", end_date="2024-01-03", run_id="filled"
+    )
+    assert len(pq.read_table(config.surface_weather.inventory_path)) == 18
+
+
+def test_unrelated_failed_row_blocks_later_canonical_publication(tmp_path: Path, monkeypatch) -> None:
+    config_path = _fixture_config(tmp_path, end_date="2024-01-03")
+    build_meteorological_spatial_support(config_path, run_id="support")
+    config = load_meteorological_config(config_path)
+    failed_time = make_sample_times_for_local_date(
+        "2024-01-02", config.surface_weather.timezone, 4
+    )[0].isoformat()
+    _patch_fetch(monkeypatch, [], failed={failed_time})
+    with pytest.raises(RuntimeError, match="incomplete"):
+        download_surface_weather(
+            config_path, start_date="2024-01-02", end_date="2024-01-02", run_id="failed"
+        )
+    _patch_fetch(monkeypatch, [])
+    with pytest.raises(RuntimeError, match="canonical acquisition artifacts were not replaced"):
+        download_surface_weather(
+            config_path, start_date="2024-01-03", end_date="2024-01-03", run_id="later"
+        )
+    assert not config.surface_weather.inventory_path.exists()
+    assert not config.surface_weather.acquisition_manifest_path.exists()
+    working = pq.read_table(config.surface_weather.working_inventory_path).to_pandas()
+    assert working["STATUS"].value_counts().to_dict() == {"COMPLETE": 11, "FAILED": 1}
+    download_surface_weather(
+        config_path, start_date="2024-01-02", end_date="2024-01-03", run_id="recovered"
+    )
+    assert len(pq.read_table(config.surface_weather.inventory_path)) == 12
+
+
+def test_mirror_uri_is_retained_separately_from_logical_hrrr_object(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config_path = _fixture_config(tmp_path)
+    build_meteorological_spatial_support(config_path, run_id="support")
+    calls: list[str] = []
+    _patch_fetch(monkeypatch, calls)
+    from meteorology.surface_weather import download as module
+
+    fetch_core = module.fetch_cropped_hrrr_grid
+    fetch_precip = module.fetch_cropped_hrrr_precip_grid
+
+    def mirror_core(**kwargs):
+        frame, uri = fetch_core(**kwargs)
+        return frame, uri.replace("noaa-hrrr-bdp-pds.s3.amazonaws.com", "mirror.example.org")
+
+    def mirror_precip(**kwargs):
+        frame, uri = fetch_precip(**kwargs)
+        return frame, uri.replace("noaa-hrrr-bdp-pds.s3.amazonaws.com", "mirror.example.org")
+
+    monkeypatch.setattr(module, "fetch_cropped_hrrr_grid", mirror_core)
+    monkeypatch.setattr(module, "fetch_cropped_hrrr_precip_grid", mirror_precip)
+    download_surface_weather(config_path, run_id="mirror")
+    config = load_meteorological_config(config_path)
+    inventory = pq.read_table(config.surface_weather.inventory_path).to_pandas()
+    assert inventory["SOURCE_URI"].str.startswith("https://mirror.example.org/").all()
+    assert inventory["SOURCE_OBJECT_URI"].str.startswith("noaa-hrrr://archive/hrrr.").all()
+    assert all(
+        row.SOURCE_OBJECT_URI == hrrr_logical_object_uri(pd.Timestamp(row.VALID_TIME_UTC))
+        for row in inventory.itertuples(index=False)
+    )
+    assert inventory["SOURCE_RETRIEVED_AT_UTC"].notna().all()
+    assert inventory["PRECIP_RETRIEVED_AT_UTC"].notna().all()
+    assert len(calls) == 6
+    download_surface_weather(config_path, run_id="mirror-cache")
+    assert len(calls) == 6
+    resumed = pq.read_table(config.surface_weather.inventory_path).to_pandas()
+    assert resumed["SOURCE_URI"].equals(inventory["SOURCE_URI"])
+
+
 def test_matrix_rejects_same_count_changed_h3_membership(tmp_path: Path, monkeypatch) -> None:
     config_path = _fixture_config(tmp_path, end_date="2024-01-03")
     build_meteorological_spatial_support(config_path, run_id="support")
@@ -226,6 +347,11 @@ def test_matrix_rejects_same_count_changed_h3_membership(tmp_path: Path, monkeyp
         matrix_path,
     )
     assert validate_daily_matrix(matrix_path)["valid"]
+    selected = apply_feature_policy(pq.read_table(matrix_path).to_pandas(), load_feature_policy())
+    assert list(selected.columns[:3]) == ["DATE", "H3_INDEX", "H3_RESOLUTION"]
+    assert set(selected["H3_RESOLUTION"]) == {4, 5}
+    assert selected.loc[selected["H3_RESOLUTION"] == 4, "surface_weather__PRECIP_MM_DAY_ESTIMATE"].isna().all()
+    assert selected.loc[selected["H3_RESOLUTION"] == 5, "daylight__DAYLIGHT_HOURS"].isna().all()
     table = pq.read_table(matrix_path)
     dates = table["DATE"].to_pylist()
     resolutions = table["H3_RESOLUTION"].to_pylist()
@@ -267,6 +393,9 @@ def test_direct_r5_download_build_and_inspect_contract(tmp_path: Path, monkeypat
     )
     assert len(list((config.surface_weather.raw_dir / "crosswalks").rglob("*.parquet"))) == 1
     load_manifest(config.surface_weather.acquisition_manifest_path, verify_artifacts=True)
+    from meteorology.validation import validate_product
+
+    assert validate_product(config.surface_weather.acquisition_manifest_path)["valid"]
 
     config.surface_weather.manifest_path.parent.mkdir(parents=True, exist_ok=True)
     config.surface_weather.manifest_path.write_text(
@@ -286,8 +415,6 @@ def test_direct_r5_download_build_and_inspect_contract(tmp_path: Path, monkeypat
     assert np.allclose(daily["PRECIP_MM_DAY_ESTIMATE"], 86.4)
     assert not daily.isna().any().any()
     load_manifest(outputs[-1], verify_artifacts=True)
-    from meteorology.validation import validate_product
-
     checked = validate_product(outputs[-1])
     assert checked["valid"] and checked["row_count"] == 2 * len(support)
     from meteorology.releases import freeze_release
@@ -423,9 +550,14 @@ def test_direct_r5_download_build_and_inspect_contract(tmp_path: Path, monkeypat
         assert inspect().exists()
 
 
-@pytest.mark.parametrize("placeholder_uri", ["aws", "existing_validated_local_sample"])
+@pytest.mark.parametrize("field,placeholder", [
+    ("SOURCE_URI", "aws"),
+    ("SOURCE_URI", "existing_validated_local_sample"),
+    ("SOURCE_RETRIEVED_AT_UTC", "not-a-date"),
+    ("PRECIP_RETRIEVED_AT_UTC", "2024-01-01T00:00:00"),
+])
 def test_download_resumes_and_repairs_checksum_mismatch(
-    tmp_path: Path, monkeypatch, placeholder_uri: str
+    tmp_path: Path, monkeypatch, field: str, placeholder: str
 ) -> None:
     config_path = _fixture_config(tmp_path)
     build_meteorological_spatial_support(config_path, run_id="fixture-support")
@@ -434,16 +566,17 @@ def test_download_resumes_and_repairs_checksum_mismatch(
     download_surface_weather(config_path, run_id="download-first")
     config = load_meteorological_config(config_path)
     inventory = pq.read_table(config.surface_weather.working_inventory_path).to_pandas()
-    inventory["SOURCE_URI"] = placeholder_uri
+    inventory[field] = placeholder
     write_table(
         config.surface_weather.working_inventory_path,
         pa.Table.from_pandas(inventory, preserve_index=False),
         INVENTORY_SCHEMA,
     )
     download_surface_weather(config_path, run_id="download-resume")
-    assert len(calls) == 6
+    assert len(calls) == (6 if field == "PRECIP_RETRIEVED_AT_UTC" else 12)
     resumed = pq.read_table(config.surface_weather.inventory_path).to_pandas()
     assert resumed["SOURCE_URI"].str.startswith("https://noaa-hrrr-bdp-pds.s3.amazonaws.com/").all()
+    assert placeholder not in set(resumed[field].astype(str))
 
     first_time = make_sample_times_for_local_date("2024-01-02", config.surface_weather.timezone, 4)[
         0
@@ -453,7 +586,7 @@ def test_download_resumes_and_repairs_checksum_mismatch(
     tampered["TEMPERATURE_2M_C"] += 1.0
     write_table(path, pa.Table.from_pandas(tampered, preserve_index=False), SAMPLE_SCHEMA)
     download_surface_weather(config_path, run_id="download-repair")
-    assert len(calls) == 7
+    assert len(calls) == (7 if field == "PRECIP_RETRIEVED_AT_UTC" else 13)
 
     inventory = pq.read_table(config.surface_weather.inventory_path).to_pandas()
     crosswalk = config.surface_weather.raw_dir / inventory["CROSSWALK_RELATIVE_PATH"].iloc[0]
@@ -484,10 +617,6 @@ def test_existing_sample_snapshot_writes_only_candidate_metadata(
     _patch_fetch(monkeypatch, calls)
     download_surface_weather(config_path, run_id="download-first")
     config = load_meteorological_config(config_path)
-    config.surface_weather.working_inventory_path.unlink()
-    config.surface_weather.inventory_path.unlink()
-    config.surface_weather.acquisition_manifest_path.unlink()
-
     def reject_network(**_kwargs):
         raise AssertionError("snapshot mode must not acquire data")
 
@@ -509,6 +638,15 @@ def test_existing_sample_snapshot_writes_only_candidate_metadata(
     assert summary["complete_times"] == 6
     assert working.exists() and inventory.exists() and manifest.exists()
     load_manifest(manifest, verify_artifacts=True)
+    config.surface_weather.working_inventory_path.unlink()
+    config.surface_weather.inventory_path.unlink()
+    with pytest.raises(FileNotFoundError, match="Cannot reconstruct actual HRRR retrieval provenance"):
+        snapshot_existing_surface_weather_acquisition(
+            config_path,
+            working_inventory_path=snapshot_root / "unproven-working.parquet",
+            inventory_path=snapshot_root / "unproven-inventory.parquet",
+            manifest_path=snapshot_root / "unproven-manifest.json",
+        )
 
 
 def test_failed_extension_preserves_canonical_and_resumes_working_inventory(

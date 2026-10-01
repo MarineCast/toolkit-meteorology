@@ -20,7 +20,7 @@ Missingness: not applicable to complete deterministic output. Limitation: Centro
 
 ## Hrrr Sample
 
-Method: `hrrr_f00_f01_earth_wind_sample_v2`. Support: R5; one UTC valid time.
+Method: `hrrr_f00_f01_earth_wind_sample_v3`. Support: R5; one UTC valid time.
 
 | Field | Source field | Unit | Processing | Range | Kind | Predictor? |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -58,7 +58,7 @@ Missingness: reject incomplete source/support; no zero fill. Limitation: Retrosp
 
 ## Hrrr Inventory
 
-Method: `hrrr_f00_f01_earth_wind_sample_v2`. Support: R5; one UTC valid time.
+Method: `hrrr_f00_f01_earth_wind_sample_v3`. Support: R5; one UTC valid time.
 
 | Field | Source field | Unit | Processing | Range | Kind | Predictor? |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -66,7 +66,7 @@ Method: `hrrr_f00_f01_earth_wind_sample_v2`. Support: R5; one UTC valid time.
 | VALID_TIME_UTC | HRRR field valid time in UTC | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | INIT_TIME_UTC | HRRR core analysis initialization time in UTC | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | AVAILABLE_AT_UTC | declared source availability time in UTC | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
-| SOURCE_URI | provider URI for the core HRRR fields | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_URI | actual retrieval URI for the core HRRR fields; may be a supported mirror | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | RELATIVE_PATH | sample path relative to the acquisition inventory directory | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | CHECKSUM | SHA-256 checksum of the retained sample | SHA-256 hex digest | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | CROSSWALK_RELATIVE_PATH | crosswalk path relative to inventory directory | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
@@ -82,13 +82,17 @@ Method: `hrrr_f00_f01_earth_wind_sample_v2`. Support: R5; one UTC valid time.
 | PRECISION_QC_STATE | source precision and identity quality state | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | PRECIP_INIT_TIME_UTC | precipitation forecast initialization time in UTC | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | PRECIP_FORECAST_HOUR | precipitation forecast lead in hours | count or identifier | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
-| PRECIP_SOURCE_URI | provider URI for the precipitation field | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| PRECIP_SOURCE_URI | actual retrieval URI for the f01 precipitation field | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_OBJECT_URI | logical NOAA HRRR f00 object identity independent of mirror | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_RETRIEVED_AT_UTC | UTC time the core GRIB retrieval completed | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| PRECIP_OBJECT_URI | logical NOAA HRRR f01 object identity independent of mirror | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| PRECIP_RETRIEVED_AT_UTC | UTC time the f01 GRIB retrieval completed | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 
-Missingness: not applicable to complete deterministic output. Nullable exceptions: `SOURCE_URI`: null before or after unsuccessful acquisition; `RELATIVE_PATH`: null until a validated sample is published; `CHECKSUM`: null until a validated sample is published; `CROSSWALK_RELATIVE_PATH`: null until a validated crosswalk is published; `CROSSWALK_CHECKSUM`: null until a validated crosswalk is published; `SOURCE_GRID_HASH`: null when the source grid could not be validated; `FAILURE_REASON`: null when acquisition succeeded; `PRECIP_INIT_TIME_UTC`: null when precipitation source acquisition failed; `PRECIP_FORECAST_HOUR`: null when precipitation source acquisition failed; `PRECIP_SOURCE_URI`: null when precipitation source acquisition failed. Limitation: Centroid support is not an area average.
+Missingness: not applicable to complete deterministic output. Nullable exceptions: `SOURCE_URI`: null before or after unsuccessful acquisition; `RELATIVE_PATH`: null until a validated sample is published; `CHECKSUM`: null until a validated sample is published; `CROSSWALK_RELATIVE_PATH`: null until a validated crosswalk is published; `CROSSWALK_CHECKSUM`: null until a validated crosswalk is published; `SOURCE_GRID_HASH`: null when the source grid could not be validated; `FAILURE_REASON`: null when acquisition succeeded; `PRECIP_INIT_TIME_UTC`: null when precipitation source acquisition failed; `PRECIP_FORECAST_HOUR`: null when precipitation source acquisition failed; `PRECIP_SOURCE_URI`: null when precipitation source acquisition failed; `SOURCE_OBJECT_URI`: null before or after unsuccessful acquisition; `SOURCE_RETRIEVED_AT_UTC`: null before or after unsuccessful acquisition; `PRECIP_OBJECT_URI`: null when precipitation source acquisition failed; `PRECIP_RETRIEVED_AT_UTC`: null when precipitation source acquisition failed. Limitation: Centroid support is not an area average.
 
 ## Hrrr Crosswalk
 
-Method: `hrrr_f00_f01_earth_wind_sample_v2`. Support: R5; one source grid.
+Method: `hrrr_f00_f01_earth_wind_sample_v3`. Support: R5; one source grid.
 
 | Field | Source field | Unit | Processing | Range | Kind | Predictor? |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -101,7 +105,7 @@ Missingness: not applicable to complete deterministic output. Limitation: Centro
 
 ## Surface Weather
 
-Method: `hrrr_surface_daily_earth_wind_v3`. Support: R5; local date.
+Method: `hrrr_surface_daily_earth_wind_v4`. Support: R5; local date.
 
 | Field | Source field | Unit | Processing | Range | Kind | Predictor? |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -137,7 +141,7 @@ Missingness: reject incomplete source/support; no zero fill. Nullable exceptions
 
 ## Daylight
 
-Method: `daylight_astronomy_v2`. Support: R4; local date.
+Method: `daylight_astronomy_v3`. Support: R4; local date.
 
 | Field | Source field | Unit | Processing | Range | Kind | Predictor? |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -165,13 +169,16 @@ Missingness: not applicable to complete deterministic output. Nullable exception
 
 ## Daylight Day Of Year
 
-Method: `daylight_astronomy_v2`. Support: R4; 365-day lookup.
+Method: `daylight_astronomy_v3`. Support: R4; leap-year reference lookup with explicit month/day.
 
 | Field | Source field | Unit | Processing | Range | Kind | Predictor? |
 | --- | --- | --- | --- | --- | --- | --- |
 | H3_INDEX | H3 cell index at the declared native resolution | H3 cell identifier | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
-| DAY_OF_YEAR | ordinal local calendar day within year | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
-| WEIGHT_DAYLIGHT | DAYLIGHT_WEIGHT | fraction | calendar-day lookup from daily product | 0..1 | continuous | False |
+| DAY_OF_YEAR | ordinal in the year-2000 leap reference calendar | category or calendar value | copied from validated input or deterministically derived as documented by the producer | 1..366 in the leap reference calendar | metadata | False |
+| MONTH_DAY | local month and day as MM-DD | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| IS_LEAP_DAY | whether local DATE is February 29 | boolean | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOLAR_DAY_365 | 365-day solar proxy index with February 29 mapped to day 60 | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| WEIGHT_DAYLIGHT | DAYLIGHT_WEIGHT | fraction | selected daily weight on the explicit reference month/day; no extra rescaling | 0..1 | continuous | False |
 
 Missingness: not applicable to complete deterministic output. Limitation: Approximate geometry; excludes weather and terrain.
 

@@ -16,8 +16,12 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from .artifacts import checksum_path, load_manifest, parquet_contract, parquet_files, resolve_portable_path, stable_hash
+from .astronomy import local_civil_day_hours as _local_civil_day_hours
 from .core.data import meteorological_schemas as schemas
 from .methods import METHOD_VERSIONS
+from .surface_weather.wind import validate_daily_wind_vectors
+from .surface_weather.download import _expected_times, retrieval_matches_object, valid_retrieval_time
+from .surface_weather.source import hrrr_logical_object_uri
 
 
 EXPECTED: dict[str, tuple[pa.Schema, ...]] = {
@@ -49,15 +53,21 @@ RANGES = {
     "DAYLIGHT_FRACTION": (0.0, 1.0),
     "SOLAR_ELEVATION_MAX_DEG": (-90.0, 90.0),
     "SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG": (0.0, 90.0),
-    "LOW_SUN_DAYLIGHT_HOURS": (0.0, 24.0),
+    "LOW_SUN_DAYLIGHT_HOURS": (0.0, math.inf),
     "LUNAR_PHASE_ANGLE_DEG": (0.0, 360.0),
     "LUNAR_ILLUMINATION_FRACTION": (0.0, 1.0),
-    "NIGHT_HOURS": (0.0, 24.0),
-    "MOON_VISIBLE_DARK_HOURS": (0.0, 24.0),
-    "MOONLIT_DARK_HOURS": (0.0, 24.0),
+    "NIGHT_HOURS": (0.0, math.inf),
+    "MOON_VISIBLE_HOURS": (0.0, math.inf),
+    "MOON_VISIBLE_DARK_HOURS": (0.0, math.inf),
+    "MOONLIT_DARK_HOURS": (0.0, math.inf),
     "MOON_VISIBLE_DARK_FRACTION": (0.0, 1.0),
     "MOONLIT_DARK_FRACTION": (0.0, 1.0),
 }
+
+INTEGRATED_HOUR_FIELDS = frozenset({
+    "LOW_SUN_DAYLIGHT_HOURS", "NIGHT_HOURS", "MOON_VISIBLE_HOURS",
+    "MOON_VISIBLE_DARK_HOURS", "MOONLIT_DARK_HOURS",
+})
 
 
 def _validate_frame(
@@ -66,6 +76,7 @@ def _validate_frame(
     product: str,
     schema: pa.Schema,
     resolution: int | None,
+    timezone: str | None,
     seen: set[tuple[str, ...]],
     dates: dict[str, set[str]],
 ) -> None:
@@ -82,6 +93,19 @@ def _validate_frame(
             values = frame[column].dropna()
             if (values < lower).any() or (values >= upper if column == "WIND_DIRECTION_FROM_10M_DEG" else values > upper).any():
                 raise ValueError(f"{product}: {column} is outside its declared range.")
+    integrated = INTEGRATED_HOUR_FIELDS.intersection(frame.columns)
+    if integrated:
+        if not timezone or "DATE" not in frame:
+            raise ValueError(f"{product}: integrated-hour validation requires local dates and timezone.")
+        duration = frame["DATE"].astype(str).map(
+            lambda date: _local_civil_day_hours(date, timezone)
+        ).to_numpy(dtype=float)
+        for column in integrated:
+            values = frame[column].to_numpy(dtype=float)
+            if (values > duration + 1e-8).any():
+                raise ValueError(f"{product}: {column} exceeds its local civil-day duration.")
+    if product == "meteorological.surface_weather" and "WIND_VECTOR_SPEED_10M_MS" in frame:
+        validate_daily_wind_vectors(frame)
     if "H3_INDEX" in frame:
         cells = frame["H3_INDEX"].astype(str)
         for cell in cells.unique():
@@ -138,6 +162,7 @@ def validate_product(manifest_path: str | Path) -> dict[str, Any]:
     dates_by_schema: dict[tuple[str, ...], dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
     artifact_count = 0
     total_rows = 0
+    acquisition_frames: list[pd.DataFrame] = []
     for declared in manifest["artifacts"]:
         path = resolve_portable_path(declared["path"], base=Path(manifest_path).parent)
         observed = parquet_contract(path, published_path=path)
@@ -157,11 +182,56 @@ def validate_product(manifest_path: str | Path) -> dict[str, Any]:
                     raise ValueError(f"{product}: mixed H3 resolutions in {file}")
                 resolution = int(frame["H3_RESOLUTION"].iloc[0])
             _validate_frame(frame, product=product, schema=schema, resolution=resolution,
+                            timezone=manifest.get("resolved_config", {}).get("timezone"),
                             seen=seen_by_schema[key], dates=dates_by_schema[key])
+            if product == "meteorological.surface_weather.download":
+                acquisition_frames.append(frame)
             total_rows += len(frame)
         artifact_count += 1
     start = manifest.get("temporal_coverage", {}).get("start_date")
     end = manifest.get("temporal_coverage", {}).get("end_date")
+    if product == "meteorological.surface_weather.download":
+        resolved = manifest["resolved_config"]
+        if not start or not end:
+            raise ValueError("Acquisition manifest lacks its declared local-date interval.")
+        inventory = pd.concat(acquisition_frames, ignore_index=True)
+        expected = {
+            value.tz_convert("UTC").isoformat()
+            for value in _expected_times(start, end, resolved["timezone"], resolved["interval_hours"])
+        }
+        if len(inventory) != len(expected) or set(inventory["VALID_TIME_UTC"].astype(str)) != expected:
+            raise ValueError("Acquisition inventory does not cover its exact continuous schedule.")
+        if set(inventory["STATUS"].astype(str)) != {"COMPLETE"}:
+            raise ValueError("Acquisition inventory contains incomplete cycles.")
+        synthetic = resolved["source"].get("model") == "synthetic_hrrr"
+        for row in inventory.itertuples(index=False):
+            valid = pd.Timestamp(row.VALID_TIME_UTC)
+            invalid = row.AVAILABLE_AT_UTC != (
+                valid + pd.Timedelta(hours=resolved["availability_lag_hours"])
+            ).isoformat()
+            if synthetic:
+                invalid |= (
+                    row.SOURCE_BACKEND != "synthetic_fixture"
+                    or not str(row.SOURCE_URI).startswith("synthetic://")
+                    or not str(row.PRECIP_SOURCE_URI).startswith("synthetic://")
+                    or pd.notna(row.SOURCE_OBJECT_URI)
+                    or pd.notna(row.PRECIP_OBJECT_URI)
+                )
+            else:
+                source_object = hrrr_logical_object_uri(valid)
+                precip_object = hrrr_logical_object_uri(
+                    valid, resolved["source"]["precipitation_forecast_hour"]
+                )
+                invalid |= (
+                    row.SOURCE_OBJECT_URI != source_object
+                    or row.PRECIP_OBJECT_URI != precip_object
+                    or not retrieval_matches_object(row.SOURCE_URI, source_object)
+                    or not retrieval_matches_object(row.PRECIP_SOURCE_URI, precip_object)
+                    or not valid_retrieval_time(row.SOURCE_RETRIEVED_AT_UTC)
+                    or not valid_retrieval_time(row.PRECIP_RETRIEVED_AT_UTC)
+                )
+            if invalid:
+                raise ValueError(f"Acquisition inventory row violates release provenance: {valid}.")
     if start and end and product != "meteorological.surface_weather.download":
         expected_dates = set(pd.date_range(start, end).strftime("%Y-%m-%d"))
         for key, dates in dates_by_schema.items():
@@ -268,23 +338,11 @@ def validate_daily_matrix(path: str | Path) -> dict[str, Any]:
             )]].rename(columns=lambda name: name.removeprefix(f"{component}__"))
             _validate_frame(
                 native, product=f"meteorological.{component}", schema=native_schema,
-                resolution=resolution, seen=native_seen[component], dates=native_dates[component]
+                resolution=resolution, timezone=metadata["timezone"],
+                seen=native_seen[component], dates=native_dates[component]
             )
             if component == "surface_weather":
-                calm = native["WIND_VECTOR_SPEED_10M_MS"].to_numpy(dtype=float) <= 1e-12
-                null_direction = native["WIND_DIRECTION_FROM_10M_DEG"].isna().to_numpy()
-                if not np.array_equal(calm, null_direction):
-                    raise ValueError("Daily matrix wind direction nulls do not match calm mean vectors.")
-                u = native["U_WIND_10M_MS_MEAN"].to_numpy(dtype=float)
-                v = native["V_WIND_10M_MS_MEAN"].to_numpy(dtype=float)
-                speed = native["WIND_VECTOR_SPEED_10M_MS"].to_numpy(dtype=float)
-                if not np.allclose(np.hypot(u, v), speed, rtol=0, atol=1e-8):
-                    raise ValueError("Daily matrix wind vector speed differs from mean components.")
-                direction = native["WIND_DIRECTION_FROM_10M_DEG"].to_numpy(dtype=float)
-                expected_direction = (np.degrees(np.arctan2(-u, -v)) + 360.0) % 360.0
-                angular_error = ((direction[~calm] - expected_direction[~calm] + 180.0) % 360.0) - 180.0
-                if not np.allclose(angular_error, 0.0, atol=1e-6):
-                    raise ValueError("Daily matrix wind direction differs from its mean components.")
+                validate_daily_wind_vectors(native)
             elif component == "daylight":
                 absent = native["SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG"].isna().to_numpy()
                 no_sampled_sun = native["SOLAR_ELEVATION_MAX_DEG"].to_numpy(dtype=float) <= 0.0

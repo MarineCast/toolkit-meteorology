@@ -13,6 +13,7 @@ import pandas as pd
 import yaml
 
 from meteorology.core.config.paths import project_root
+from meteorology.components import DAILY_COMPONENTS
 
 DEFAULT_CATALOG_PATH = Path("config/feature_catalog.yaml")
 DEFAULT_POLICY_PATH = Path(
@@ -27,7 +28,7 @@ DETERMINISTIC_ALIASES = {
     ("daylight_daily", "DAYLIGHT_FRACTION"): "deterministic_transform_of_daylight_hours",
     ("daylight_daily", "DAYLIGHT_WEIGHT"): "duplicate_of_daylight_fraction",
     ("daylight_day_of_year", "DAYLIGHT_FRACTION"): ("deterministic_transform_of_daylight_hours"),
-    ("daylight_day_of_year", "WEIGHT_DAYLIGHT"): "scaled_alias_of_daylight_weight",
+    ("daylight_day_of_year", "WEIGHT_DAYLIGHT"): "reference_calendar_copy_of_selected_daily_weight",
     ("lunar_daily", "LUNAR_PHASE_ANGLE_DEG"): "deterministic_transform_of_lunar_age_days",
     ("lunar_daily", "WEIGHT_LUNAR_ILLUMINATION"): ("duplicate_of_lunar_illumination_fraction"),
     ("lunar_daily", "WEIGHT_MOONLIT_DARK_HOURS"): ("duplicate_of_moonlit_dark_fraction"),
@@ -94,7 +95,7 @@ def build_feature_policy(catalog: Mapping[str, Any]) -> dict[str, Any]:
                 }
             )
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "policy_scope": "default_ecological_occurrence_model",
         "feature_catalog_subset_checksum": checksum,
         "complete_scientific_products_retained": True,
@@ -137,13 +138,19 @@ def apply_feature_policy(frame: pd.DataFrame, policy: Mapping[str, Any]) -> pd.D
     records = policy.get("features")
     if not isinstance(records, Sequence):
         raise ValueError("Meteorological model-feature policy has no feature records.")
+    native_prefixes = tuple(f"{prefix}__" for prefix, _ in DAILY_COMPONENTS.values())
+    if any(str(column).startswith(native_prefixes) for column in frame.columns):
+        missing_keys = {"DATE", "H3_INDEX", "H3_RESOLUTION"}.difference(frame.columns)
+        if missing_keys:
+            raise ValueError(f"Native meteorology matrix is missing identity keys: {sorted(missing_keys)}")
     selected: list[str] = []
     missing: list[str] = []
     for record in records:
         if not isinstance(record, Mapping) or not record.get("included_by_default"):
             continue
         column = str(record["column"])
-        prefixed = f"{record['product']}__{column}"
+        component = DAILY_COMPONENTS.get(str(record["product"]))
+        prefixed = f"{component[0] if component else record['product']}__{column}"
         if prefixed in frame.columns:
             selected.append(prefixed)
         elif column in frame.columns:
@@ -153,7 +160,7 @@ def apply_feature_policy(frame: pd.DataFrame, policy: Mapping[str, Any]) -> pd.D
     missing = sorted(missing)
     if missing:
         raise ValueError(f"Model matrix is missing policy-selected fields: {missing[:10]}")
-    keys = [column for column in ("H3_INDEX", "DATE") if column in frame.columns]
+    keys = [column for column in ("DATE", "H3_INDEX", "H3_RESOLUTION") if column in frame.columns]
     return frame[[*keys, *sorted(set(selected))]].copy()
 
 

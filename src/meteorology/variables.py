@@ -24,7 +24,7 @@ PRODUCTS: dict[str, tuple[pa.Schema, str, str]] = {
     "hrrr_crosswalk": (schemas.HRRR_CROSSWALK_SCHEMA, "meteorological.surface_weather.download", "R5; one source grid"),
     "surface_weather": (schemas.SURFACE_WEATHER_DAILY_SCHEMA, "meteorological.surface_weather", "R5; local date"),
     "daylight": (schemas.DAYLIGHT_SCHEMA, "meteorological.daylight", "R4; local date"),
-    "daylight_day_of_year": (schemas.DAYLIGHT_DOY_SCHEMA, "meteorological.daylight", "R4; 365-day lookup"),
+    "daylight_day_of_year": (schemas.DAYLIGHT_DOY_SCHEMA, "meteorological.daylight", "R4; leap-year reference lookup with explicit month/day"),
     "lunar": (schemas.LUNAR_SCHEMA, "meteorological.lunar", "R5; local date"),
 }
 
@@ -70,7 +70,7 @@ SOLAR: dict[str, tuple[str, str, str, str, str]] = {
     "SOLAR_ELEVATION_MAX_DEG": ("approximate solar geometry", "degrees", "maximum of local-day sample altitudes", "-90..90", "sampled maximum solar elevation"),
     "SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG": ("approximate solar geometry", "degrees", "mean positive sampled altitude", "0..90 or null", "sampled mean elevation during daylight; undefined on polar night"),
     "LOW_SUN_DAYLIGHT_HOURS": ("approximate solar geometry", "h", "count of daylight samples under configured low-sun threshold * timestep", "0..25", "low solar-elevation hours"),
-    "WEIGHT_DAYLIGHT": ("DAYLIGHT_WEIGHT", "fraction", "calendar-day lookup from daily product", "0..1", "365-day compact daylight weight"),
+    "WEIGHT_DAYLIGHT": ("DAYLIGHT_WEIGHT", "fraction", "selected daily weight on the explicit reference month/day; no extra rescaling", "0..1", "compact reference-calendar daylight weight"),
 }
 
 LUNAR: dict[str, tuple[str, str, str, str, str]] = {
@@ -98,6 +98,8 @@ PHYSICAL = {
 
 INVENTORY_NULLS = {
     "SOURCE_URI": "null before or after unsuccessful acquisition",
+    "SOURCE_OBJECT_URI": "null before or after unsuccessful acquisition",
+    "SOURCE_RETRIEVED_AT_UTC": "null before or after unsuccessful acquisition",
     "RELATIVE_PATH": "null until a validated sample is published",
     "CHECKSUM": "null until a validated sample is published",
     "CROSSWALK_RELATIVE_PATH": "null until a validated crosswalk is published",
@@ -107,6 +109,8 @@ INVENTORY_NULLS = {
     "PRECIP_INIT_TIME_UTC": "null when precipitation source acquisition failed",
     "PRECIP_FORECAST_HOUR": "null when precipitation source acquisition failed",
     "PRECIP_SOURCE_URI": "null when precipitation source acquisition failed",
+    "PRECIP_OBJECT_URI": "null when precipitation source acquisition failed",
+    "PRECIP_RETRIEVED_AT_UTC": "null when precipitation source acquisition failed",
 }
 
 # Identity, acquisition, calendar and quality fields are documented as
@@ -139,8 +143,12 @@ METADATA_SOURCE = {
     "PRECIP_VALID_TIME_UTC": "precipitation forecast valid time in UTC",
     "PRECIP_FORECAST_HOUR": "precipitation forecast lead in hours",
     "PRECIP_SOURCE_PRODUCT": "precipitation GRIB product identifier",
-    "SOURCE_URI": "provider URI for the core HRRR fields",
-    "PRECIP_SOURCE_URI": "provider URI for the precipitation field",
+    "SOURCE_URI": "actual retrieval URI for the core HRRR fields; may be a supported mirror",
+    "SOURCE_OBJECT_URI": "logical NOAA HRRR f00 object identity independent of mirror",
+    "SOURCE_RETRIEVED_AT_UTC": "UTC time the core GRIB retrieval completed",
+    "PRECIP_SOURCE_URI": "actual retrieval URI for the f01 precipitation field",
+    "PRECIP_OBJECT_URI": "logical NOAA HRRR f01 object identity independent of mirror",
+    "PRECIP_RETRIEVED_AT_UTC": "UTC time the f01 GRIB retrieval completed",
     "RELATIVE_PATH": "sample path relative to the acquisition inventory directory",
     "CHECKSUM": "SHA-256 checksum of the retained sample",
     "CROSSWALK_RELATIVE_PATH": "crosswalk path relative to inventory directory",
@@ -213,6 +221,10 @@ def catalog() -> dict[str, list[dict[str, Any]]]:
                 )
                 kind = "metadata"
                 predictor = False
+                if family == "daylight_day_of_year" and field.name == "DAY_OF_YEAR":
+                    source = "ordinal in the year-2000 leap reference calendar"
+                    interpretation = "reference ordinal; use MONTH_DAY or SOLAR_DAY_365 for joins across years"
+                    valid_range = "1..366 in the leap reference calendar"
             else:
                 source, unit, processing, valid_range, interpretation = details
                 kind = "circular" if field.name == "WIND_DIRECTION_FROM_10M_DEG" else (

@@ -8,6 +8,15 @@ import numpy as np
 import pandas as pd
 
 
+def local_civil_day_hours(date: str | pd.Timestamp, timezone_name: str) -> float:
+    """Return the elapsed UTC hours between consecutive local midnights."""
+
+    day = pd.Timestamp(date).normalize()
+    start = day.tz_localize(timezone_name).tz_convert("UTC")
+    end = (day + pd.Timedelta(days=1)).tz_localize(timezone_name).tz_convert("UTC")
+    return float((end - start) / pd.Timedelta(hours=1))
+
+
 def _wrap_degrees(value: np.ndarray | float) -> np.ndarray | float:
     return np.mod(value, 360.0)
 

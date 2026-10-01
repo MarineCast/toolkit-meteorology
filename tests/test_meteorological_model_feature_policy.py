@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 import yaml
 
 from meteorology.modeling.feature_policy import (
@@ -11,6 +12,7 @@ from meteorology.modeling.feature_policy import (
     build_feature_policy,
     load_feature_policy,
 )
+from meteorology.components import DAILY_COMPONENTS
 
 
 def test_policy_excludes_metadata_observer_effort_and_deterministic_aliases() -> None:
@@ -34,12 +36,18 @@ def test_checked_in_policy_matches_catalog_and_applies_prefixed_columns() -> Non
         {
             "H3_INDEX": ["cell"],
             "DATE": ["2024-01-01"],
-            **{f"{row['product']}__{row['column']}": [1.0] for row in selected},
+            "H3_RESOLUTION": [5],
+            **{
+                f"{DAILY_COMPONENTS[row['product']][0]}__{row['column']}": [1.0]
+                for row in selected
+            },
         }
     )
     result = apply_feature_policy(frame, policy)
-    assert list(result.columns[:2]) == ["H3_INDEX", "DATE"]
-    assert result.shape[1] == len({(row["product"], row["column"]) for row in selected}) + 2
+    assert list(result.columns[:3]) == ["DATE", "H3_INDEX", "H3_RESOLUTION"]
+    assert result.shape[1] == len({(row["product"], row["column"]) for row in selected}) + 3
+    with pytest.raises(ValueError, match="missing identity keys"):
+        apply_feature_policy(frame.drop(columns="H3_RESOLUTION"), policy)
 
 
 def test_declared_deterministic_aliases_are_exact_in_producer_outputs() -> None:

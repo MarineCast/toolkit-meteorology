@@ -194,6 +194,18 @@ def hrrr_aws_archive_uri(valid_time_utc: pd.Timestamp, forecast_hour: int = FORE
     )
 
 
+def hrrr_logical_object_uri(
+    valid_time_utc: pd.Timestamp, forecast_hour: int = FORECAST_HOUR
+) -> str:
+    """Name the NOAA cycle/product/lead independently of its retrieval host."""
+
+    from urllib.parse import urlsplit
+
+    return "noaa-hrrr://archive" + urlsplit(
+        hrrr_aws_archive_uri(valid_time_utc, forecast_hour)
+    ).path
+
+
 def _grid_hash(latitudes: pd.Series, longitudes: pd.Series) -> str:
     from ..artifacts import stable_hash
 

@@ -67,6 +67,8 @@ nav:
   - Development:
       - Architecture: ARCHITECTURE.md
       - Development checks: DEVELOPMENT.md
+      - Archived validation: archived-validation.md
+      - Scientific validation plan: scientific-validation-plan.md
       - Release process: development/release-process.md
       - Repository presentation: development/repository-presentation.md
       - Migration history: MIGRATION.md

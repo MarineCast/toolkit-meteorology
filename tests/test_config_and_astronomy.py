@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from collections import defaultdict
 from pathlib import Path
 
+import h3
 import pandas as pd
 import numpy as np
 import pytest
@@ -19,7 +21,9 @@ from meteorology.daylight.compute import (
     solar_day_365,
 )
 from meteorology.daylight.features import (
+    build_daylight_day_of_year_features,
     build_daylight_features,
+    compact_daylight_weight_output,
 )
 from meteorology.lunar.compute import (
     SYNODIC_MONTH_DAYS,
@@ -32,6 +36,8 @@ from meteorology.lunar.validation import (
 from meteorology.surface_weather.sampling import (
     make_sample_times_for_local_date,
 )
+from meteorology.core.data.meteorological_schemas import LUNAR_SCHEMA
+from meteorology.validation import _local_civil_day_hours, _validate_frame
 
 
 def test_config_is_strict_and_latest_complete_is_timezone_aware(tmp_path: Path) -> None:
@@ -56,6 +62,28 @@ def test_config_is_strict_and_latest_complete_is_timezone_aware(tmp_path: Path) 
         )
         == "2026-07-28"
     )
+
+
+@pytest.mark.parametrize(
+    ("boundary", "before", "after"),
+    [
+        ("2024-03-11T02:00:00", "2024-03-09", "2024-03-10"),
+        ("2024-11-04T02:00:00", "2024-11-02", "2024-11-03"),
+    ],
+)
+def test_latest_complete_uses_local_calendar_at_dst_boundaries(
+    boundary: str, before: str, after: str
+) -> None:
+    from dataclasses import replace
+
+    config = load_meteorological_config("config/data/environment_meteorological.yaml")
+    weather = replace(config.surface_weather, end_date="latest_complete")
+    instant = pd.Timestamp(boundary, tz="America/Los_Angeles")
+    assert weather.resolved_end_date(instant - pd.Timedelta(minutes=1)) == before
+    assert weather.resolved_end_date(instant) == after
+    assert weather.resolved_end_date(
+        pd.Timestamp("2024-03-11T07:00:00", tz="America/Los_Angeles")
+    ) == "2024-03-10"
 
 
 @pytest.mark.parametrize(
@@ -133,6 +161,31 @@ def test_solar_sampling_preserves_dst_day_lengths() -> None:
     assert len(make_sample_times_for_local_date("2024-11-03", "America/Los_Angeles", 4)) == 6
 
 
+def test_integrated_hours_use_the_actual_local_civil_day() -> None:
+    zone = "America/Los_Angeles"
+    assert _local_civil_day_hours("2024-03-10", zone) == 23
+    assert _local_civil_day_hours("2024-07-01", zone) == 24
+    assert _local_civil_day_hours("2024-11-03", zone) == 25
+    cell = h3.latlng_to_cell(85.0, 0.0, 5)
+    cells = pd.DataFrame({"h3": [cell], "centroid_lat": [85.0], "centroid_lon": [0.0]})
+    frame = compute_lunar_illumination_table(
+        cells, "2024-11-03", "2024-11-03", timezone_name=zone, timestep_minutes=30
+    ).rename(columns={"h3": "H3_INDEX"})
+    frame.columns = [str(column).upper() for column in frame]
+    frame = frame[LUNAR_SCHEMA.names]
+    assert frame.loc[0, "NIGHT_HOURS"] == 25
+    _validate_frame(
+        frame, product="meteorological.lunar", schema=LUNAR_SCHEMA,
+        resolution=5, timezone=zone, seen=set(), dates=defaultdict(set),
+    )
+    frame.loc[0, "NIGHT_HOURS"] = 25.1
+    with pytest.raises(ValueError, match="exceeds its local civil-day duration"):
+        _validate_frame(
+            frame, product="meteorological.lunar", schema=LUNAR_SCHEMA,
+            resolution=5, timezone=zone, seen=set(), dates=defaultdict(set),
+        )
+
+
 def test_daylight_formula_and_leap_day_policy_are_characterized() -> None:
     assert compute_daylight_hours(0.0, 81) == pytest.approx(12.0)
     assert solar_day_365(2, 29) == 60
@@ -146,6 +199,18 @@ def test_daylight_formula_and_leap_day_policy_are_characterized() -> None:
     assert leap["solar_day_365"].tolist() == [60, 60]
     assert leap["is_leap_day"].tolist() == [True, False]
     assert leap["daylight_hours"].nunique() == 1
+
+
+def test_compact_daylight_keeps_calendar_identity_and_selected_weight() -> None:
+    cells = pd.DataFrame({"h3": ["equator"], "centroid_lat": [0.0], "centroid_lon": [0.0]})
+    full = build_daylight_day_of_year_features(cells, default_weight="fraction")
+    compact = compact_daylight_weight_output(full).set_index("month_day")
+    assert compact.loc["03-01", "day_of_year"] == 61
+    assert compact.loc["03-01", "solar_day_365"] == 60
+    assert compact.loc["03-02", "day_of_year"] == 62
+    assert compact.loc["03-02", "solar_day_365"] == 61
+    assert compact.loc["02-29", "is_leap_day"]
+    assert compact["weight_daylight"].eq(0.5).all()
 
 
 def test_lunar_kernel_preserves_characterized_legacy_calculations() -> None:

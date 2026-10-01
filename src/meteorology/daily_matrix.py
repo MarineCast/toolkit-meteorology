@@ -16,10 +16,11 @@ import pyarrow.parquet as pq
 from .artifacts import load_manifest, resolve_portable_path, checksum_path, code_state, stable_hash
 from .core.artifacts import TransactionalFamilyPublisher, atomic_write_json
 from ._version import __version__
+from .components import NATIVE_RESOLUTIONS
 from .methods import method_version
 
 KEYS = ["DATE", "H3_INDEX", "H3_RESOLUTION"]
-RESOLUTIONS = {"surface_weather": 5, "daylight": 4, "lunar": 5}
+RESOLUTIONS = NATIVE_RESOLUTIONS
 
 
 def units(column: str) -> str:

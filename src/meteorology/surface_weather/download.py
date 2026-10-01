@@ -9,9 +9,11 @@ import os
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
 from typing import Any
+from urllib.parse import urlsplit
 
 import numpy as np
 import pandas as pd
@@ -21,6 +23,7 @@ import pyarrow.parquet as pq
 from meteorology.core.artifacts import TransactionalFamilyPublisher, atomic_write_json
 from meteorology.core.data.meteorological_schemas import HRRR_INVENTORY_SCHEMA as INVENTORY_SCHEMA
 from meteorology.core.data.meteorological_schemas import (
+    LEGACY_HRRR_INVENTORY_SCHEMA,
     PRE_F01_INVENTORY_SCHEMA,
 )
 
@@ -51,7 +54,7 @@ from .source import (
     HRRR_VARIABLES,
     fetch_cropped_hrrr_grid,
     fetch_cropped_hrrr_precip_grid,
-    hrrr_aws_archive_uri,
+    hrrr_logical_object_uri,
     replace_source_grid_precipitation,
 )
 
@@ -86,20 +89,48 @@ def _expected_times(
     return times
 
 
+def retrieval_matches_object(retrieval_uri: str | None, object_uri: str) -> bool:
+    """Require the expected object key on a recorded HTTPS/S3 retrieval URI."""
+
+    if not retrieval_uri:
+        return False
+    actual, logical = urlsplit(str(retrieval_uri)), urlsplit(object_uri)
+    return (
+        actual.scheme in {"https", "s3"}
+        and bool(actual.netloc)
+        and actual.path.endswith(logical.path)
+    )
+
+
+def valid_retrieval_time(value: object) -> bool:
+    """Require a parseable UTC timestamp for a recorded source retrieval."""
+
+    try:
+        parsed = pd.Timestamp(value)
+    except (TypeError, ValueError):
+        return False
+    return not pd.isna(parsed) and parsed.tzinfo is not None and parsed.utcoffset() == pd.Timedelta(0)
+
+
 def _load_inventory(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     parquet = pq.ParquetFile(path)
     schema = parquet.schema_arrow
-    if not schema.equals(INVENTORY_SCHEMA, check_metadata=False) and not schema.equals(
-        PRE_F01_INVENTORY_SCHEMA, check_metadata=False
-    ):
+    if not any(schema.equals(candidate, check_metadata=False) for candidate in (
+        INVENTORY_SCHEMA, LEGACY_HRRR_INVENTORY_SCHEMA, PRE_F01_INVENTORY_SCHEMA
+    )):
         raise ValueError(f"R5 HRRR inventory has an incompatible schema: {path}")
     rows = parquet.read().to_pylist()
     for row in rows:
         row.setdefault("PRECIP_INIT_TIME_UTC", None)
         row.setdefault("PRECIP_FORECAST_HOUR", None)
         row.setdefault("PRECIP_SOURCE_URI", None)
+        for name in (
+            "SOURCE_OBJECT_URI", "SOURCE_RETRIEVED_AT_UTC",
+            "PRECIP_OBJECT_URI", "PRECIP_RETRIEVED_AT_UTC",
+        ):
+            row.setdefault(name, None)
     valid_times = [str(row["VALID_TIME_UTC"]) for row in rows]
     if len(valid_times) != len(set(valid_times)):
         raise ValueError(f"R5 HRRR inventory contains duplicate valid times: {path}")
@@ -246,6 +277,8 @@ def _inventory_row(
     status: str,
     source_uri: str | None = None,
     precip_source_uri: str | None = None,
+    source_retrieved_at_utc: str | None = None,
+    precip_retrieved_at_utc: str | None = None,
     failure_reason: str | None = None,
     sample_checksum: str | None = None,
     crosswalk_checksum: str | None = None,
@@ -293,6 +326,10 @@ def _inventory_row(
         "PRECIP_INIT_TIME_UTC": precip_init.isoformat() if status == "COMPLETE" else None,
         "PRECIP_FORECAST_HOUR": precip_forecast_hour if status == "COMPLETE" else None,
         "PRECIP_SOURCE_URI": precip_source_uri if status == "COMPLETE" else None,
+        "SOURCE_OBJECT_URI": hrrr_logical_object_uri(valid) if status == "COMPLETE" else None,
+        "SOURCE_RETRIEVED_AT_UTC": source_retrieved_at_utc if status == "COMPLETE" else None,
+        "PRECIP_OBJECT_URI": hrrr_logical_object_uri(valid, precip_forecast_hour) if status == "COMPLETE" else None,
+        "PRECIP_RETRIEVED_AT_UTC": precip_retrieved_at_utc if status == "COMPLETE" else None,
     }
 
 
@@ -308,20 +345,61 @@ def _publish_complete_acquisition(
     run_id: str,
 ) -> None:
     weather = config.surface_weather
+    expected_times = _expected_times(start, end, weather.timezone, weather.interval_hours)
+    expected_keys = {value.tz_convert("UTC").isoformat() for value in expected_times}
+    observed_keys = [str(row["VALID_TIME_UTC"]) for row in rows]
+    if len(observed_keys) != len(expected_keys) or set(observed_keys) != expected_keys:
+        raise ValueError(
+            "Canonical HRRR acquisition requires every valid time in its continuous "
+            f"declared interval {start} through {end}, exactly once."
+        )
+    support = load_meteorological_support(weather.h3_resolution, config_path)
     for row in rows:
         valid_time = pd.Timestamp(str(row["VALID_TIME_UTC"]))
-        expected_uri = hrrr_aws_archive_uri(valid_time)
-        expected_precip_uri = hrrr_aws_archive_uri(valid_time, weather.precipitation_forecast_hour)
+        expected_uri = hrrr_logical_object_uri(valid_time)
+        expected_precip_uri = hrrr_logical_object_uri(valid_time, weather.precipitation_forecast_hour)
         if (
             row.get("STATUS") != "COMPLETE"
-            or row.get("SOURCE_URI") != expected_uri
-            or row.get("PRECIP_SOURCE_URI") != expected_precip_uri
+            or row.get("SOURCE_OBJECT_URI") != expected_uri
+            or row.get("PRECIP_OBJECT_URI") != expected_precip_uri
+            or not retrieval_matches_object(row.get("SOURCE_URI"), expected_uri)
+            or not retrieval_matches_object(row.get("PRECIP_SOURCE_URI"), expected_precip_uri)
+            or not valid_retrieval_time(row.get("SOURCE_RETRIEVED_AT_UTC"))
+            or not valid_retrieval_time(row.get("PRECIP_RETRIEVED_AT_UTC"))
             or int(row.get("PRECIP_FORECAST_HOUR") or -1) != weather.precipitation_forecast_hour
         ):
             raise ValueError(
                 "Canonical HRRR acquisition publication requires COMPLETE f00 core and f01 "
                 f"precipitation provenance for {valid_time.isoformat()}."
             )
+        expected_available = (
+            valid_time + pd.Timedelta(hours=weather.availability_lag_hours)
+        ).isoformat()
+        if (
+            row.get("LOCAL_DATE") != valid_time.tz_convert(weather.timezone).strftime("%Y-%m-%d")
+            or row.get("AVAILABLE_AT_UTC") != expected_available
+            or int(row.get("H3_CELL_COUNT") or -1) != len(support)
+            or int(row.get("H3_RESOLUTION") or -1) != weather.h3_resolution
+        ):
+            raise ValueError(f"Retained HRRR row has incompatible release policy: {valid_time}.")
+        sample_relative = Path(str(row.get("RELATIVE_PATH") or ""))
+        crosswalk_relative = Path(str(row.get("CROSSWALK_RELATIVE_PATH") or ""))
+        if any(path.is_absolute() or ".." in path.parts or not path.parts for path in (
+            sample_relative, crosswalk_relative
+        )):
+            raise ValueError(f"Retained HRRR row has an unsafe artifact path: {valid_time}.")
+        sample = weather.raw_dir / sample_relative
+        crosswalk = weather.raw_dir / crosswalk_relative
+        if (
+            not _valid_sample(
+                sample, support, valid_time_utc=valid_time,
+                availability_lag_hours=weather.availability_lag_hours,
+            )
+            or sha256_file(sample) != row.get("CHECKSUM")
+            or not _valid_crosswalk(crosswalk, support, str(row.get("SOURCE_GRID_HASH")))
+            or sha256_file(crosswalk) != row.get("CROSSWALK_CHECKSUM")
+        ):
+            raise ValueError(f"Retained HRRR sample or crosswalk is invalid: {valid_time}.")
     inventory_table = pa.Table.from_pylist(rows, schema=INVENTORY_SCHEMA)
     publication_parent = Path(
         os.path.commonpath([inventory_destination.parent, manifest_destination.parent])
@@ -496,7 +574,8 @@ def download_surface_weather(
         destination = sample_path(weather.raw_dir, valid, weather.timezone)
         existing = existing_by_time.get(valid_key, {})
         precip_forecast_hour = weather.precipitation_forecast_hour
-        expected_precip_uri = hrrr_aws_archive_uri(valid, precip_forecast_hour)
+        expected_source_uri = hrrr_logical_object_uri(valid)
+        expected_precip_uri = hrrr_logical_object_uri(valid, precip_forecast_hour)
         expected_checksum = str(existing.get("CHECKSUM") or "")
         expected_crosswalk_checksum = str(existing.get("CROSSWALK_CHECKSUM") or "")
         expected_hash = str(existing.get("SOURCE_GRID_HASH") or "") or None
@@ -528,8 +607,15 @@ def download_surface_weather(
                     and _valid_crosswalk(existing_crosswalk, support, expected_hash)
                 )
             crosswalk_ok = crosswalk_validation_cache[validation_key] and crosswalk_checksum_ok
+        source_provenance_ok = (
+            existing.get("SOURCE_OBJECT_URI") == expected_source_uri
+            and retrieval_matches_object(existing.get("SOURCE_URI"), expected_source_uri)
+            and valid_retrieval_time(existing.get("SOURCE_RETRIEVED_AT_UTC"))
+        )
         precip_provenance_ok = (
-            str(existing.get("PRECIP_SOURCE_URI") or "") == expected_precip_uri
+            existing.get("PRECIP_OBJECT_URI") == expected_precip_uri
+            and retrieval_matches_object(existing.get("PRECIP_SOURCE_URI"), expected_precip_uri)
+            and valid_retrieval_time(existing.get("PRECIP_RETRIEVED_AT_UTC"))
             and int(existing.get("PRECIP_FORECAST_HOUR") or -1) == precip_forecast_hour
         )
         if (
@@ -537,9 +623,9 @@ def download_surface_weather(
             and checksum_ok
             and _valid_sample(destination, support, valid_time_utc=valid, availability_lag_hours=weather.availability_lag_hours)
             and crosswalk_ok
+            and source_provenance_ok
             and precip_provenance_ok
         ):
-            source_uri = hrrr_aws_archive_uri(valid)
             return _inventory_row(
                 valid_time=valid,
                 timezone=weather.timezone,
@@ -550,8 +636,10 @@ def download_surface_weather(
                 sample=destination,
                 crosswalk=existing_crosswalk,
                 status="COMPLETE",
-                source_uri=source_uri,
-                precip_source_uri=expected_precip_uri,
+                source_uri=str(existing["SOURCE_URI"]),
+                precip_source_uri=str(existing["PRECIP_SOURCE_URI"]),
+                source_retrieved_at_utc=str(existing["SOURCE_RETRIEVED_AT_UTC"]),
+                precip_retrieved_at_utc=str(existing["PRECIP_RETRIEVED_AT_UTC"]),
                 sample_checksum=actual_checksum,
                 crosswalk_checksum=actual_crosswalk_checksum,
                 source_grid_hash=expected_hash,
@@ -559,7 +647,7 @@ def download_surface_weather(
         try:
             reusable_core = (
                 _reusable_core_sample(destination, support, valid_time_utc=valid, availability_lag_hours=weather.availability_lag_hours)
-                if not overwrite and checksum_ok and crosswalk_ok
+                if not overwrite and checksum_ok and crosswalk_ok and source_provenance_ok
                 else None
             )
             if reusable_core is not None and existing_crosswalk is not None:
@@ -572,6 +660,7 @@ def download_surface_weather(
                             availability_lag_hours=weather.availability_lag_hours,
                             forecast_hour=precip_forecast_hour,
                         )
+                        precip_retrieved_at = datetime.now(UTC).isoformat()
                         break
                     except Exception:
                         if attempt == HERBIE_ATTEMPTS_PER_TIMESTAMP:
@@ -607,8 +696,10 @@ def download_surface_weather(
                     sample=destination,
                     crosswalk=existing_crosswalk,
                     status="COMPLETE",
-                    source_uri=hrrr_aws_archive_uri(valid),
+                    source_uri=str(existing["SOURCE_URI"]),
                     precip_source_uri=precip_source_uri,
+                    source_retrieved_at_utc=str(existing["SOURCE_RETRIEVED_AT_UTC"]),
+                    precip_retrieved_at_utc=precip_retrieved_at,
                     source_grid_hash=expected_hash,
                 )
             for attempt in range(1, HERBIE_ATTEMPTS_PER_TIMESTAMP + 1):
@@ -619,6 +710,7 @@ def download_surface_weather(
                         bbox_padding_degrees=weather.bbox_padding_degrees,
                         availability_lag_hours=weather.availability_lag_hours,
                     )
+                    source_retrieved_at = datetime.now(UTC).isoformat()
                     break
                 except Exception:
                     if attempt == HERBIE_ATTEMPTS_PER_TIMESTAMP:
@@ -639,6 +731,7 @@ def download_surface_weather(
                         availability_lag_hours=weather.availability_lag_hours,
                         forecast_hour=precip_forecast_hour,
                     )
+                    precip_retrieved_at = datetime.now(UTC).isoformat()
                     source_grid = replace_source_grid_precipitation(source_grid, precip_grid)
                     break
                 except Exception:
@@ -692,6 +785,8 @@ def download_surface_weather(
                 status="COMPLETE",
                 source_uri=source_uri,
                 precip_source_uri=precip_source_uri,
+                source_retrieved_at_utc=source_retrieved_at,
+                precip_retrieved_at_utc=precip_retrieved_at,
                 source_grid_hash=grid_hash,
             )
         except Exception as exc:
@@ -786,9 +881,19 @@ def snapshot_existing_surface_weather_acquisition(
     manifest_path: str | Path | None = None,
     run_id: str | None = None,
 ) -> dict[str, object]:
-    """Publish a complete inventory from existing validated R5 timestamp samples."""
+    """Publish a network-free snapshot with its retained retrieval provenance."""
 
     config = load_meteorological_config(config_path)
+    weather = config.surface_weather
+    source_inventory = (
+        weather.inventory_path if weather.inventory_path.exists()
+        else weather.working_inventory_path
+    )
+    if not source_inventory.exists():
+        raise FileNotFoundError(
+            "Cannot reconstruct actual HRRR retrieval provenance from samples alone; "
+            "a current acquisition inventory is required for a network-free snapshot."
+        )
     sample_files = sorted((config.surface_weather.raw_dir / "samples").rglob("*.parquet"))
     if not sample_files:
         raise FileNotFoundError(
@@ -808,19 +913,29 @@ def snapshot_existing_surface_weather_acquisition(
     if dates != expected_dates:
         missing = sorted(set(expected_dates).difference(dates))
         raise ValueError(f"Existing R5 HRRR samples contain a date gap: {missing[0]}")
-    result = download_surface_weather(
-        config_path,
-        start_date=dates[0],
-        end_date=dates[-1],
-        overwrite=False,
-        max_workers=1,
-        working_inventory_path=working_inventory_path,
-        inventory_path=inventory_path,
-        manifest_path=manifest_path,
-        run_id=run_id,
+    rows = _load_inventory(source_inventory)
+    candidate_working = Path(working_inventory_path or weather.working_inventory_path)
+    candidate_inventory = Path(inventory_path or weather.inventory_path)
+    candidate_manifest = Path(manifest_path or weather.acquisition_manifest_path)
+    _atomic_table_write(
+        pa.Table.from_pylist(rows, schema=INVENTORY_SCHEMA).to_pandas(),
+        candidate_working, INVENTORY_SCHEMA,
     )
-    result["snapshot_mode"] = "existing_validated_r5_samples"
-    return result
+    _publish_complete_acquisition(
+        config_path=config.path, config=config, rows=rows,
+        inventory_destination=candidate_inventory, manifest_destination=candidate_manifest,
+        start=dates[0], end=dates[-1],
+        run_id=run_id or f"hrrr-r5-snapshot-{uuid.uuid4().hex[:12]}",
+    )
+    return {
+        "snapshot_mode": "existing_validated_r5_samples",
+        "start_date": dates[0], "end_date": dates[-1],
+        "expected_times": len(_expected_times(dates[0], dates[-1], weather.timezone, weather.interval_hours)),
+        "complete_times": len(rows), "failed_times": 0,
+        "working_inventory_path": str(candidate_working),
+        "inventory_path": str(candidate_inventory),
+        "manifest_path": str(candidate_manifest),
+    }
 
 
 def main() -> int:

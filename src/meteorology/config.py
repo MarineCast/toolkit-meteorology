@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Mapping
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -80,12 +80,16 @@ class SurfaceWeatherConfig:
             current = current.tz_localize(self.timezone)
         else:
             current = current.tz_convert(self.timezone)
+        from .surface_weather.sampling import make_sample_times_for_local_date
+
         cutoff = current - pd.Timedelta(hours=self.availability_lag_hours)
-        last_sample_hour = 24 - self.interval_hours
-        complete = cutoff.normalize()
-        if cutoff.hour < last_sample_hour:
-            complete -= pd.Timedelta(days=1)
-        return complete.strftime("%Y-%m-%d")
+        candidate = cutoff.date()
+        last_sample = make_sample_times_for_local_date(
+            candidate.isoformat(), self.timezone, self.interval_hours
+        )[-1]
+        if last_sample > cutoff.tz_convert("UTC"):
+            candidate -= timedelta(days=1)
+        return candidate.isoformat()
 
 
 @dataclass(frozen=True)

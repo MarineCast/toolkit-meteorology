@@ -39,6 +39,11 @@ The dry run shows the date range and number of cycles. A request over seven loca
 Canonical acquisition metadata is published only after the requested range is complete. Do not
 substitute a partial working inventory for the canonical one. See [contracts](CONTRACTS.md) for
 source identity, completeness and precipitation gates.
+Incremental requests extend one continuous canonical interval. If an earlier date is absent or
+still failed, request that date explicitly; the downloader does not silently fill it. If the
+availability lag changes, reacquire every retained date under the new policy before publication.
+`snapshot_existing_surface_weather_acquisition` makes no network request and requires a current
+inventory recording actual retrieval URLs and times; samples alone are insufficient.
 
 ## 3. Build astronomy
 
@@ -90,6 +95,9 @@ meteorology feature-policy --check
 The catalog checks materialized schemas and marks absent products pending. The inherited model
 policy excludes metadata and deterministic aliases from a default ecological-model matrix; it
 does not remove scientific product columns or establish suitability for a particular species.
+For a native daily export, `apply_feature_policy` preserves `DATE`, `H3_INDEX` and
+`H3_RESOLUTION` and selects fields by the export's component prefixes. R4 and R5 rows still
+require an explicit modeling alignment policy; no values are filled across resolutions.
 The catalog generator uses its declared standard product paths, so custom output locations need
 explicit attention when generating metadata; it does not read the producer config to discover them.
 
@@ -103,10 +111,12 @@ explicit attention when generating metadata; it does not read the producer confi
 | Schema, checksum or source-identity failure | Diagnose the input or provenance mismatch before publishing |
 | Policy reported stale | Regenerate catalog, then policy, against the intended workspace |
 | Interrupted publication | The family transaction journal supports recovery on the next run |
+| Interrupted legacy migration | Rerun with the same `--archive-root`; inspect a retained `CONFLICT` journal and both copies before resolving |
 
 `meteorology benchmark` performs live acquisition comparisons. `meteorology migrate-legacy`
 defaults to planning; `--execute` moves legacy artifacts after replacement validation. Neither is a
 required setup step. The toolkit does not provide a whole-domain candidate release command.
+Migration execution uses an exclusive lock and writes a recovery record on rollback.
 
 ## Combined daily export
 

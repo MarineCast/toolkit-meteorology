@@ -13,6 +13,19 @@ interpolation, resolution transfer, zero filling, temporal averaging or truncati
 The R6 support product has no native daily variables and is not added as empty rows.
 Day-of-year daylight lookup remains a separate native artifact.
 
+The policy API accepts this exported frame directly:
+
+```python
+import pandas as pd
+from meteorology.modeling.feature_policy import apply_feature_policy, load_feature_policy
+
+native = pd.read_parquet("NEW.parquet")
+selected = apply_feature_policy(native, load_feature_policy())
+```
+
+`selected` keeps `DATE`, `H3_INDEX` and `H3_RESOLUTION`. It retains the separate native R4/R5
+rows; consumers must choose a spatial alignment and missingness policy before modeling.
+
 The exporter rejects duplicate/invalid cells, inconsistent resolution, incomplete daily
 support, mismatched date ranges/timezones and existing destinations. It streams yearly
 row groups to a unique temporary file, validates the complete matrix, then promotes it
