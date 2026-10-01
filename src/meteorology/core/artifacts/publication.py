@@ -5,6 +5,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import re
 import shutil
 import uuid
 from collections.abc import Mapping
@@ -62,9 +63,13 @@ class TransactionalFamilyPublisher(AbstractContextManager["TransactionalFamilyPu
     def __init__(self, parent: str | Path, run_id: str | None = None):
         self.parent = Path(parent).resolve()
         self.run_id = run_id or f"publication-{uuid.uuid4().hex[:12]}"
-        self.staging = self.parent / ".staging" / self.run_id
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", self.run_id):
+            raise ValueError("Publication run_id must be one safe path component.")
+        # The external display ID never determines a path or replaces prior staging.
+        token = uuid.uuid4().hex
+        self.staging = self.parent / ".staging" / token
         self.transactions = self.parent / ".transactions"
-        self.transaction = self.transactions / self.run_id
+        self.transaction = self.transactions / token
         self.journal = self.transaction / "journal.json"
         self._items: dict[Path, dict[str, Any]] = {}
         self._ownership = None
@@ -92,10 +97,11 @@ class TransactionalFamilyPublisher(AbstractContextManager["TransactionalFamilyPu
         self._ownership = self._exclusive_parent(self.parent)
         self._ownership.__enter__()
         try:
+            for private_root in (self.staging.parent, self.transactions):
+                if private_root.is_symlink():
+                    raise ValueError(f"Publication control directory is a symlink: {private_root}")
             self._recover_owned(self.parent)
-            if self.staging.exists():
-                shutil.rmtree(self.staging)
-            self.staging.mkdir(parents=True)
+            self.staging.mkdir(parents=True, exist_ok=False)
             _fsync_directory(self.staging.parent)
             return self
         except BaseException:

@@ -16,7 +16,7 @@ import pyarrow.parquet as pq
 from meteorology.core.artifacts import atomic_write_json
 from meteorology.core.config.paths import project_root
 from meteorology._version import __version__
-from meteorology.methods import METHOD_VERSIONS
+from meteorology.methods import HISTORICAL_METHOD_VERSIONS, METHOD_VERSIONS
 
 MANIFEST_SCHEMA_VERSION = 3
 
@@ -291,7 +291,8 @@ def validate_manifest(
             if not isinstance(payload.get(field), str) or not payload[field]:
                 raise ValueError(f"Meteorological manifest {field} is invalid.")
         product = str(payload["product"])
-        if product in METHOD_VERSIONS and payload["method_version"] != METHOD_VERSIONS[product]:
+        accepted = {METHOD_VERSIONS[product], *HISTORICAL_METHOD_VERSIONS.get(product, ())} if product in METHOD_VERSIONS else None
+        if accepted is not None and payload["method_version"] not in accepted:
             raise ValueError(f"Incompatible scientific method version for {product}.")
         identity = {
             "product": product,

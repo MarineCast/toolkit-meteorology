@@ -12,6 +12,8 @@ Atmospheric support contains H3 cell **centroids inside the configured WGS84 bou
 
 For each identified HRRR source grid, the producer finds the closest source-grid coordinate to each R5 H3 centroid with a haversine BallTree. It records source row index, grid hash and great-circle distance in a crosswalk. The sampled value is **nearest-neighbor point sampling**, not an area-weighted H3 mean. Mixed land/water cells and coastal microscale effects are not resolved by the H3 polygon. Cropped source grids and missing source pixels fail the strict acquisition path. The method assumes the supported HRRR CONUS region and does not implement global or antimeridian handling. Check source-grid distances when choosing a new domain.
 
+The [GRIB wind-reference flag](https://confluence.ecmwf.int/spaces/UDOC/pages/212440350/What+are+Code+and+Flag+tables+-+ecCodes+GRIB+and+BUFR+FAQ) is checked for both 10 m components. If it identifies grid-relative vectors, local geodesic bearings of the decoded grid axes rotate U/V to true east/north before nearest-cell sampling. Source and published bases are retained in each sample; missing or conflicting flags fail acquisition. Synthetic direction tests and a one-cycle HRRR smoke at 2024-01-02 12:00 UTC exercise this path. Independent wind-observation validation remains to be done.
+
 ## Daily weather reduction
 
 Every R5 cell and local date must have all six validated source samples. A missing, duplicated, non-finite or unsupported source value blocks publication of that family. The daily row publishes `EXPECTED_SAMPLE_COUNT=6`, `SAMPLE_COUNT=6`, `SAMPLE_COVERAGE_FRAC=1` and `QC_STATE=COMPLETE`. The current method does not publish partial-day values.
@@ -30,7 +32,7 @@ Every R5 cell and local date must have all six validated source samples. A missi
 
 The wind direction of 359° and 1° averages near north under the vector method. Mean wind speed and mean-vector speed answer different questions: opposing winds can have a positive speed mean and zero vector mean. Calm vector direction is undefined and remains null.
 
-PRATE is a forecast rate in kg m⁻² s⁻¹, converted to mm/h by multiplying by 3600 for liquid-water equivalent. The six valid times are distinct, so the algorithm counts each rate once. It extrapolates each point rate across a nominal four-hour window; it does **not** use six measured disjoint accumulation windows, and no 24-hour precipitation total is claimed. The complete-range all-zero precipitation gate rejects a suspiciously empty forecast field; a valid zero in an otherwise nonzero range remains zero. NOAA's [HRRR field documentation](https://rapidrefresh.noaa.gov/RAP_var_diagnosis.html) provides source-field context; the precise selectors and unit checks are in the acquisition inventory and [variable inventory](reference/variables.md).
+PRATE is a forecast rate in kg m⁻² s⁻¹, converted to mm/h by multiplying by 3600 for liquid-water equivalent. The six valid times are distinct, so the algorithm counts each rate once. It extrapolates each point rate across a nominal four-hour window; it does **not** use six measured disjoint accumulation windows, and no 24-hour precipitation total is claimed. A fully dry range can legitimately contain only zeros; missing or invalid source records still block publication. NOAA's [HRRR field documentation](https://rapidrefresh.noaa.gov/RAP_var_diagnosis.html) provides source-field context; the precise selectors and unit checks are in the acquisition inventory and [variable inventory](reference/variables.md).
 
 ## Solar context
 

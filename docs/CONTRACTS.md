@@ -56,10 +56,21 @@ meteorology build surface-weather \
 
 Every published date contains the exact configured support, all six four-hourly `f00` core-weather
 analyses, and six matched `f01` precipitation rates initialized one hour earlier and valid at the
-same timestamps. Missing, ambiguous, non-finite, unsupported, or complete-range all-zero inputs
-block publication and are never converted to zero. `PRECIP_MM_DAY_ESTIMATE` is explicitly the sum
+same timestamps. Missing, ambiguous, non-finite, or unsupported inputs
+block publication and are never converted to zero. A fully dry range is valid when all six
+source samples per date pass those checks. `PRECIP_MM_DAY_ESTIMATE` is explicitly the sum
 of the six `f01` rates multiplied by four hours; it is not a true hourly or accumulated 24-hour
 precipitation analysis.
+
+The decoded GRIB wind-reference flag is required for both 10 m components. Grid-relative
+components are rotated using the decoded grid axes before R5 sampling; published U/V and
+FROM direction are earth-relative. Missing or conflicting flags block acquisition. The sample
+schema records `WIND_VECTOR_BASIS=earth_relative`, so older cached samples cannot be reused
+as if they had been rotated. Changing the support bounding box or inclusion method requires
+rebuilding support before acquisition or product builds.
+`AVAILABLE_AT_UTC` is a versioned assumed fixed-lag policy, not a measured provider
+publication timestamp. A changed lag invalidates cached samples; acquisition and build
+check sample timestamps against the current policy and inventory.
 
 Before recoverably archiving legacy weather artifacts, run the complete-range and shared-core
 parity gate:
@@ -71,6 +82,9 @@ python -m meteorology.surface_weather.verify \
 
 The migration command refuses to run unless that report passes and is bound to the current weather
 manifest checksum.
+Arithmetic matches to a subset of historical samples are recorded as suspected legacy
+missingness, not evidence sufficient to exclude a date. Unexplained cloud differences remain
+comparison failures; a selector explanation requires independent historical source evidence.
 
 Publication is staged and manifest-validated before promotion. Inspectors verify manifest
 checksums before rendering to `outputs/domains/environmental_layer/meteorological/<product>/`.
@@ -91,6 +105,9 @@ declared inputs and outputs. Schema version 2 manifests remain readable for
 historical checksum inspection. Deep validation targets current method/schema
 versions. The [method registry](methodology.md#provenance-and-reproducibility)
 identifies changes in numerical meaning separately from the software version.
+Known earlier schema-3 methods remain readable with checksum verification. Deep scientific
+validation requires the matching archived validator; the current validator only certifies
+current method IDs.
 
 Daily wind direction is meteorological **FROM** direction calculated from the
 mean 10 m U/V vector; its Arrow field is nullable for calm mean vectors.

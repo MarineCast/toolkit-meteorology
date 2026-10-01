@@ -33,10 +33,29 @@ RANGES = {
     "RELATIVE_HUMIDITY_2M_PCT_MEAN": (0.0, 100.0),
     "TOTAL_CLOUD_COVER_PCT_MEAN": (0.0, 100.0),
     "WIND_DIRECTION_FROM_10M_DEG": (0.0, 360.0),
+    "WIND_SPEED_10M_MS_MEAN": (0.0, math.inf),
+    "WIND_SPEED_10M_MS_MAX": (0.0, math.inf),
+    "WIND_VECTOR_SPEED_10M_MS": (0.0, math.inf),
+    "WIND_GUST_SURFACE_MS_MEAN": (0.0, math.inf),
+    "WIND_GUST_SURFACE_MS_MAX": (0.0, math.inf),
+    "VISIBILITY_KM_MEAN": (0.0, math.inf),
+    "VISIBILITY_KM_MIN": (0.0, math.inf),
+    "SOURCE_GRID_DISTANCE_M_MEAN": (0.0, math.inf),
+    "SOURCE_GRID_DISTANCE_M_MAX": (0.0, math.inf),
     "PRECIP_MM_DAY_ESTIMATE": (0.0, math.inf),
+    "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN": (800.0, 1100.0),
+    "MEAN_SEA_LEVEL_PRESSURE_HPA_MIN": (800.0, 1100.0),
     "DAYLIGHT_HOURS": (0.0, 24.0),
     "DAYLIGHT_FRACTION": (0.0, 1.0),
+    "SOLAR_ELEVATION_MAX_DEG": (-90.0, 90.0),
+    "SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG": (0.0, 90.0),
+    "LOW_SUN_DAYLIGHT_HOURS": (0.0, 24.0),
+    "LUNAR_PHASE_ANGLE_DEG": (0.0, 360.0),
     "LUNAR_ILLUMINATION_FRACTION": (0.0, 1.0),
+    "NIGHT_HOURS": (0.0, 24.0),
+    "MOON_VISIBLE_DARK_HOURS": (0.0, 24.0),
+    "MOONLIT_DARK_HOURS": (0.0, 24.0),
+    "MOON_VISIBLE_DARK_FRACTION": (0.0, 1.0),
     "MOONLIT_DARK_FRACTION": (0.0, 1.0),
 }
 
@@ -114,7 +133,7 @@ def validate_product(manifest_path: str | Path) -> dict[str, Any]:
     if product not in EXPECTED:
         raise ValueError(f"Unsupported product for deep validation: {product}")
     if manifest.get("method_version") != METHOD_VERSIONS[product]:
-        raise ValueError(f"{product}: current method version is not recorded in this manifest.")
+        raise ValueError(f"{product}: archived method requires its archived deep validator.")
     seen_by_schema: dict[tuple[str, ...], set[tuple[str, ...]]] = defaultdict(set)
     dates_by_schema: dict[tuple[str, ...], dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
     artifact_count = 0
@@ -172,7 +191,12 @@ def validate_daily_matrix(path: str | Path) -> dict[str, Any]:
     if raw is None:
         raise ValueError("Daily matrix lacks meteorology_daily_matrix metadata.")
     metadata = json.loads(raw)
-    if metadata.get("schema_version") != 1 or set(metadata.get("native_manifests", {})) != {"surface_weather", "daylight", "lunar"}:
+    native_schemas = {
+        "surface_weather": (schemas.SURFACE_WEATHER_DAILY_SCHEMA, 5),
+        "daylight": (schemas.DAYLIGHT_SCHEMA, 4),
+        "lunar": (schemas.LUNAR_SCHEMA, 5),
+    }
+    if metadata.get("schema_version") != 2 or set(metadata.get("native_manifests", {})) != set(native_schemas):
         raise ValueError("Daily matrix has incompatible schema or source manifests.")
     if metadata.get("method_version") != METHOD_VERSIONS["meteorological.daily_matrix"]:
         raise ValueError("Daily matrix has an incompatible scientific method version.")
@@ -190,9 +214,31 @@ def validate_daily_matrix(path: str | Path) -> dict[str, Any]:
     }
     if metadata.get("release_id") != stable_hash(identity):
         raise ValueError("Daily matrix release ID differs from embedded source identity.")
+    expected_fields = {
+        "DATE": pa.string(), "H3_INDEX": pa.string(), "H3_RESOLUTION": pa.int8()
+    }
+    for component, (native_schema, _) in native_schemas.items():
+        if metadata["native_manifests"][component]["manifest"].get("product") != f"meteorological.{component}":
+            raise ValueError("Daily matrix declares an incompatible native product.")
+        expected_fields.update({
+            f"{component}__{field.name}": field.type
+            for field in native_schema if field.name not in {"DATE", "H3_INDEX", "H3_RESOLUTION"}
+        })
+    actual_fields = {field.name: field.type for field in parquet.schema_arrow}
+    if actual_fields != expected_fields or set(metadata.get("fields", {})) != set(expected_fields).difference({"DATE", "H3_INDEX", "H3_RESOLUTION"}):
+        raise ValueError("Daily matrix scientific Arrow schema or field metadata differs from the native contracts.")
+    sidecar = Path(path).with_suffix(Path(path).suffix + ".manifest.json")
+    if not sidecar.exists():
+        raise ValueError("Daily matrix content manifest is missing.")
+    content = json.loads(sidecar.read_text(encoding="utf-8"))
+    if content.get("release_id") != metadata["release_id"] or content.get("matrix_checksum") != checksum_path(path):
+        raise ValueError("Daily matrix content checksum or release identity differs from its manifest.")
     seen: set[tuple[str, str, int]] = set()
     dates: set[str] = set()
     counts: dict[int, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    support_sets: dict[int, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+    native_seen: dict[str, set[tuple[str, ...]]] = defaultdict(set)
+    native_dates: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
     rows = 0
     for index in range(parquet.num_row_groups):
         frame = parquet.read_row_group(index).to_pandas()
@@ -206,11 +252,49 @@ def validate_daily_matrix(path: str | Path) -> dict[str, Any]:
             seen.add(identity)
             dates.add(date)
             counts[resolution][date] += 1
+            support_sets[resolution][date].add(cell)
         for resolution, absent in ((4, ("surface_weather__", "lunar__")), (5, ("daylight__",))):
             subset = frame[frame["H3_RESOLUTION"] == resolution]
             columns = [name for name in subset if name.startswith(absent)]
             if columns and not subset[columns].isna().all().all():
                 raise ValueError("Daily matrix has a value at an unsupported native resolution.")
+        for component, (native_schema, resolution) in native_schemas.items():
+            subset = frame[frame["H3_RESOLUTION"] == resolution]
+            if subset.empty:
+                continue
+            native = subset[["DATE", "H3_INDEX", *(
+                f"{component}__{field.name}" for field in native_schema
+                if field.name not in {"DATE", "H3_INDEX", "H3_RESOLUTION"}
+            )]].rename(columns=lambda name: name.removeprefix(f"{component}__"))
+            _validate_frame(
+                native, product=f"meteorological.{component}", schema=native_schema,
+                resolution=resolution, seen=native_seen[component], dates=native_dates[component]
+            )
+            if component == "surface_weather":
+                calm = native["WIND_VECTOR_SPEED_10M_MS"].to_numpy(dtype=float) <= 1e-12
+                null_direction = native["WIND_DIRECTION_FROM_10M_DEG"].isna().to_numpy()
+                if not np.array_equal(calm, null_direction):
+                    raise ValueError("Daily matrix wind direction nulls do not match calm mean vectors.")
+                u = native["U_WIND_10M_MS_MEAN"].to_numpy(dtype=float)
+                v = native["V_WIND_10M_MS_MEAN"].to_numpy(dtype=float)
+                speed = native["WIND_VECTOR_SPEED_10M_MS"].to_numpy(dtype=float)
+                if not np.allclose(np.hypot(u, v), speed, rtol=0, atol=1e-8):
+                    raise ValueError("Daily matrix wind vector speed differs from mean components.")
+                direction = native["WIND_DIRECTION_FROM_10M_DEG"].to_numpy(dtype=float)
+                expected_direction = (np.degrees(np.arctan2(-u, -v)) + 360.0) % 360.0
+                angular_error = ((direction[~calm] - expected_direction[~calm] + 180.0) % 360.0) - 180.0
+                if not np.allclose(angular_error, 0.0, atol=1e-6):
+                    raise ValueError("Daily matrix wind direction differs from its mean components.")
+            elif component == "daylight":
+                absent = native["SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG"].isna().to_numpy()
+                no_sampled_sun = native["SOLAR_ELEVATION_MAX_DEG"].to_numpy(dtype=float) <= 0.0
+                if not np.array_equal(absent, no_sampled_sun):
+                    raise ValueError("Daily matrix daylight mean nulls do not match sampled sunlight.")
+            elif component == "lunar":
+                no_night = native["NIGHT_HOURS"].to_numpy(dtype=float) == 0.0
+                for name in ("MOON_VISIBLE_DARK_FRACTION", "MOONLIT_DARK_FRACTION", "WEIGHT_MOONLIT_DARK_HOURS"):
+                    if not np.array_equal(no_night, native[name].isna().to_numpy()):
+                        raise ValueError("Daily matrix lunar nulls do not match night support.")
         rows += len(frame)
     expected = set(pd.date_range(metadata["temporal_coverage"]["start_date"], metadata["temporal_coverage"]["end_date"]).strftime("%Y-%m-%d"))
     if dates != expected:
@@ -218,6 +302,8 @@ def validate_daily_matrix(path: str | Path) -> dict[str, Any]:
     for resolution in (4, 5):
         if set(counts[resolution]) != expected or len(set(counts[resolution].values())) != 1:
             raise ValueError(f"Daily matrix R{resolution} support count varies by date.")
+        if len({frozenset(cells) for cells in support_sets[resolution].values()}) != 1:
+            raise ValueError(f"Daily matrix R{resolution} support membership varies by date.")
     return {"valid": True, "product": "meteorological.daily_matrix", "row_count": rows,
             "date_count": len(dates), "h3_cell_counts": {str(k): next(iter(v.values())) for k, v in counts.items()},
             "checksum": checksum_path(path)}
