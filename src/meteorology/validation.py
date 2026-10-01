@@ -22,6 +22,7 @@ from .methods import METHOD_VERSIONS
 from .surface_weather.wind import validate_daily_wind_vectors
 from .surface_weather.download import _expected_times, retrieval_matches_object, valid_retrieval_time
 from .surface_weather.source import hrrr_logical_object_uri
+from .surface_weather.storage import acquisition_lock, resolve_raw_relative
 
 
 EXPECTED: dict[str, tuple[pa.Schema, ...]] = {
@@ -147,6 +148,16 @@ def _validate_frame(
 def validate_product(manifest_path: str | Path) -> dict[str, Any]:
     """Validate manifest, checksums, schemas, primary keys, ranges and coverage."""
 
+    path = Path(manifest_path)
+    if path.name == "R5_DOWNLOAD_MANIFEST.json":
+        with acquisition_lock(path.parent, writer=False):
+            return _validate_product_unlocked(path)
+    return _validate_product_unlocked(path)
+
+
+def _validate_product_unlocked(manifest_path: str | Path) -> dict[str, Any]:
+    """Validate a stable manifest and its declared artifacts."""
+
     manifest = load_manifest(manifest_path, verify_artifacts=True)
     archived = manifest.get("archived_hrrr_samples")
     if archived is not None:
@@ -163,8 +174,12 @@ def validate_product(manifest_path: str | Path) -> dict[str, Any]:
     artifact_count = 0
     total_rows = 0
     acquisition_frames: list[pd.DataFrame] = []
+    acquisition_inventory_source: Path | None = None
+    checked_crosswalks: dict[tuple[Path, str, str], set[str]] = {}
     for declared in manifest["artifacts"]:
         path = resolve_portable_path(declared["path"], base=Path(manifest_path).parent)
+        if manifest["product"] == "meteorological.surface_weather.download":
+            acquisition_inventory_source = path
         observed = parquet_contract(path, published_path=path)
         for field in ("checksum", "file_count", "row_count", "schema", "h3_cell_count", "h3_cell_set_hash"):
             if observed[field] != declared[field]:
@@ -204,6 +219,9 @@ def validate_product(manifest_path: str | Path) -> dict[str, Any]:
         if set(inventory["STATUS"].astype(str)) != {"COMPLETE"}:
             raise ValueError("Acquisition inventory contains incomplete cycles.")
         synthetic = resolved["source"].get("model") == "synthetic_hrrr"
+        if acquisition_inventory_source is None:
+            raise ValueError("Acquisition inventory artifact is missing.")
+        raw_root = acquisition_inventory_source.parent
         for row in inventory.itertuples(index=False):
             valid = pd.Timestamp(row.VALID_TIME_UTC)
             invalid = row.AVAILABLE_AT_UTC != (
@@ -232,6 +250,39 @@ def validate_product(manifest_path: str | Path) -> dict[str, Any]:
                 )
             if invalid:
                 raise ValueError(f"Acquisition inventory row violates release provenance: {valid}.")
+            sample = resolve_raw_relative(raw_root, str(row.RELATIVE_PATH))
+            crosswalk = resolve_raw_relative(raw_root, str(row.CROSSWALK_RELATIVE_PATH))
+            if not sample.is_file() or checksum_path(sample) != str(row.CHECKSUM):
+                raise ValueError(f"Acquisition sample is missing or checksum-invalid: {sample}")
+            sample_file = pq.ParquetFile(sample)
+            if not sample_file.schema_arrow.equals(schemas.HRRR_SAMPLE_SCHEMA, check_metadata=False):
+                raise ValueError(f"Acquisition sample schema is invalid: {sample}")
+            sample_frame = sample_file.read().to_pandas()
+            if (
+                len(sample_frame) != int(row.H3_CELL_COUNT)
+                or sample_frame["H3_INDEX"].duplicated().any()
+                or set(sample_frame["VALID_TIME_UTC"].astype(str)) != {valid.isoformat()}
+                or set(sample_frame["AVAILABLE_AT_UTC"].astype(str)) != {str(row.AVAILABLE_AT_UTC)}
+                or set(sample_frame["SOURCE_GRID_HASH"].astype(str)) != {str(row.SOURCE_GRID_HASH)}
+            ):
+                raise ValueError(f"Acquisition sample identity is invalid: {sample}")
+            crosswalk_key = (crosswalk, str(row.CROSSWALK_CHECKSUM), str(row.SOURCE_GRID_HASH))
+            if crosswalk_key not in checked_crosswalks:
+                if not crosswalk.is_file() or checksum_path(crosswalk) != str(row.CROSSWALK_CHECKSUM):
+                    raise ValueError(f"Acquisition crosswalk is missing or checksum-invalid: {crosswalk}")
+                crosswalk_file = pq.ParquetFile(crosswalk)
+                if not crosswalk_file.schema_arrow.equals(schemas.HRRR_CROSSWALK_SCHEMA, check_metadata=False):
+                    raise ValueError(f"Acquisition crosswalk schema is invalid: {crosswalk}")
+                crosswalk_frame = crosswalk_file.read().to_pandas()
+                if (
+                    len(crosswalk_frame) != int(row.H3_CELL_COUNT)
+                    or crosswalk_frame["H3_INDEX"].duplicated().any()
+                    or set(crosswalk_frame["SOURCE_GRID_HASH"].astype(str)) != {str(row.SOURCE_GRID_HASH)}
+                ):
+                    raise ValueError(f"Acquisition crosswalk identity is invalid: {crosswalk}")
+                checked_crosswalks[crosswalk_key] = set(crosswalk_frame["H3_INDEX"].astype(str))
+            if set(sample_frame["H3_INDEX"].astype(str)) != checked_crosswalks[crosswalk_key]:
+                raise ValueError(f"Acquisition sample and crosswalk support differ: {sample}")
     if start and end and product != "meteorological.surface_weather.download":
         expected_dates = set(pd.date_range(start, end).strftime("%Y-%m-%d"))
         for key, dates in dates_by_schema.items():

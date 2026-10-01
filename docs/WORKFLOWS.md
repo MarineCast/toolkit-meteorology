@@ -31,8 +31,9 @@ meteorology build surface-weather --start-date 2024-01-02 --end-date 2024-01-02
 
 The download command performs network access; the build consumes validated local samples and
 inventory. Worker count must be between 1 and 16. Successful samples and the working inventory
-survive acquisition failures. Rerun the same command to resume. `--overwrite` explicitly replaces
-already validated samples; it is not needed for normal resumption.
+survive acquisition failures. Rerun the same command to resume. `--overwrite` refetches
+already validated times into new immutable objects; it does not change published references
+until the complete acquisition commits. It is not needed for normal resumption.
 The dry run shows the date range and number of cycles. A request over seven local days requires
 `--allow-large-download` on the actual download command.
 
@@ -43,7 +44,9 @@ Incremental requests extend one continuous canonical interval. If an earlier dat
 still failed, request that date explicitly; the downloader does not silently fill it. If the
 availability lag changes, reacquire every retained date under the new policy before publication.
 `snapshot_existing_surface_weather_acquisition` makes no network request and requires a current
-inventory recording actual retrieval URLs and times; samples alone are insufficient.
+inventory recording actual retrieval URLs and times; samples alone are insufficient. A snapshot
+written to a different raw root copies its referenced objects there, so that metadata remains
+deeply valid and independently relocatable; allow for that storage cost.
 
 ## 3. Build astronomy
 
@@ -76,7 +79,7 @@ python -m meteorology.surface_weather.time_series_map --help
 
 `meteorology freeze-release --manifest /path/to/MANIFEST.json --output-root /path/to/releases`
 archives a validated family under its release ID and refuses to replace an existing release.
-Weather freezing also copies every sample and crosswalk referenced by its inventory, so plan for
+Weather and acquisition freezing also copy every sample and crosswalk referenced by their inventories, so plan for
 potentially substantial disk use.
 
 `meteorology verify` audits an existing HRRR rebuild and optionally compares legacy data. An absent
@@ -110,7 +113,8 @@ explicit attention when generating metadata; it does not read the producer confi
 | Acquisition incomplete | Review failures in the working inventory; resume the frozen request range |
 | Schema, checksum or source-identity failure | Diagnose the input or provenance mismatch before publishing |
 | Policy reported stale | Regenerate catalog, then policy, against the intended workspace |
-| Interrupted publication | The family transaction journal supports recovery on the next run |
+| Acquisition workspace busy | Retry after the current writer finishes; no candidate state was changed by the rejected writer |
+| Interrupted publication | A canonical reader reports recovery required; the next acquisition or snapshot run recovers the family journal before reading its seed |
 | Interrupted legacy migration | Rerun with the same `--archive-root`; inspect a retained `CONFLICT` journal and both copies before resolving |
 
 `meteorology benchmark` performs live acquisition comparisons. `meteorology migrate-legacy`

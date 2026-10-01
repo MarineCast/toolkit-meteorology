@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
+import subprocess
+import sys
+import threading
 from pathlib import Path
 
 import h3
@@ -61,7 +65,7 @@ from meteorology.surface_weather.verify import (
     _legacy_field_partial_evidence,
     verify_hrrr_r5_rebuild,
 )
-from meteorology.validation import validate_daily_matrix
+from meteorology.validation import validate_daily_matrix, validate_product
 
 
 def _fixture_config(tmp_path: Path, *, end_date: str = "2024-01-02") -> Path:
@@ -164,6 +168,23 @@ def _patch_fetch(
     monkeypatch.setattr(module, "fetch_cropped_hrrr_precip_grid", fetch_precip)
 
 
+def _published_acquisition_bytes(config_path: Path) -> dict[Path, str]:
+    config = load_meteorological_config(config_path)
+    weather = config.surface_weather
+    inventory = pq.read_table(weather.inventory_path).to_pandas()
+    references = {
+        weather.raw_dir / str(value)
+        for field in ("RELATIVE_PATH", "CROSSWALK_RELATIVE_PATH")
+        for value in inventory[field]
+    }
+    references.update((weather.inventory_path, weather.acquisition_manifest_path))
+    return {path: sha256_file(path) for path in references}
+
+
+def _assert_published_bytes(before: dict[Path, str]) -> None:
+    assert {path: sha256_file(path) for path in before} == before
+
+
 def test_complete_range_all_zero_forecast_precipitation_is_valid(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -241,6 +262,319 @@ def test_incremental_lag_change_rejects_stale_retained_rows(tmp_path: Path, monk
         == pd.Timestamp(row.VALID_TIME_UTC) + pd.Timedelta(hours=8)
         for row in inventory.itertuples(index=False)
     )
+
+
+def test_failed_overlapping_lag_refresh_preserves_published_references(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config_path = _fixture_config(tmp_path, end_date="2024-01-03")
+    build_meteorological_spatial_support(config_path, run_id="support")
+    _patch_fetch(monkeypatch, [])
+    download_surface_weather(config_path, run_id="first")
+    config = load_meteorological_config(config_path)
+    original_config = config_path.read_bytes()
+    inventory_path = config.surface_weather.inventory_path
+    manifest_path = config.surface_weather.acquisition_manifest_path
+    inventory = pq.read_table(inventory_path).to_pandas()
+    references = {
+        config.surface_weather.raw_dir / str(relative)
+        for column in ("RELATIVE_PATH", "CROSSWALK_RELATIVE_PATH")
+        for relative in inventory[column]
+    }
+    references.update((config.support_path(5), config.support_manifest_path))
+    before = {
+        path: sha256_file(path)
+        for path in (inventory_path, manifest_path, *sorted(references))
+    }
+
+    raw = yaml.safe_load(config_path.read_text())
+    raw["surface_weather"]["time"]["availability_lag_hours"] = 8
+    config_path.write_text(yaml.safe_dump(raw, sort_keys=False))
+    _patch_fetch(monkeypatch, [], availability_lag_hours=8)
+    with pytest.raises(ValueError, match="incompatible release policy"):
+        download_surface_weather(
+            config_path, start_date="2024-01-03", end_date="2024-01-03", run_id="mixed"
+        )
+    config_path.write_bytes(original_config)
+
+    changed = [str(path) for path, checksum in before.items()
+               if not path.exists() or sha256_file(path) != checksum]
+    assert changed == []
+    assert validate_product(manifest_path)["valid"]
+    assert build_surface_weather(config_path, run_id="old-still-usable")
+
+
+def test_partial_overwrite_failure_preserves_published_references(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config_path = _fixture_config(tmp_path, end_date="2024-01-03")
+    build_meteorological_spatial_support(config_path, run_id="support")
+    _patch_fetch(monkeypatch, [])
+    download_surface_weather(config_path, run_id="first", max_workers=1)
+    config = load_meteorological_config(config_path)
+    inventory_path = config.surface_weather.inventory_path
+    manifest_path = config.surface_weather.acquisition_manifest_path
+    inventory = pq.read_table(inventory_path).to_pandas()
+    references = {
+        config.surface_weather.raw_dir / str(relative)
+        for column in ("RELATIVE_PATH", "CROSSWALK_RELATIVE_PATH")
+        for relative in inventory[column]
+    }
+    before = {path: sha256_file(path) for path in
+              (inventory_path, manifest_path, *sorted(references))}
+    late = make_sample_times_for_local_date(
+        "2024-01-03", config.surface_weather.timezone, 4
+    )[-1]
+    from meteorology.surface_weather import download as module
+
+    def changed_or_failed(**kwargs):
+        valid = pd.Timestamp(kwargs["valid_time_utc"]).tz_convert("UTC")
+        if valid == late:
+            raise RuntimeError("fixture late provider failure")
+        frame = _raw_grid(valid)
+        frame["TEMPERATURE_2M_K"] += 2.0
+        return frame, hrrr_aws_archive_uri(valid)
+
+    monkeypatch.setattr(module, "fetch_cropped_hrrr_grid", changed_or_failed)
+    monkeypatch.setattr(module.time, "sleep", lambda _seconds: None)
+    with pytest.raises(RuntimeError, match="canonical acquisition artifacts were not replaced"):
+        download_surface_weather(
+            config_path, start_date="2024-01-03", end_date="2024-01-03",
+            overwrite=True, max_workers=1, run_id="partial",
+        )
+    changed = [str(path) for path, checksum in before.items()
+               if not path.exists() or sha256_file(path) != checksum]
+    assert changed == []
+    assert build_surface_weather(config_path, run_id="old-still-usable")
+
+
+def test_partial_refresh_resumes_retained_candidates(tmp_path: Path, monkeypatch) -> None:
+    config_path = _fixture_config(tmp_path)
+    build_meteorological_spatial_support(config_path, run_id="support")
+    _patch_fetch(monkeypatch, [])
+    download_surface_weather(config_path, run_id="first", max_workers=1)
+    before = _published_acquisition_bytes(config_path)
+    from meteorology.surface_weather import download as module
+
+    first_fetch = module.fetch_cropped_hrrr_grid
+    late = make_sample_times_for_local_date("2024-01-02", "America/Los_Angeles", 4)[-1]
+
+    def changed_then_failed(**kwargs):
+        valid = pd.Timestamp(kwargs["valid_time_utc"]).tz_convert("UTC")
+        if valid == late:
+            raise RuntimeError("late fixture failure")
+        frame, uri = first_fetch(**kwargs)
+        frame["TEMPERATURE_2M_K"] += 2.0
+        return frame, uri
+
+    monkeypatch.setattr(module, "fetch_cropped_hrrr_grid", changed_then_failed)
+    monkeypatch.setattr(module.time, "sleep", lambda _seconds: None)
+    with pytest.raises(RuntimeError, match="incomplete"):
+        download_surface_weather(config_path, overwrite=True, max_workers=1)
+    _assert_published_bytes(before)
+    config = load_meteorological_config(config_path)
+    working = pq.read_table(config.surface_weather.working_inventory_path).to_pandas()
+    assert (working["STATUS"] == "COMPLETE").sum() == 5
+    candidate_paths = set(working.loc[working["STATUS"] == "COMPLETE", "RELATIVE_PATH"])
+    assert candidate_paths - set(pq.read_table(config.surface_weather.inventory_path).to_pandas()["RELATIVE_PATH"])
+    calls: list[str] = []
+    _patch_fetch(monkeypatch, calls)
+    result = download_surface_weather(config_path, max_workers=1, run_id="resumed")
+    assert result["complete_times"] == 6
+    assert calls == [pd.Timestamp(late).tz_convert("UTC").isoformat()]
+    assert validate_product(config.surface_weather.acquisition_manifest_path)["valid"]
+    _assert_published_bytes({path: checksum for path, checksum in before.items()
+                             if path not in {config.surface_weather.inventory_path,
+                                             config.surface_weather.acquisition_manifest_path}})
+
+
+def test_prepublication_corrupt_candidate_and_cancellation_leave_old_release(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config_path = _fixture_config(tmp_path)
+    build_meteorological_spatial_support(config_path, run_id="support")
+    _patch_fetch(monkeypatch, [])
+    download_surface_weather(config_path, run_id="first", max_workers=1)
+    before = _published_acquisition_bytes(config_path)
+    from meteorology.surface_weather import download as module
+
+    source_fetch = module.fetch_cropped_hrrr_grid
+
+    def changed(**kwargs):
+        frame, uri = source_fetch(**kwargs)
+        frame["TEMPERATURE_2M_K"] += 3.0
+        return frame, uri
+
+    monkeypatch.setattr(module, "fetch_cropped_hrrr_grid", changed)
+    real_write = module.write_immutable_table
+    corrupted = False
+
+    def corrupt_candidate(*args, **kwargs):
+        nonlocal corrupted
+        path, checksum = real_write(*args, **kwargs)
+        if kwargs["family"] == "samples" and not corrupted:
+            path.write_bytes(path.read_bytes() + b"corrupt")
+            corrupted = True
+        return path, checksum
+
+    monkeypatch.setattr(module, "write_immutable_table", corrupt_candidate)
+    with pytest.raises(ValueError, match="sample or crosswalk is invalid"):
+        download_surface_weather(config_path, overwrite=True, max_workers=1)
+    _assert_published_bytes(before)
+    assert validate_product(load_meteorological_config(config_path).surface_weather.acquisition_manifest_path)["valid"]
+
+    monkeypatch.setattr(module, "write_immutable_table", real_write)
+    _patch_fetch(monkeypatch, [])
+    real_fetch = module.fetch_cropped_hrrr_grid
+    count = 0
+
+    def cancel_after_one(**kwargs):
+        nonlocal count
+        count += 1
+        if count == 2:
+            raise KeyboardInterrupt("fixture cancellation")
+        return real_fetch(**kwargs)
+
+    monkeypatch.setattr(module, "fetch_cropped_hrrr_grid", cancel_after_one)
+    with pytest.raises(KeyboardInterrupt, match="fixture cancellation"):
+        download_surface_weather(config_path, overwrite=True, max_workers=1)
+    _assert_published_bytes(before)
+    states = load_meteorological_config(config_path).surface_weather.raw_dir.glob("runs/*/RUN_STATE.json")
+    assert any(json.loads(path.read_text())["status"] == "INCOMPLETE" for path in states)
+    _patch_fetch(monkeypatch, [])
+    assert download_surface_weather(config_path, max_workers=1)["complete_times"] == 6
+
+
+@pytest.mark.parametrize("phase,exit_code", [("candidate", 71), ("promoting", 72), ("committed", 73)])
+def test_hard_interruption_recovers_complete_generation(
+    tmp_path: Path, monkeypatch, phase: str, exit_code: int
+) -> None:
+    config_path = _fixture_config(tmp_path)
+    build_meteorological_spatial_support(config_path, run_id="support")
+    _patch_fetch(monkeypatch, [])
+    download_surface_weather(config_path, run_id="first", max_workers=1)
+    before = _published_acquisition_bytes(config_path)
+    config = load_meteorological_config(config_path)
+    child = Path(__file__).with_name("test_acquisition_interrupt_child.py")
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1] / "src")
+    result = subprocess.run([sys.executable, str(child), str(config_path), phase],
+                            env=env, capture_output=True, text=True, check=False)
+    assert result.returncode == exit_code, result.stderr
+    if phase in {"promoting", "committed"}:
+        with pytest.raises(RuntimeError, match="requires recovery"):
+            validate_product(config.surface_weather.acquisition_manifest_path)
+    from meteorology.core.artifacts import TransactionalFamilyPublisher
+    from meteorology.surface_weather.storage import acquisition_lock
+
+    with acquisition_lock(config.surface_weather.raw_dir, writer=True):
+        TransactionalFamilyPublisher.recover(config.surface_weather.raw_dir)
+    assert validate_product(config.surface_weather.acquisition_manifest_path)["valid"]
+    if phase != "committed":
+        _assert_published_bytes(before)
+    else:
+        assert sha256_file(config.surface_weather.acquisition_manifest_path) != before[
+            config.surface_weather.acquisition_manifest_path
+        ]
+        _assert_published_bytes({path: checksum for path, checksum in before.items()
+                                 if path not in {config.surface_weather.inventory_path,
+                                                 config.surface_weather.acquisition_manifest_path}})
+    if phase == "candidate":
+        assert list((config.surface_weather.raw_dir / "objects" / "samples").glob("*.parquet"))
+        interrupted = [path for path in config.surface_weather.raw_dir.glob("runs/*/RUN_STATE.json")
+                       if json.loads(path.read_text())["status"] == "ACQUIRING"]
+        assert len(interrupted) == 1
+        working = pq.read_table(interrupted[0].parent / "WORKING_INVENTORY.parquet").to_pandas()
+        assert len(working) == 6 and set(working["STATUS"]) == {"COMPLETE"}
+    _patch_fetch(monkeypatch, [])
+    assert download_surface_weather(config_path, max_workers=1)["complete_times"] == 6
+
+
+def test_concurrent_writer_and_reader_get_explicit_busy(tmp_path: Path, monkeypatch) -> None:
+    config_path = _fixture_config(tmp_path)
+    build_meteorological_spatial_support(config_path, run_id="support")
+    _patch_fetch(monkeypatch, [])
+    download_surface_weather(config_path, run_id="first", max_workers=1)
+    before = _published_acquisition_bytes(config_path)
+    from meteorology.surface_weather import download as module
+
+    entered, release = threading.Event(), threading.Event()
+    normal_fetch = module.fetch_cropped_hrrr_grid
+
+    def blocked_fetch(**kwargs):
+        entered.set()
+        assert release.wait(timeout=10)
+        return normal_fetch(**kwargs)
+
+    monkeypatch.setattr(module, "fetch_cropped_hrrr_grid", blocked_fetch)
+    errors: list[BaseException] = []
+
+    def first_writer():
+        try:
+            download_surface_weather(config_path, overwrite=True, max_workers=1)
+        except BaseException as exc:
+            errors.append(exc)
+
+    thread = threading.Thread(target=first_writer)
+    thread.start()
+    assert entered.wait(timeout=10)
+    try:
+        with pytest.raises(RuntimeError, match="workspace is busy"):
+            download_surface_weather(config_path, overwrite=True, max_workers=1)
+        with pytest.raises(RuntimeError, match="workspace is busy"):
+            validate_product(load_meteorological_config(config_path).surface_weather.acquisition_manifest_path)
+    finally:
+        release.set()
+        thread.join(timeout=10)
+    assert not thread.is_alive() and errors == []
+    _assert_published_bytes({path: checksum for path, checksum in before.items()
+                             if path not in {load_meteorological_config(config_path).surface_weather.inventory_path,
+                                             load_meteorological_config(config_path).surface_weather.acquisition_manifest_path}})
+
+
+def test_full_refresh_keeps_old_objects_and_frozen_releases_relocatable(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from meteorology.releases import freeze_release
+
+    config_path = _fixture_config(tmp_path)
+    build_meteorological_spatial_support(config_path, run_id="support")
+    _patch_fetch(monkeypatch, [])
+    download_surface_weather(config_path, run_id="first", max_workers=1)
+    build_surface_weather(config_path, run_id="first-weather")
+    config = load_meteorological_config(config_path)
+    old = _published_acquisition_bytes(config_path)
+    old_inventory = pq.read_table(config.surface_weather.inventory_path).to_pandas()
+    frozen_acquisition = freeze_release(config.surface_weather.acquisition_manifest_path, tmp_path / "releases")
+    frozen_weather = freeze_release(config.surface_weather.manifest_path, tmp_path / "releases")
+    from meteorology.surface_weather import download as module
+
+    real_fetch = module.fetch_cropped_hrrr_grid
+
+    def warmer(**kwargs):
+        frame, uri = real_fetch(**kwargs)
+        frame["TEMPERATURE_2M_K"] += 2.0
+        return frame, uri
+
+    monkeypatch.setattr(module, "fetch_cropped_hrrr_grid", warmer)
+    download_surface_weather(config_path, overwrite=True, max_workers=1, run_id="warmer")
+    new_inventory = pq.read_table(config.surface_weather.inventory_path).to_pandas()
+    assert set(old_inventory["RELATIVE_PATH"]).isdisjoint(set(new_inventory["RELATIVE_PATH"]))
+    _assert_published_bytes({path: checksum for path, checksum in old.items()
+                             if path not in {config.surface_weather.inventory_path,
+                                             config.surface_weather.acquisition_manifest_path}})
+    assert validate_product(config.surface_weather.acquisition_manifest_path)["valid"]
+    relocated = tmp_path / "relocated"
+    relocated.mkdir()
+    shutil.move(str(frozen_acquisition.parent), str(relocated / "acquisition"))
+    shutil.move(str(frozen_weather.parent), str(relocated / "weather"))
+    hidden_raw = config.surface_weather.raw_dir.with_name("raw-hidden")
+    config.surface_weather.raw_dir.rename(hidden_raw)
+    try:
+        assert validate_product(relocated / "acquisition" / "MANIFEST.json")["valid"]
+        assert validate_product(relocated / "weather" / "MANIFEST.json")["valid"]
+    finally:
+        hidden_raw.rename(config.surface_weather.raw_dir)
 
 
 def test_disjoint_acquisitions_do_not_claim_a_complete_interval(tmp_path: Path, monkeypatch) -> None:
@@ -391,7 +725,9 @@ def test_direct_r5_download_build_and_inspect_contract(tmp_path: Path, monkeypat
         row.PRECIP_SOURCE_URI == hrrr_aws_archive_uri(pd.Timestamp(row.VALID_TIME_UTC), 1)
         for row in inventory.itertuples(index=False)
     )
-    assert len(list((config.surface_weather.raw_dir / "crosswalks").rglob("*.parquet"))) == 1
+    crosswalks = set(inventory["CROSSWALK_RELATIVE_PATH"].astype(str))
+    assert len(crosswalks) == 1
+    assert all(value.startswith("objects/crosswalks/") for value in crosswalks)
     load_manifest(config.surface_weather.acquisition_manifest_path, verify_artifacts=True)
     from meteorology.validation import validate_product
 
@@ -581,15 +917,33 @@ def test_download_resumes_and_repairs_checksum_mismatch(
     first_time = make_sample_times_for_local_date("2024-01-02", config.surface_weather.timezone, 4)[
         0
     ]
-    path = sample_path(config.surface_weather.raw_dir, first_time, config.surface_weather.timezone)
-    tampered = pq.ParquetFile(path).read().to_pandas()
+    first_row = resumed.loc[
+        resumed["VALID_TIME_UTC"] == pd.Timestamp(first_time).tz_convert("UTC").isoformat()
+    ].iloc[0]
+    path = config.surface_weather.raw_dir / str(first_row["RELATIVE_PATH"])
+    legacy_sample = sample_path(config.surface_weather.raw_dir, first_time, config.surface_weather.timezone)
+    legacy_sample.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(path, legacy_sample)
+    candidate = resumed.copy()
+    candidate.loc[candidate["VALID_TIME_UTC"] == first_row["VALID_TIME_UTC"], "RELATIVE_PATH"] = str(
+        legacy_sample.relative_to(config.surface_weather.raw_dir)
+    )
+    write_table(config.surface_weather.working_inventory_path,
+                pa.Table.from_pandas(candidate, preserve_index=False), INVENTORY_SCHEMA)
+    tampered = pq.ParquetFile(legacy_sample).read().to_pandas()
     tampered["TEMPERATURE_2M_C"] += 1.0
-    write_table(path, pa.Table.from_pandas(tampered, preserve_index=False), SAMPLE_SCHEMA)
+    write_table(legacy_sample, pa.Table.from_pandas(tampered, preserve_index=False), SAMPLE_SCHEMA)
     download_surface_weather(config_path, run_id="download-repair")
     assert len(calls) == (7 if field == "PRECIP_RETRIEVED_AT_UTC" else 13)
 
     inventory = pq.read_table(config.surface_weather.inventory_path).to_pandas()
-    crosswalk = config.surface_weather.raw_dir / inventory["CROSSWALK_RELATIVE_PATH"].iloc[0]
+    original_crosswalk = config.surface_weather.raw_dir / inventory["CROSSWALK_RELATIVE_PATH"].iloc[0]
+    crosswalk = config.surface_weather.raw_dir / "crosswalks" / "legacy-working.parquet"
+    crosswalk.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(original_crosswalk, crosswalk)
+    inventory["CROSSWALK_RELATIVE_PATH"] = str(crosswalk.relative_to(config.surface_weather.raw_dir))
+    write_table(config.surface_weather.working_inventory_path,
+                pa.Table.from_pandas(inventory, preserve_index=False), INVENTORY_SCHEMA)
     crosswalk_frame = pq.ParquetFile(crosswalk).read().to_pandas()
     crosswalk_frame["SOURCE_GRID_DISTANCE_M"] += 1.0
     from meteorology.surface_weather.sampling import (
@@ -605,10 +959,15 @@ def test_download_resumes_and_repairs_checksum_mismatch(
     download_surface_weather(config_path, run_id="crosswalk-repair")
     assert len(calls) > calls_before_crosswalk_repair
     repaired = pq.read_table(config.surface_weather.inventory_path).to_pandas()
-    assert set(repaired["CROSSWALK_CHECKSUM"]) == {sha256_file(crosswalk)}
+    assert set(repaired["CROSSWALK_CHECKSUM"]) != {sha256_file(crosswalk)}
+    assert all(
+        sha256_file(config.surface_weather.raw_dir / str(row.CROSSWALK_RELATIVE_PATH))
+        == row.CROSSWALK_CHECKSUM
+        for row in repaired.itertuples(index=False)
+    )
 
 
-def test_existing_sample_snapshot_writes_only_candidate_metadata(
+def test_existing_sample_snapshot_copies_candidate_references(
     tmp_path: Path, monkeypatch
 ) -> None:
     config_path = _fixture_config(tmp_path)
@@ -638,6 +997,13 @@ def test_existing_sample_snapshot_writes_only_candidate_metadata(
     assert summary["complete_times"] == 6
     assert working.exists() and inventory.exists() and manifest.exists()
     load_manifest(manifest, verify_artifacts=True)
+    assert validate_product(manifest)["valid"]
+    copied_inventory = pq.read_table(inventory).to_pandas()
+    assert all(
+        (snapshot_root / str(relative)).exists()
+        for field in ("RELATIVE_PATH", "CROSSWALK_RELATIVE_PATH")
+        for relative in copied_inventory[field]
+    )
     config.surface_weather.working_inventory_path.unlink()
     config.surface_weather.inventory_path.unlink()
     with pytest.raises(FileNotFoundError, match="Cannot reconstruct actual HRRR retrieval provenance"):
@@ -647,6 +1013,28 @@ def test_existing_sample_snapshot_writes_only_candidate_metadata(
             inventory_path=snapshot_root / "unproven-inventory.parquet",
             manifest_path=snapshot_root / "unproven-manifest.json",
         )
+
+
+def test_custom_acquisition_destination_copies_references(tmp_path: Path, monkeypatch) -> None:
+    config_path = _fixture_config(tmp_path)
+    build_meteorological_spatial_support(config_path, run_id="support")
+    _patch_fetch(monkeypatch, [])
+    candidate = tmp_path / "candidate-raw"
+    inventory = candidate / "HRRR_R5_SOURCE_INVENTORY.parquet"
+    manifest = candidate / "R5_DOWNLOAD_MANIFEST.json"
+    result = download_surface_weather(
+        config_path, max_workers=1,
+        working_inventory_path=candidate / "HRRR_R5_WORKING_INVENTORY.parquet",
+        inventory_path=inventory, manifest_path=manifest,
+    )
+    assert result["complete_times"] == 6
+    assert validate_product(manifest)["valid"]
+    references = pq.read_table(inventory).to_pandas()
+    assert all(
+        (candidate / str(relative)).is_file()
+        for field in ("RELATIVE_PATH", "CROSSWALK_RELATIVE_PATH")
+        for relative in references[field]
+    )
 
 
 def test_failed_extension_preserves_canonical_and_resumes_working_inventory(

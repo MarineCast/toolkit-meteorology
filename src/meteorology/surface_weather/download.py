@@ -9,6 +9,7 @@ import os
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
@@ -56,6 +57,12 @@ from .source import (
     fetch_cropped_hrrr_precip_grid,
     hrrr_logical_object_uri,
     replace_source_grid_precipitation,
+)
+from .storage import (
+    acquisition_lock,
+    copy_referenced_object,
+    resolve_raw_relative,
+    write_immutable_table,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -354,6 +361,7 @@ def _publish_complete_acquisition(
             f"declared interval {start} through {end}, exactly once."
         )
     support = load_meteorological_support(weather.h3_resolution, config_path)
+    validated_crosswalks: set[tuple[Path, str, str]] = set()
     for row in rows:
         valid_time = pd.Timestamp(str(row["VALID_TIME_UTC"]))
         expected_uri = hrrr_logical_object_uri(valid_time)
@@ -388,18 +396,40 @@ def _publish_complete_acquisition(
             sample_relative, crosswalk_relative
         )):
             raise ValueError(f"Retained HRRR row has an unsafe artifact path: {valid_time}.")
-        sample = weather.raw_dir / sample_relative
-        crosswalk = weather.raw_dir / crosswalk_relative
+        sample = resolve_raw_relative(weather.raw_dir, str(sample_relative))
+        crosswalk = resolve_raw_relative(weather.raw_dir, str(crosswalk_relative))
+        crosswalk_key = (
+            crosswalk, str(row.get("CROSSWALK_CHECKSUM")), str(row.get("SOURCE_GRID_HASH"))
+        )
+        if crosswalk_key not in validated_crosswalks:
+            if (
+                not _valid_crosswalk(crosswalk, support, str(row.get("SOURCE_GRID_HASH")))
+                or sha256_file(crosswalk) != row.get("CROSSWALK_CHECKSUM")
+            ):
+                raise ValueError(f"Retained HRRR sample or crosswalk is invalid: {valid_time}.")
+            validated_crosswalks.add(crosswalk_key)
         if (
             not _valid_sample(
                 sample, support, valid_time_utc=valid_time,
                 availability_lag_hours=weather.availability_lag_hours,
             )
             or sha256_file(sample) != row.get("CHECKSUM")
-            or not _valid_crosswalk(crosswalk, support, str(row.get("SOURCE_GRID_HASH")))
-            or sha256_file(crosswalk) != row.get("CROSSWALK_CHECKSUM")
         ):
             raise ValueError(f"Retained HRRR sample or crosswalk is invalid: {valid_time}.")
+    if inventory_destination.parent.resolve() != weather.raw_dir.resolve():
+        copied: set[tuple[str, str]] = set()
+        for row in rows:
+            for path_field, checksum_field in (
+                ("RELATIVE_PATH", "CHECKSUM"),
+                ("CROSSWALK_RELATIVE_PATH", "CROSSWALK_CHECKSUM"),
+            ):
+                reference = (str(row[path_field]), str(row[checksum_field]))
+                if reference not in copied:
+                    copy_referenced_object(
+                        source_root=weather.raw_dir, target_root=inventory_destination.parent,
+                        relative=reference[0], checksum=reference[1],
+                    )
+                    copied.add(reference)
     inventory_table = pa.Table.from_pylist(rows, schema=INVENTORY_SCHEMA)
     publication_parent = Path(
         os.path.commonpath([inventory_destination.parent, manifest_destination.parent])
@@ -431,7 +461,7 @@ def _publish_complete_acquisition(
                     "backend": "direct_grib_via_herbie",
                     "variable_selectors": HRRR_VARIABLES,
                 },
-                "sample_storage": "one strict H3 R5 Parquet file per valid time",
+                "sample_storage": "immutable-sha256-objects-v1; one strict H3 R5 Parquet file per valid time",
             },
             artifacts=[inventory_contract],
             inputs=[
@@ -489,7 +519,7 @@ def _publish_complete_acquisition(
         publisher.publish()
 
 
-def download_surface_weather(
+def _download_surface_weather_locked(
     config_path: str | Path = DEFAULT_CONFIG_PATH,
     *,
     start_date: str | None = None,
@@ -502,6 +532,7 @@ def download_surface_weather(
     working_inventory_path: str | Path | None = None,
     inventory_path: str | Path | None = None,
     manifest_path: str | Path | None = None,
+    _run_state_path: Path | None = None,
 ) -> dict[str, object]:
     """Acquire a frozen direct-HRRR range and publish only when it is complete."""
 
@@ -563,16 +594,21 @@ def download_surface_weather(
     seed_path = working_destination if working_destination.exists() else inventory_destination
     existing_rows = _load_inventory(seed_path)
     existing_by_time = {str(row["VALID_TIME_UTC"]): row for row in existing_rows}
-    crosswalk_cache: dict[str, pd.DataFrame] = {}
+    crosswalk_cache: dict[str, tuple[pd.DataFrame, Path, str]] = {}
     crosswalk_validation_cache: dict[tuple[str, str], bool] = {}
+    crosswalk_checksum_cache: dict[Path, str] = {}
     crosswalk_lock = Lock()
 
     def acquire(valid_time: pd.Timestamp) -> dict[str, object]:
         valid = pd.Timestamp(valid_time).tz_convert("UTC")
         valid_key = valid.isoformat()
         local_date = valid.tz_convert(weather.timezone).strftime("%Y-%m-%d")
-        destination = sample_path(weather.raw_dir, valid, weather.timezone)
         existing = existing_by_time.get(valid_key, {})
+        destination = (
+            resolve_raw_relative(weather.raw_dir, str(existing["RELATIVE_PATH"]))
+            if existing.get("RELATIVE_PATH")
+            else sample_path(weather.raw_dir, valid, weather.timezone)
+        )
         precip_forecast_hour = weather.precipitation_forecast_hour
         expected_source_uri = hrrr_logical_object_uri(valid)
         expected_precip_uri = hrrr_logical_object_uri(valid, precip_forecast_hour)
@@ -584,23 +620,23 @@ def download_surface_weather(
                 pq.read_table(destination, columns=["SOURCE_GRID_HASH"])[0][0].as_py()
             )
         existing_crosswalk = (
-            weather.raw_dir / str(existing["CROSSWALK_RELATIVE_PATH"])
+            resolve_raw_relative(weather.raw_dir, str(existing["CROSSWALK_RELATIVE_PATH"]))
             if existing.get("CROSSWALK_RELATIVE_PATH")
             else (crosswalk_path(weather.raw_dir, expected_hash) if expected_hash else None)
         )
         actual_checksum = sha256_file(destination) if destination.exists() else ""
         checksum_ok = not expected_checksum or actual_checksum == expected_checksum
-        actual_crosswalk_checksum = (
-            sha256_file(existing_crosswalk)
-            if existing_crosswalk is not None and existing_crosswalk.exists()
-            else ""
-        )
-        crosswalk_checksum_ok = (
-            not expected_crosswalk_checksum
-            or actual_crosswalk_checksum == expected_crosswalk_checksum
-        )
         validation_key = (str(existing_crosswalk), str(expected_hash))
         with crosswalk_lock:
+            if existing_crosswalk is not None and existing_crosswalk not in crosswalk_checksum_cache:
+                crosswalk_checksum_cache[existing_crosswalk] = (
+                    sha256_file(existing_crosswalk) if existing_crosswalk.exists() else ""
+                )
+            actual_crosswalk_checksum = crosswalk_checksum_cache.get(existing_crosswalk, "")
+            crosswalk_checksum_ok = (
+                not expected_crosswalk_checksum
+                or actual_crosswalk_checksum == expected_crosswalk_checksum
+            )
             if validation_key not in crosswalk_validation_cache:
                 crosswalk_validation_cache[validation_key] = (
                     existing_crosswalk is not None
@@ -681,11 +717,13 @@ def download_surface_weather(
                     valid_time_utc=valid,
                     forecast_hour=precip_forecast_hour,
                 )
-                _atomic_table_write(repaired, destination, SAMPLE_SCHEMA)
-                if not _valid_sample(destination, support, valid_time_utc=valid, availability_lag_hours=weather.availability_lag_hours):
-                    raise RuntimeError(
-                        f"Written HRRR precipitation repair failed validation: {destination}"
-                    )
+                repaired_path, repaired_checksum = write_immutable_table(
+                    repaired, raw_dir=weather.raw_dir, family="samples", schema=SAMPLE_SCHEMA,
+                    validate=lambda path: _valid_sample(
+                        path, support, valid_time_utc=valid,
+                        availability_lag_hours=weather.availability_lag_hours,
+                    ),
+                )
                 return _inventory_row(
                     valid_time=valid,
                     timezone=weather.timezone,
@@ -693,7 +731,7 @@ def download_surface_weather(
                     h3_resolution=weather.h3_resolution,
                     h3_cell_count=len(support),
                     raw_dir=weather.raw_dir,
-                    sample=destination,
+                    sample=repaired_path,
                     crosswalk=existing_crosswalk,
                     status="COMPLETE",
                     source_uri=str(existing["SOURCE_URI"]),
@@ -701,6 +739,8 @@ def download_surface_weather(
                     source_retrieved_at_utc=str(existing["SOURCE_RETRIEVED_AT_UTC"]),
                     precip_retrieved_at_utc=precip_retrieved_at,
                     source_grid_hash=expected_hash,
+                    sample_checksum=repaired_checksum,
+                    crosswalk_checksum=actual_crosswalk_checksum,
                 )
             for attempt in range(1, HERBIE_ATTEMPTS_PER_TIMESTAMP + 1):
                 try:
@@ -745,23 +785,22 @@ def download_surface_weather(
                     )
                     time.sleep(2 ** (attempt - 1))
             grid_hash = str(source_grid["SOURCE_GRID_HASH"].iloc[0])
-            crosswalk_destination = crosswalk_path(weather.raw_dir, grid_hash)
             with crosswalk_lock:
-                crosswalk = crosswalk_cache.get(grid_hash)
-                can_reuse_existing_crosswalk = expected_hash != grid_hash or crosswalk_checksum_ok
-                if (
-                    crosswalk is None
-                    and can_reuse_existing_crosswalk
-                    and _valid_crosswalk(crosswalk_destination, support, grid_hash)
-                ):
-                    crosswalk = pq.read_table(
-                        crosswalk_destination, schema=CROSSWALK_SCHEMA
-                    ).to_pandas()
-                if crosswalk is None:
+                cached = crosswalk_cache.get(grid_hash)
+                if cached is not None:
+                    crosswalk, crosswalk_destination, crosswalk_checksum = cached
+                elif expected_hash == grid_hash and crosswalk_ok and existing_crosswalk is not None:
+                    crosswalk_destination = existing_crosswalk
+                    crosswalk_checksum = actual_crosswalk_checksum
+                    crosswalk = pq.read_table(existing_crosswalk, schema=CROSSWALK_SCHEMA).to_pandas()
+                else:
                     crosswalk = build_nearest_grid_crosswalk(support, source_grid)
-                    _atomic_table_write(crosswalk, crosswalk_destination, CROSSWALK_SCHEMA)
-                crosswalk_cache[grid_hash] = crosswalk
-                crosswalk_validation_cache[(str(crosswalk_destination), grid_hash)] = True
+                    crosswalk_destination, crosswalk_checksum = write_immutable_table(
+                        crosswalk, raw_dir=weather.raw_dir, family="crosswalks",
+                        schema=CROSSWALK_SCHEMA,
+                        validate=lambda path: _valid_crosswalk(path, support, grid_hash),
+                    )
+                crosswalk_cache[grid_hash] = (crosswalk, crosswalk_destination, crosswalk_checksum)
             sampled = sample_source_grid(
                 source_grid,
                 crosswalk,
@@ -770,9 +809,13 @@ def download_surface_weather(
                 precip_init_time_utc=valid - pd.Timedelta(hours=precip_forecast_hour),
                 precip_forecast_hour=precip_forecast_hour,
             )
-            _atomic_table_write(sampled, destination, SAMPLE_SCHEMA)
-            if not _valid_sample(destination, support, valid_time_utc=valid, availability_lag_hours=weather.availability_lag_hours):
-                raise RuntimeError(f"Written HRRR sample failed validation: {destination}")
+            published_sample, published_checksum = write_immutable_table(
+                sampled, raw_dir=weather.raw_dir, family="samples", schema=SAMPLE_SCHEMA,
+                validate=lambda path: _valid_sample(
+                    path, support, valid_time_utc=valid,
+                    availability_lag_hours=weather.availability_lag_hours,
+                ),
+            )
             return _inventory_row(
                 valid_time=valid,
                 timezone=weather.timezone,
@@ -780,7 +823,7 @@ def download_surface_weather(
                 h3_resolution=weather.h3_resolution,
                 h3_cell_count=len(support),
                 raw_dir=weather.raw_dir,
-                sample=destination,
+                sample=published_sample,
                 crosswalk=crosswalk_destination,
                 status="COMPLETE",
                 source_uri=source_uri,
@@ -788,6 +831,8 @@ def download_surface_weather(
                 source_retrieved_at_utc=source_retrieved_at,
                 precip_retrieved_at_utc=precip_retrieved_at,
                 source_grid_hash=grid_hash,
+                sample_checksum=published_checksum,
+                crosswalk_checksum=crosswalk_checksum,
             )
         except Exception as exc:
             LOGGER.exception("Direct HRRR acquisition failed for %s", valid)
@@ -817,12 +862,20 @@ def download_surface_weather(
             working_destination,
             INVENTORY_SCHEMA,
         )
+        if _run_state_path is not None:
+            _atomic_table_write(
+                pa.Table.from_pylist(merged, schema=INVENTORY_SCHEMA).to_pandas(),
+                _run_state_path.parent / "WORKING_INVENTORY.parquet", INVENTORY_SCHEMA,
+            )
         return merged
 
     def record(row: dict[str, object]) -> None:
         requested_rows.append(row)
-        if len(requested_rows) % 100 == 0:
+        if len(times) <= 100:
             checkpoint()
+        if len(requested_rows) % 100 == 0:
+            if len(times) > 100:
+                checkpoint()
             elapsed = max(time.perf_counter() - started, 1e-9)
             LOGGER.warning(
                 "Direct HRRR R5 progress: %d/%d valid times validated (%.1f per minute, "
@@ -873,7 +926,66 @@ def download_surface_weather(
     return summary
 
 
-def snapshot_existing_surface_weather_acquisition(
+def download_surface_weather(
+    config_path: str | Path = DEFAULT_CONFIG_PATH,
+    *,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    overwrite: bool = False,
+    max_workers: int = DEFAULT_HERBIE_WORKERS,
+    dry_run: bool = False,
+    allow_large_download: bool = False,
+    run_id: str | None = None,
+    working_inventory_path: str | Path | None = None,
+    inventory_path: str | Path | None = None,
+    manifest_path: str | Path | None = None,
+) -> dict[str, object]:
+    """Own the raw workspace through recovery, acquisition, and metadata commit."""
+
+    options = dict(
+        start_date=start_date, end_date=end_date, overwrite=overwrite,
+        max_workers=max_workers, dry_run=dry_run,
+        allow_large_download=allow_large_download, run_id=run_id,
+        working_inventory_path=working_inventory_path, inventory_path=inventory_path,
+        manifest_path=manifest_path,
+    )
+    if dry_run:
+        return _download_surface_weather_locked(config_path, **options)
+    config = load_meteorological_config(config_path)
+    weather = config.surface_weather
+    inventory_parent = Path(inventory_path or weather.inventory_path).parent.resolve()
+    manifest_parent = Path(manifest_path or weather.acquisition_manifest_path).parent.resolve()
+    if inventory_parent != manifest_parent:
+        raise ValueError("Acquisition inventory and manifest must share one publication directory.")
+    publication_parent = inventory_parent
+    other_owner = (
+        acquisition_lock(publication_parent, writer=True)
+        if publication_parent.resolve() != weather.raw_dir.resolve() else nullcontext()
+    )
+    with acquisition_lock(weather.raw_dir, writer=True), other_owner:
+        TransactionalFamilyPublisher.recover(weather.raw_dir)
+        if publication_parent.resolve() != weather.raw_dir.resolve():
+            TransactionalFamilyPublisher.recover(publication_parent)
+        token = uuid.uuid4().hex
+        state_path = weather.raw_dir / "runs" / token / "RUN_STATE.json"
+        state = {"schema_version": 1, "run_id": run_id or token,
+                 "status": "ACQUIRING", "started_at_utc": datetime.now(UTC).isoformat()}
+        atomic_write_json(state_path, state)
+        try:
+            result = _download_surface_weather_locked(
+                config_path, **options, _run_state_path=state_path,
+            )
+        except BaseException as exc:
+            state.update(status="INCOMPLETE", failure=f"{type(exc).__name__}: {exc}")
+            atomic_write_json(state_path, state, overwrite=True)
+            raise
+        state.update(status="COMMITTED", completed_at_utc=datetime.now(UTC).isoformat())
+        atomic_write_json(state_path, state, overwrite=True)
+        result["run_state_path"] = str(state_path)
+        return result
+
+
+def _snapshot_existing_surface_weather_acquisition_locked(
     config_path: str | Path = DEFAULT_CONFIG_PATH,
     *,
     working_inventory_path: str | Path | None = None,
@@ -894,26 +1006,16 @@ def snapshot_existing_surface_weather_acquisition(
             "Cannot reconstruct actual HRRR retrieval provenance from samples alone; "
             "a current acquisition inventory is required for a network-free snapshot."
         )
-    sample_files = sorted((config.surface_weather.raw_dir / "samples").rglob("*.parquet"))
-    if not sample_files:
-        raise FileNotFoundError(
-            f"No existing R5 HRRR samples are available: {config.surface_weather.raw_dir / 'samples'}"
-        )
-    dates = sorted(
-        {
-            part.removeprefix("date=")
-            for path in sample_files
-            for part in path.parts
-            if part.startswith("date=")
-        }
-    )
+    rows = _load_inventory(source_inventory)
+    dates = sorted({str(row["LOCAL_DATE"]) for row in rows})
+    if not dates:
+        raise FileNotFoundError(f"No existing R5 HRRR inventory rows: {source_inventory}")
     expected_dates = [
         value.strftime("%Y-%m-%d") for value in pd.date_range(dates[0], dates[-1], freq="D")
     ]
     if dates != expected_dates:
         missing = sorted(set(expected_dates).difference(dates))
         raise ValueError(f"Existing R5 HRRR samples contain a date gap: {missing[0]}")
-    rows = _load_inventory(source_inventory)
     candidate_working = Path(working_inventory_path or weather.working_inventory_path)
     candidate_inventory = Path(inventory_path or weather.inventory_path)
     candidate_manifest = Path(manifest_path or weather.acquisition_manifest_path)
@@ -936,6 +1038,37 @@ def snapshot_existing_surface_weather_acquisition(
         "inventory_path": str(candidate_inventory),
         "manifest_path": str(candidate_manifest),
     }
+
+
+def snapshot_existing_surface_weather_acquisition(
+    config_path: str | Path = DEFAULT_CONFIG_PATH,
+    *,
+    working_inventory_path: str | Path | None = None,
+    inventory_path: str | Path | None = None,
+    manifest_path: str | Path | None = None,
+    run_id: str | None = None,
+) -> dict[str, object]:
+    """Publish inventory-driven existing objects under exclusive acquisition ownership."""
+
+    config = load_meteorological_config(config_path)
+    weather = config.surface_weather
+    inventory_parent = Path(inventory_path or weather.inventory_path).parent.resolve()
+    manifest_parent = Path(manifest_path or weather.acquisition_manifest_path).parent.resolve()
+    if inventory_parent != manifest_parent:
+        raise ValueError("Acquisition inventory and manifest must share one publication directory.")
+    publication_parent = inventory_parent
+    other_owner = (
+        acquisition_lock(publication_parent, writer=True)
+        if publication_parent.resolve() != weather.raw_dir.resolve() else nullcontext()
+    )
+    with acquisition_lock(weather.raw_dir, writer=True), other_owner:
+        TransactionalFamilyPublisher.recover(weather.raw_dir)
+        if publication_parent.resolve() != weather.raw_dir.resolve():
+            TransactionalFamilyPublisher.recover(publication_parent)
+        return _snapshot_existing_surface_weather_acquisition_locked(
+            config_path, working_inventory_path=working_inventory_path,
+            inventory_path=inventory_path, manifest_path=manifest_path, run_id=run_id,
+        )
 
 
 def main() -> int:
