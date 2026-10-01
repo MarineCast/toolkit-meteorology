@@ -1,6 +1,6 @@
 # Acquisition, build and inspection
 
-[Documentation index](README.md)
+[Documentation index](index.md)
 
 These examples assume installation, an initialized workspace, and geography configured as described
 in [setup](SETUP.md) and [configuration](CONFIGURATION.md). Commands use an explicit short interval.
@@ -16,6 +16,9 @@ meteorology build spatial-support
 Build support before weather acquisition or astronomy. All downstream families use these same
 configured H3 cells at their respective resolutions.
 
+For a fully offline first run, use `meteorology example-offline` in a freshly initialized
+one-day workspace. It labels its source synthetic and invokes the normal builders and validators.
+
 ## 2. Acquire and build weather
 
 Install the acquisition extra before downloading. Preview requests first:
@@ -30,6 +33,8 @@ The download command performs network access; the build consumes validated local
 inventory. Worker count must be between 1 and 16. Successful samples and the working inventory
 survive acquisition failures. Rerun the same command to resume. `--overwrite` explicitly replaces
 already validated samples; it is not needed for normal resumption.
+The dry run shows the date range and number of cycles. A request over seven local days requires
+`--allow-large-download` on the actual download command.
 
 Canonical acquisition metadata is published only after the requested range is complete. Do not
 substitute a partial working inventory for the canonical one. See [contracts](CONTRACTS.md) for
@@ -54,6 +59,7 @@ meteorology inspect surface-weather --date 2024-01-02
 meteorology inspect daylight --date 2024-01-02
 meteorology inspect lunar --date 2024-01-02
 meteorology verify --help
+meteorology validate --manifest /path/to/MANIFEST.json
 ```
 
 Inspectors validate manifest checksums before writing HTML. Rendering an HTML file is separate from
@@ -62,6 +68,11 @@ visually reviewing it. The additional weather time-series exporter is available 
 ```sh
 python -m meteorology.surface_weather.time_series_map --help
 ```
+
+`meteorology freeze-release --manifest /path/to/MANIFEST.json --output-root /path/to/releases`
+archives a validated family under its release ID and refuses to replace an existing release.
+Weather freezing also copies every sample and crosswalk referenced by its inventory, so plan for
+potentially substantial disk use.
 
 `meteorology verify` audits an existing HRRR rebuild and optionally compares legacy data. An absent
 legacy archive is recorded as unavailable; it is not evidence of parity. Use its `--help` to select

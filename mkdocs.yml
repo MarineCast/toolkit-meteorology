@@ -1,0 +1,73 @@
+site_name: Meteorology Toolkit
+site_description: Reproducible meteorological and astronomical H3 data products
+site_url: https://marinecast.github.io/toolkit-meteorology/
+repo_url: https://github.com/MarineCast/toolkit-meteorology
+repo_name: MarineCast/toolkit-meteorology
+copyright: Apache-2.0 · MarineCast contributors
+theme:
+  name: material
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+  palette:
+    - scheme: default
+      primary: teal
+      accent: cyan
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: teal
+      accent: cyan
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+nav:
+  - Home: index.md
+  - Get started:
+      - Quickstart: getting-started/quickstart.md
+      - Installation: SETUP.md
+      - Configuration: CONFIGURATION.md
+  - Science:
+      - Methodology: methodology.md
+      - Product contracts: CONTRACTS.md
+      - Product tables: PRODUCTS.md
+      - Variable inventory: reference/variables.md
+      - Limitations: limitations.md
+  - Guides:
+      - Acquisition and build: WORKFLOWS.md
+      - Daily matrix: daily-matrix.md
+      - Modeling guidance: guides/downstream-modeling.md
+  - Reference:
+      - CLI: reference/cli.md
+      - Python API: reference/api.md
+      - Sources and rights: DATA_SOURCES.md
+  - Development:
+      - Architecture: ARCHITECTURE.md
+      - Development checks: DEVELOPMENT.md
+      - Release process: development/release-process.md
+      - Repository presentation: development/repository-presentation.md
+      - Migration history: MIGRATION.md
+      - Changelog: changelog.md

@@ -23,6 +23,7 @@ DEFAULT_POLICY_PATH = Path(
 # published formula.  They remain in scientific artifacts but not in the
 # default model matrix.
 DETERMINISTIC_ALIASES = {
+    ("surface_weather_daily", "WIND_DIRECTION_FROM_10M_DEG"): "requires_circular_encoding_and_calm_missingness_policy",
     ("daylight_daily", "DAYLIGHT_FRACTION"): "deterministic_transform_of_daylight_hours",
     ("daylight_daily", "DAYLIGHT_WEIGHT"): "duplicate_of_daylight_fraction",
     ("daylight_day_of_year", "DAYLIGHT_FRACTION"): ("deterministic_transform_of_daylight_hours"),

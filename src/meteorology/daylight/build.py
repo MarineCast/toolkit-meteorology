@@ -120,8 +120,12 @@ def _daylight_doy_frame(support: pd.DataFrame, default_weight: str) -> pd.DataFr
 
 
 def validate_daylight_product(frame: pd.DataFrame, support: pd.DataFrame) -> None:
-    if frame.duplicated(["H3_INDEX", "DATE"]).any() or frame.isna().any().any():
+    required = frame.drop(columns=["SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG"])
+    if frame.duplicated(["H3_INDEX", "DATE"]).any() or required.isna().any().any():
         raise ValueError("Daylight product has duplicate keys or null values.")
+    absent_mean = frame["SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG"].isna()
+    if (absent_mean & frame["SOLAR_ELEVATION_MAX_DEG"].gt(0)).any():
+        raise ValueError("Daylight mean solar elevation is missing despite sampled daylight.")
     cells = set(support["H3_INDEX"].astype(str))
     for date, group in frame.groupby("DATE"):
         if set(group["H3_INDEX"].astype(str)) != cells:
@@ -134,7 +138,10 @@ def validate_daylight_product(frame: pd.DataFrame, support: pd.DataFrame) -> Non
         "LOW_SUN_DAYLIGHT_HOURS": (0.0, 25.0),
     }
     for field, (lower, upper) in bounds.items():
-        if not pd.to_numeric(frame[field], errors="coerce").between(lower, upper).all():
+        values = pd.to_numeric(frame[field], errors="coerce")
+        if field == "SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG":
+            values = values.dropna()
+        if not values.between(lower, upper).all():
             raise ValueError(f"Daylight field {field} is outside [{lower}, {upper}].")
 
 
@@ -211,8 +218,8 @@ def build_daylight(
             sources=[
                 {
                     "name": "Dependency-light solar-position approximation",
-                    "license": "OrcaCast implementation",
-                    "attribution": "OrcaCast",
+                    "license": "Apache-2.0 toolkit implementation",
+                    "attribution": "toolkit-meteorology",
                     "observation_period": "Not applicable; deterministic astronomy",
                     "redistribution_restrictions": "None",
                 }

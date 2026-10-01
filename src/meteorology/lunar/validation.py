@@ -20,9 +20,16 @@ def validate_lunar_illumination_features(
     else:
         if frame.duplicated(["h3", "date"]).any():
             errors.append("Duplicate h3-date rows found.")
-        nulls = [column for column in OUTPUT_COLUMNS if frame[column].isna().any()]
+        nullable_when_no_night = {
+            "moon_visible_dark_fraction", "moonlit_dark_fraction", "weight_moonlit_dark_hours"
+        }
+        nulls = [column for column in OUTPUT_COLUMNS if column not in nullable_when_no_night and frame[column].isna().any()]
         if nulls:
             errors.append(f"Null values found in columns: {nulls}")
+        no_night = frame["night_hours"].eq(0)
+        for column in nullable_when_no_night:
+            if not frame[column].isna().eq(no_night).all():
+                errors.append(f"{column} must be null exactly when night_hours is zero.")
         bounds = {
             "centroid_lat": (-90.0, 90.0),
             "centroid_lon": (-180.0, 180.0),
@@ -36,6 +43,8 @@ def validate_lunar_illumination_features(
         }
         for column, (lower, upper) in bounds.items():
             values = pd.to_numeric(frame[column], errors="coerce")
+            if column in nullable_when_no_night:
+                values = values.dropna()
             if not values.between(lower, upper).all():
                 errors.append(f"{column} contains values outside [{lower}, {upper}].")
         for column in (

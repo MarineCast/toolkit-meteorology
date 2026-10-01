@@ -83,7 +83,9 @@ def prepare_h3_centroids(
     cells["h3"] = cells["h3"].astype("string")
     cells["centroid_lat"] = pd.to_numeric(cells["centroid_lat"], errors="coerce")
     cells["centroid_lon"] = pd.to_numeric(cells["centroid_lon"], errors="coerce")
-    cells = cells.drop_duplicates("h3", keep="first").reset_index(drop=True)
+    if cells["h3"].duplicated().any():
+        raise ValueError("H3 centroid table has duplicate cell identities.")
+    cells = cells.reset_index(drop=True)
     if cells.isna().any().any():
         raise ValueError("H3 centroid table contains null identifiers or coordinates.")
     if not cells["centroid_lat"].between(-90.0, 90.0).all():
@@ -238,10 +240,10 @@ def compute_moonlight_exposure_table(
         output["moon_visible_dark_hours"] = visible_dark
         output["moonlit_dark_hours"] = moonlit_dark
         output["moon_visible_dark_fraction"] = np.divide(
-            visible_dark, night, out=np.zeros_like(visible_dark), where=night > 0
+            visible_dark, night, out=np.full_like(visible_dark, np.nan), where=night > 0
         )
         output["moonlit_dark_fraction"] = np.divide(
-            moonlit_dark, night, out=np.zeros_like(moonlit_dark), where=night > 0
+            moonlit_dark, night, out=np.full_like(moonlit_dark, np.nan), where=night > 0
         )
         chunks.append(output)
     return pd.concat(chunks, ignore_index=True)

@@ -1,6 +1,6 @@
 # Architecture
 
-[Documentation index](README.md)
+[Documentation index](index.md)
 
 ## Package organization
 
@@ -43,7 +43,8 @@ Each producer stages its family artifacts before transactional replacement. A du
 supports recovery after interruption. This is a family-level guarantee, not a simultaneous release
 of weather, daylight and lunar products. Callers must coordinate cross-family releases themselves.
 
-Manifests carry resolved configuration and its hash, source attribution, input/output checksums,
+Manifests carry software and method versions, an execution `run_id`, a content-derived `release_id`,
+resolved configuration and its hash, source attribution, input/output checksums,
 spatial and temporal support, units, formulas and limitations. The code fingerprint hashes the
 installed Python/YAML files; an unrelated data-workspace Git revision is never used as producer
 identity. An ordinary wheel can have a null Git revision while retaining a source hash.
@@ -51,16 +52,15 @@ identity. An ordinary wheel can have a null Git revision while retaining a sourc
 ## Public Python entry points
 
 ```python
-from meteorology.config import load_meteorological_config
-from meteorology.spatial_support.build import build_meteorological_spatial_support
-from meteorology.surface_weather.download import download_surface_weather
-from meteorology.surface_weather.build import build_surface_weather
-from meteorology.daylight.build import build_daylight
-from meteorology.lunar.build import build_lunar
-from meteorology.artifacts import load_manifest
+from meteorology import (
+    load_config, build_spatial_support, download_surface_weather,
+    build_surface_weather, build_daylight, build_lunar,
+    export_daily_matrix, validate_product, freeze_release,
+)
 ```
 
 Set `METEOROLOGY_WORKSPACE` before invoking these APIs outside the workspace. Loading configuration
-is read-only; build/download functions perform the same writes as their CLI counterparts.
+and validation are read-only; build/download/freezing functions perform the same writes as their
+CLI counterparts. Older deep imports remain usable for advanced workflows.
 Read [workflows](WORKFLOWS.md) before invoking producers and [migration](MIGRATION.md) for the
 remaining OrcaCast integration boundary.

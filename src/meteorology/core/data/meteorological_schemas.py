@@ -37,7 +37,7 @@ DAYLIGHT_SCHEMA = pa.schema(
         pa.field("DAYLIGHT_WEIGHT_GLOBAL_NORM", pa.float64(), nullable=False),
         pa.field("DAYLIGHT_WEIGHT", pa.float64(), nullable=False),
         pa.field("SOLAR_ELEVATION_MAX_DEG", pa.float64(), nullable=False),
-        pa.field("SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG", pa.float64(), nullable=False),
+        pa.field("SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG", pa.float64(), nullable=True),
         pa.field("LOW_SUN_DAYLIGHT_HOURS", pa.float64(), nullable=False),
     ]
 )
@@ -70,10 +70,10 @@ LUNAR_SCHEMA = pa.schema(
         pa.field("MOON_VISIBLE_HOURS", pa.float64(), nullable=False),
         pa.field("MOON_VISIBLE_DARK_HOURS", pa.float64(), nullable=False),
         pa.field("MOONLIT_DARK_HOURS", pa.float64(), nullable=False),
-        pa.field("MOON_VISIBLE_DARK_FRACTION", pa.float64(), nullable=False),
-        pa.field("MOONLIT_DARK_FRACTION", pa.float64(), nullable=False),
+        pa.field("MOON_VISIBLE_DARK_FRACTION", pa.float64(), nullable=True),
+        pa.field("MOONLIT_DARK_FRACTION", pa.float64(), nullable=True),
         pa.field("WEIGHT_LUNAR_ILLUMINATION", pa.float64(), nullable=False),
-        pa.field("WEIGHT_MOONLIT_DARK_HOURS", pa.float64(), nullable=False),
+        pa.field("WEIGHT_MOONLIT_DARK_HOURS", pa.float64(), nullable=True),
     ]
 )
 
@@ -163,6 +163,10 @@ SURFACE_WEATHER_DAILY_SCHEMA = pa.schema(
         pa.field("RELATIVE_HUMIDITY_2M_PCT_MEAN", pa.float64(), nullable=False),
         pa.field("WIND_SPEED_10M_MS_MEAN", pa.float64(), nullable=False),
         pa.field("WIND_SPEED_10M_MS_MAX", pa.float64(), nullable=False),
+        pa.field("U_WIND_10M_MS_MEAN", pa.float64(), nullable=False),
+        pa.field("V_WIND_10M_MS_MEAN", pa.float64(), nullable=False),
+        pa.field("WIND_VECTOR_SPEED_10M_MS", pa.float64(), nullable=False),
+        pa.field("WIND_DIRECTION_FROM_10M_DEG", pa.float64(), nullable=True),
         pa.field("WIND_GUST_SURFACE_MS_MEAN", pa.float64(), nullable=False),
         pa.field("WIND_GUST_SURFACE_MS_MAX", pa.float64(), nullable=False),
         pa.field("VISIBILITY_KM_MEAN", pa.float64(), nullable=False),

@@ -1,10 +1,10 @@
 # Installation and workspace setup
 
-[Documentation index](README.md)
+[Documentation index](index.md)
 
 ## Install
 
-Use Python 3.11 or newer on Linux or macOS. Publication uses POSIX file locks. From the toolkit
+Use Python 3.11–3.13 on Linux or macOS. Publication uses POSIX file locks. From the toolkit
 checkout, install into your chosen Python environment:
 
 ```sh
@@ -44,8 +44,9 @@ reference-metadata files, preserves existing files, and performs no acquisition 
 | `config/feature_catalog.yaml` | Product and field metadata |
 | `config/model_feature_policy.yaml` | Optional inherited ecological-model selection policy |
 
-The example defaults cover the Northeast Pacific and several years. Edit geography and dates
-before running a build. Start with a short interval in a separate workspace.
+The packaged example covers a Pacific Northwest bounding box and one local day. Edit geography,
+timezone and dates before a real build. The date range is intentionally small to avoid a surprise
+multi-year acquisition.
 
 ## Select the workspace consistently
 

@@ -1,6 +1,6 @@
 # Sources, attribution and limits
 
-[Documentation index](README.md)
+[Documentation index](index.md)
 
 ## NOAA/NCEP HRRR
 
@@ -21,6 +21,6 @@ They do not account for terrain horizons, refraction, clouds, sea state or artif
 They are environmental covariates, not direct observations of visibility or species occurrence.
 
 The detailed source contract retained with the installed package is
-[`meteorology/DATA_SOURCES.md`](../src/meteorology/DATA_SOURCES.md).
-Software licensing is recorded in [LICENSE](../LICENSE); software rights and dataset rights are
+[`meteorology/DATA_SOURCES.md`](https://github.com/MarineCast/toolkit-meteorology/blob/main/src/meteorology/DATA_SOURCES.md).
+Software licensing is recorded in [LICENSE](https://github.com/MarineCast/toolkit-meteorology/blob/main/LICENSE); software rights and dataset rights are
 separate. Source access and GRIB decoding were not exercised by the extraction's offline validation.

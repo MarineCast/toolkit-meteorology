@@ -396,6 +396,7 @@ def download_surface_weather(
     overwrite: bool = False,
     max_workers: int = DEFAULT_HERBIE_WORKERS,
     dry_run: bool = False,
+    allow_large_download: bool = False,
     run_id: str | None = None,
     working_inventory_path: str | Path | None = None,
     inventory_path: str | Path | None = None,
@@ -436,6 +437,12 @@ def download_surface_weather(
     }
     if dry_run:
         return summary
+    if len(times) > 42 and not allow_large_download:
+        raise ValueError(
+            f"Requested {len(times)} HRRR valid times for {start} through {end} "
+            f"at R{weather.h3_resolution}. Preview with --dry-run, then pass "
+            "--allow-large-download if this acquisition is intentional."
+        )
     if use_latest_freeze and not freeze_path.exists():
         atomic_write_json(
             freeze_path,
@@ -801,6 +808,7 @@ def main() -> int:
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--workers", type=int, default=DEFAULT_HERBIE_WORKERS)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--allow-large-download", action="store_true")
     parser.add_argument("--run-id")
     parser.add_argument("--logs", action="store_true")
     args = parser.parse_args()
@@ -815,6 +823,7 @@ def main() -> int:
             overwrite=args.overwrite,
             max_workers=args.workers,
             dry_run=args.dry_run,
+            allow_large_download=args.allow_large_download,
             run_id=args.run_id,
         )
     )

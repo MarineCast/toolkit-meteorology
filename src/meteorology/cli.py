@@ -52,7 +52,7 @@ def main(argv: list[str] | None = None) -> int:
         sub = commands.add_parser(action, help=f"{action.title()} one product; use FAMILY --help for options.")
         sub.add_argument("family", choices=("surface-weather",) if action == "download" else FAMILIES)
         sub.add_argument("arguments", nargs=argparse.REMAINDER)
-    for action in ("verify", "catalog", "feature-policy", "benchmark", "migrate-legacy"):
+    for action in ("verify", "catalog", "feature-policy", "benchmark", "migrate-legacy", "validate", "variables", "freeze-release", "example-offline"):
         sub = commands.add_parser(action, add_help=False)
         sub.add_argument("arguments", nargs=argparse.REMAINDER)
     matrix = commands.add_parser("export-daily-matrix", help="Combine native daily weather and astronomy.")
@@ -61,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
     args, extra = parser.parse_known_args(argv)
     if extra:
         # Forward --help and other flags for commands with no family argument.
-        if args.command in {"verify", "catalog", "feature-policy", "benchmark", "migrate-legacy"}:
+        if args.command in {"verify", "catalog", "feature-policy", "benchmark", "migrate-legacy", "validate", "variables", "freeze-release", "example-offline"}:
             args.arguments = extra + args.arguments
         else:
             parser.error(f"unrecognized arguments: {' '.join(extra)}")
@@ -89,8 +89,14 @@ def main(argv: list[str] | None = None) -> int:
             "feature-policy": "modeling.feature_policy",
             "benchmark": "maintenance.benchmark_hrrr_r5_acquisition",
             "migrate-legacy": "migration",
+            "validate": "validation",
+            "variables": "variables",
+            "freeze-release": "releases",
+            "example-offline": "offline_example",
         }
         return _invoke(f"meteorology.{modules[args.command]}", args.arguments)
+    except (ValueError, FileNotFoundError, FileExistsError, RuntimeError, ImportError) as exc:
+        parser.exit(2, f"meteorology: {exc}\n")
     finally:
         if old is None:
             os.environ.pop("METEOROLOGY_WORKSPACE", None)

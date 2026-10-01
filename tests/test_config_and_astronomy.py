@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 import pytest
 import yaml
 
@@ -13,6 +15,7 @@ from meteorology.astronomy import (
 from meteorology.config import load_meteorological_config
 from meteorology.daylight.compute import (
     compute_daylight_hours,
+    prepare_h3_centroids as prepare_solar_centroids,
     solar_day_365,
 )
 from meteorology.daylight.features import (
@@ -21,6 +24,7 @@ from meteorology.daylight.features import (
 from meteorology.lunar.compute import (
     SYNODIC_MONTH_DAYS,
     compute_lunar_illumination_table,
+    prepare_h3_centroids as prepare_lunar_centroids,
 )
 from meteorology.lunar.validation import (
     validate_lunar_illumination_features,
@@ -39,14 +43,15 @@ def test_config_is_strict_and_latest_complete_is_timezone_aware(tmp_path: Path) 
         load_meteorological_config(config_path)
 
     config = load_meteorological_config("config/data/environment_meteorological.yaml")
+    weather = replace(config.surface_weather, end_date="latest_complete")
     assert (
-        config.surface_weather.resolved_end_date(
+        weather.resolved_end_date(
             pd.Timestamp("2026-07-28T21:59:00", tz="America/Los_Angeles")
         )
         == "2026-07-27"
     )
     assert (
-        config.surface_weather.resolved_end_date(
+        weather.resolved_end_date(
             pd.Timestamp("2026-07-29T03:00:00", tz="America/Los_Angeles")
         )
         == "2026-07-28"
@@ -192,3 +197,39 @@ def test_lunar_phase_is_continuous_bounded_and_year_dependent() -> None:
         timestep_minutes=60,
     )
     assert next_year.loc[0, "lunar_age_days"] != pytest.approx(ages[0])
+
+
+def test_polar_night_solar_mean_and_no_night_lunar_fraction_are_null() -> None:
+    from meteorology.daylight.build import _daylight_frame, validate_daylight_product
+
+    support = pd.DataFrame({"H3_INDEX": ["polar"], "CENTROID_LAT": [90.0], "CENTROID_LON": [0.0]})
+    winter = _daylight_frame(support, start_date="2024-12-21", end_date="2024-12-21",
+                             timezone="UTC", timestep_minutes=30, low_sun_max_degrees=10,
+                             default_weight="fraction")
+    assert winter.loc[0, "DAYLIGHT_HOURS"] == 0
+    assert pd.isna(winter.loc[0, "SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG"])
+    validate_daylight_product(winter, support)
+
+    summer = compute_lunar_illumination_table(
+        pd.DataFrame({"h3": ["polar"], "centroid_lat": [90.0], "centroid_lon": [0.0]}),
+        "2024-06-21", "2024-06-21", timezone_name="UTC", timestep_minutes=60,
+    )
+    assert summer.loc[0, "night_hours"] == 0
+    for column in ("moon_visible_dark_fraction", "moonlit_dark_fraction", "weight_moonlit_dark_hours"):
+        assert pd.isna(summer.loc[0, column])
+    assert validate_lunar_illumination_features(summer, strict=False) == []
+
+
+def test_constant_daylight_normalization_uses_absolute_fraction() -> None:
+    cells = pd.DataFrame({"h3": ["equator"], "centroid_lat": [0.0], "centroid_lon": [0.0]})
+    frame = build_daylight_features(cells, "2024-03-20", "2024-03-20")
+    assert frame.loc[0, "daylight_hours"] == pytest.approx(12.0)
+    assert frame.loc[0, "daylight_weight_cell_norm"] == pytest.approx(0.5)
+    assert np.isfinite(frame.loc[0, "daylight_weight_global_norm"])
+
+
+@pytest.mark.parametrize("prepare", [prepare_solar_centroids, prepare_lunar_centroids])
+def test_centroid_inputs_reject_duplicate_identity(prepare) -> None:
+    cells = pd.DataFrame({"h3": ["same", "same"], "centroid_lat": [48.0, 49.0], "centroid_lon": [-123.0, -124.0]})
+    with pytest.raises(ValueError, match="duplicate"):
+        prepare(cells)

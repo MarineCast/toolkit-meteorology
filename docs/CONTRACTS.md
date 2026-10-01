@@ -83,6 +83,22 @@ Coverage, availability, lineage, sampling distance, calendar bookkeeping, and QC
 The retired atmospheric-viewability, event-hour, storm, and lightning products are not part of the
 canonical meteorological family.
 
+## Versioned output contract
+
+Current family manifests use schema version 3 and record `software_version`,
+`method_version`, `run_id`, `release_id`, resolved configuration and hashes for
+declared inputs and outputs. Schema version 2 manifests remain readable for
+historical checksum inspection. Deep validation targets current method/schema
+versions. The [method registry](methodology.md#provenance-and-reproducibility)
+identifies changes in numerical meaning separately from the software version.
+
+Daily wind direction is meteorological **FROM** direction calculated from the
+mean 10 m U/V vector; its Arrow field is nullable for calm mean vectors.
+`SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG` is null when sampled daylight is absent.
+Lunar night fractions and their matching weight are null if `NIGHT_HOURS=0`.
+These nulls are not zeros. The [variable inventory](reference/variables.md)
+contains field-level units, source identity, processing and ranges.
+
 The default ecological model matrix is governed separately from the complete scientific products:
 
 ```bash
