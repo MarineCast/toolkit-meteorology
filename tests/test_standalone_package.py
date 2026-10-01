@@ -70,6 +70,7 @@ def test_dataset_dependencies_resolve():
     ['build', 'lunar'], ['download', 'surface-weather'], ['inspect', 'spatial-support'],
     ['inspect', 'surface-weather'], ['inspect', 'daylight'], ['inspect', 'lunar'],
     ['catalog'], ['feature-policy'], ['verify'], ['benchmark'], ['migrate-legacy'],
+    ['validate-science'],
 ])
 def test_cli_routes_help(args, capsys):
     with pytest.raises(SystemExit) as exc:

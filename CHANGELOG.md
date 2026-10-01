@@ -4,6 +4,7 @@ All notable changes to this package are recorded here. Software versions follow 
 
 ## Unreleased
 
+- Added an offline `validate-science` command and versioned comparison report contract for frozen releases and checksum-verified reference files. Synthetic runs verify pairing/report software only; independent accuracy evidence remains pending.
 - Added strict release IDs, method-version metadata, read-only product validation and explicit release freezing.
 - Added an installed-wheel, offline synthetic example and bounded HRRR download confirmation.
 - Added vector mean wind components/speed/direction to daily weather; calm direction is null (`hrrr_surface_daily_v2`).

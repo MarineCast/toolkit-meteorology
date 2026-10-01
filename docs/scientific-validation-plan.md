@@ -5,6 +5,13 @@ software behavior and compatibility for their tested conditions. They do not
 establish regional accuracy or prospective ecological value. No independent
 station/buoy or ephemeris result is claimed by this repository revision.
 
+The [offline comparison workflow](scientific-validation-workflow.md) implements the
+prespecified pairing and report gate. Its synthetic integration test establishes that the
+comparison software runs against frozen releases. The independent-reference gate remains
+`NOT_RUN` until rights-checked independent reference files are supplied and a bounded
+comparison is executed. Any live HRRR acquisition additionally needs its own declared
+product/date/region network budget. The comparison tool never acquires data on its own.
+
 ## Inputs to freeze before comparison
 
 Archive the exact generated release and its manifest, source inventory,

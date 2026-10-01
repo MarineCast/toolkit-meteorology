@@ -15,6 +15,7 @@ All commands accept `--workspace PATH` **before** the subcommand. `METEOROLOGY_W
 | `meteorology example-offline` | Build synthetic one-day full example | Writes a fresh workspace; no network |
 | `meteorology validate --manifest PATH` | Validate a family release | Read only, optional JSON result write |
 | `meteorology validate --daily-matrix PATH` | Validate combined native-resolution matrix | Read only, optional JSON result write |
+| `meteorology validate-science --reference-bundle PATH --protocol PATH --output-dir PATH ...` | Compare frozen releases to separate references | Offline; writes a new evidence directory |
 | `meteorology inspect FAMILY` | Render a manifest-validated HTML view | HTML write |
 | `meteorology export-daily-matrix --manifest ... --output PATH` | Combine native daily families | Writes one Parquet; refuses an existing output |
 | `meteorology freeze-release --manifest PATH --output-root PATH` | Copy validated family and declared inputs to `release_id` directory | Potentially large copy; refuses an existing release |
@@ -24,3 +25,5 @@ All commands accept `--workspace PATH` **before** the subcommand. `METEOROLOGY_W
 Run `meteorology COMMAND --help` or `meteorology build FAMILY --help` for the exact options. Invalid dates/configuration, missing GRIB dependencies and checksum mismatches return actionable errors. A download over seven local days requires `--allow-large-download`; `--dry-run` is always available without that flag. `--workers` is constrained to 1–16.
 
 `validate` prints a JSON result, exits 0 on success and 1 on validation failure. `--json-output PATH` saves the same result for automation. A synthetic example is always marked as synthetic in its source manifest and weather provenance.
+For the `validate-science` input schemas, release selection and evidence limits, see the
+[offline scientific comparison workflow](../scientific-validation-workflow.md).
