@@ -57,6 +57,7 @@ def build_offline_example(config_path: str | Path = "config/data/environment_met
             VALID_TIME_UTC=valid.isoformat(), INIT_TIME_UTC=valid.isoformat(),
             AVAILABLE_AT_UTC=(valid + pd.Timedelta(hours=6)).isoformat(),
             SOURCE_MODEL="synthetic_hrrr", SOURCE_PRODUCT="sfc", FORECAST_HOUR=0,
+            SOURCE_WIND_BASIS="earth_relative",
             TEMPERATURE_2M_K=280.15 + index,
             RELATIVE_HUMIDITY_2M_PCT=65.0, U_WIND_10M_MS=2.0,
             V_WIND_10M_MS=-3.0, WIND_GUST_SURFACE_MS=8.0,

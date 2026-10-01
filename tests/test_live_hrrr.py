@@ -31,8 +31,10 @@ def test_one_hrrr_cycle_and_matched_precipitation() -> None:
     assert core_uri and precip_uri and core_uri != precip_uri
     assert not core.empty and len(core) == len(precip)
     assert set(core["SOURCE_GRID_HASH"]) == set(precip["SOURCE_GRID_HASH"])
+    assert set(core["SOURCE_WIND_BASIS"]) == {"grid_relative"}
     assert np.array_equal(core["SOURCE_GRID_INDEX"], precip["SOURCE_GRID_INDEX"])
     assert np.isfinite(core["TEMPERATURE_2M_K"]).all()
+    assert np.isfinite(core[["U_WIND_10M_MS", "V_WIND_10M_MS"]].to_numpy(dtype=float)).all()
     assert np.isfinite(precip["PRECIP_RATE_KG_M2_S"]).all()
     assert (precip["PRECIP_RATE_KG_M2_S"] >= 0).all()
     assert set(precip["PRECIP_FORECAST_HOUR"]) == {1}

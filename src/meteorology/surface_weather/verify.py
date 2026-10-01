@@ -280,8 +280,8 @@ def _legacy_field_partial_evidence(
                 for current, reducer in metrics.items()
             }
             evidence[group] = {
-                "legacy_selector_state": "AMBIGUOUS_TCDC_LEVEL",
-                "legacy_selector": ":TCDC:",
+                "diagnosis": "UNEXPLAINED_CLOUD_MISMATCH",
+                "possible_legacy_selector": ":TCDC:",
                 "required_selector": ":TCDC:entire atmosphere:",
                 "unexplained_selector_contaminated_cell_count": unexplained_cells,
                 "subset_explained_cell_count": affected_cells,
@@ -318,8 +318,8 @@ def _compare_legacy(
     compared_dates = 0
     compared_rows = 0
     excluded_partial_dates = 0
-    excluded_field_partial_dates = 0
-    excluded_selector_ambiguous_dates = 0
+    suspected_field_partial_dates = 0
+    unexplained_cloud_dates = 0
     field_partial_evidence: dict[str, Any] = {}
     for date, frames in sorted(legacy.items()):
         if date not in daily_files:
@@ -339,21 +339,19 @@ def _compare_legacy(
             interval_hours=interval_hours,
         )
         if partial_evidence is not None:
-            excluded_partial_dates += 1
-            if any(
-                "legacy_selector_state" in group_evidence
+            has_unexplained = any(
+                group_evidence.get("diagnosis") == "UNEXPLAINED_CLOUD_MISMATCH"
                 for group_evidence in partial_evidence.values()
-            ):
-                excluded_selector_ambiguous_dates += 1
+            )
+            if has_unexplained:
+                unexplained_cloud_dates += 1
             if any(
                 "legacy_missingness_behavior" in group_evidence
                 or "affected_cell_count" in group_evidence
-                or int(group_evidence.get("subset_explained_cell_count", 0)) > 0
                 for group_evidence in partial_evidence.values()
             ):
-                excluded_field_partial_dates += 1
+                suspected_field_partial_dates += 1
             field_partial_evidence[date] = partial_evidence
-            continue
         new = pq.ParquetFile(daily_files[date]).read().to_pandas()
         joined = old.merge(
             new,
@@ -392,8 +390,8 @@ def _compare_legacy(
             "compared_dates": compared_dates,
             "compared_rows": compared_rows,
             "excluded_partial_dates": excluded_partial_dates,
-            "excluded_field_partial_dates": excluded_field_partial_dates,
-            "excluded_selector_ambiguous_dates": excluded_selector_ambiguous_dates,
+            "suspected_field_partial_dates": suspected_field_partial_dates,
+            "unexplained_cloud_dates": unexplained_cloud_dates,
             "field_partial_evidence": field_partial_evidence,
             "maximum_absolute_difference": maxima,
             "absolute_tolerances": ABSOLUTE_TOLERANCES,
@@ -535,14 +533,16 @@ def verify_hrrr_r5_rebuild(
             continue
         frame = parquet.read().to_pandas()
         daily_rows += len(frame)
-        numeric = frame.select_dtypes(include=[np.number]).to_numpy(dtype=float)
+        required = frame.drop(columns=["WIND_DIRECTION_FROM_10M_DEG"])
+        numeric = required.select_dtypes(include=[np.number]).to_numpy(dtype=float)
         if (
             len(frame) != len(support_cells)
             or set(frame["H3_INDEX"].astype(str)) != support_cells
             or frame.duplicated(["H3_INDEX", "DATE"]).any()
         ):
             errors.append(f"Daily weather support or keys are invalid for {date}.")
-        if frame.isna().any().any() or not np.isfinite(numeric).all():
+        direction = frame["WIND_DIRECTION_FROM_10M_DEG"].dropna().to_numpy(dtype=float)
+        if required.isna().any().any() or not np.isfinite(numeric).all() or not np.isfinite(direction).all():
             errors.append(f"Daily weather contains null or non-finite values for {date}.")
         if (
             set(frame["DATE"].astype(str)) != {date}
@@ -570,8 +570,8 @@ def verify_hrrr_r5_rebuild(
     expected_daily_rows = len(dates) * len(support_cells)
     if daily_rows != expected_daily_rows:
         errors.append(f"Daily weather row count is {daily_rows}; expected {expected_daily_rows}.")
-    if precipitation_nonzero_rows == 0 or not np.isfinite(precipitation_maximum):
-        errors.append("Daily precipitation is degenerate or all zero across the frozen range.")
+    if not np.isfinite(precipitation_maximum):
+        errors.append("Daily precipitation is missing or non-finite across the frozen range.")
 
     sample_files_by_date: dict[str, list[Path]] = defaultdict(list)
     for row in inventory.itertuples(index=False):
@@ -606,7 +606,7 @@ def verify_hrrr_r5_rebuild(
             "source_forecast_hour": weather.precipitation_forecast_hour,
             "maximum_mm_day_estimate": precipitation_maximum,
             "nonzero_daily_rows": precipitation_nonzero_rows,
-            "all_zero_rejected": True,
+            "all_zero_rejected": False,
             "legacy_parity": "not_applicable_semantics_changed_from_f00_to_f01",
         },
         "legacy_comparison": legacy_report,

@@ -10,6 +10,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import xarray as xr
+from pyproj import Geod
 
 LOGGER = logging.getLogger(__name__)
 
@@ -368,23 +369,73 @@ def _standardize_coords(ds: Any) -> tuple[np.ndarray, np.ndarray]:
 
 
 def _as_2d_values(da: Any) -> np.ndarray:
-    values = np.asarray(da.squeeze().values)
-    if values.ndim < 2:
-        raise ValueError(f"HRRR variable {da.name!r} is not at least 2-dimensional after squeeze.")
-    if values.ndim > 2:
-        values = values.reshape((-1,) + values.shape[-2:])[-1]
-    return values.reshape(values.shape[-2:])
+    values = np.asarray(da.squeeze(drop=True).values)
+    if values.ndim != 2:
+        raise ValueError(f"HRRR variable {da.name!r} must have exactly two spatial dimensions after squeezing singletons.")
+    return values
 
 
 def _lat_lon_for_values(ds: Any, shape: tuple[int, int]) -> tuple[np.ndarray, np.ndarray]:
     lat, lon = _standardize_coords(ds)
-    if lat.ndim > 2:
-        lat = np.squeeze(lat)[-shape[0] :, -shape[1] :]
-    if lon.ndim > 2:
-        lon = np.squeeze(lon)[-shape[0] :, -shape[1] :]
     if lat.ndim == 1 and lon.ndim == 1:
+        if (len(lat), len(lon)) != shape:
+            raise ValueError("HRRR one-dimensional coordinate lengths do not match the field.")
         lon, lat = np.meshgrid(lon, lat)
-    return np.asarray(lat).reshape(shape), np.asarray(lon).reshape(shape)
+    if lat.shape != shape or lon.shape != shape:
+        raise ValueError("HRRR coordinate shape does not match the field.")
+    if not np.isfinite(lat).all() or not np.isfinite(lon).all():
+        raise ValueError("HRRR coordinates contain non-finite values.")
+    return lat, lon
+
+
+def validate_decoded_source_times(
+    mapping: dict[str, tuple[Any, str] | None], *, valid_time_utc: pd.Timestamp, forecast_hour: int
+) -> None:
+    """Bind each decoded field to the requested initialization, lead, and valid time."""
+
+    valid = pd.Timestamp(valid_time_utc).tz_convert("UTC").tz_localize(None)
+    init = valid - pd.Timedelta(hours=forecast_hour)
+    lead = pd.Timedelta(hours=forecast_hour)
+    for name, selected in mapping.items():
+        if selected is None:
+            continue
+        dataset, variable = selected
+        field = dataset[variable]
+        if field.attrs.get("GRIB_stepType") != "instant" or str(
+            field.attrs.get("GRIB_stepRange")
+        ) != str(forecast_hour):
+            raise ValueError(
+                f"HRRR {name} step type or interval does not match the requested instantaneous lead."
+            )
+        for key, expected in (("time", init), ("step", lead), ("valid_time", valid)):
+            if key not in field.coords or field.coords[key].size != 1:
+                raise ValueError(f"HRRR {name} lacks a unique decoded {key} coordinate.")
+            raw = np.asarray(field.coords[key].values).reshape(-1)[0]
+            actual = pd.Timedelta(raw) if key == "step" else pd.Timestamp(raw)
+            if actual != expected:
+                raise ValueError(f"HRRR {name} decoded {key} does not match the requested cycle.")
+
+
+def _earth_wind_from_grid(
+    lat: np.ndarray, lon: np.ndarray, u: np.ndarray, v: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Rotate grid-axis components using the decoded grid's local geodesic axes."""
+
+    if min(lat.shape) < 2:
+        raise ValueError("Grid-relative wind requires at least two rows and columns.")
+    geod = Geod(ellps="WGS84")
+    az_i, _, distance_i = geod.inv(lon[:, :-1], lat[:, :-1], lon[:, 1:], lat[:, 1:])
+    az_j, _, distance_j = geod.inv(lon[:-1, :], lat[:-1, :], lon[1:, :], lat[1:, :])
+    if (distance_i <= 0).any() or (distance_j <= 0).any():
+        raise ValueError("HRRR wind grid has coincident adjacent coordinates.")
+    az_i = np.concatenate([az_i, az_i[:, -1:]], axis=1)
+    az_j = np.concatenate([az_j, az_j[-1:, :]], axis=0)
+    i_rad, j_rad = np.deg2rad(az_i), np.deg2rad(az_j)
+    if (np.abs(np.cos(i_rad - j_rad)) > 0.05).any():
+        raise ValueError("HRRR wind grid axes are not locally orthogonal.")
+    east = u * np.sin(i_rad) + v * np.sin(j_rad)
+    north = u * np.cos(i_rad) + v * np.cos(j_rad)
+    return east, north
 
 
 def dataset_to_flat_variable_grid(
@@ -392,6 +443,7 @@ def dataset_to_flat_variable_grid(
     variable_mapping: dict[str, tuple[Any, str] | None],
     bbox: BoundingBox,
     pad_deg: float = 0.2,
+    wind_basis: str | None = None,
 ) -> pd.DataFrame:
     if not variable_mapping:
         raise ValueError("variable_mapping must be non-empty.")
@@ -400,6 +452,7 @@ def dataset_to_flat_variable_grid(
         raise ValueError("At least one HRRR variable must be present to build the flat grid.")
     first_output = next(iter(present_mapping))
     first_ds, first_var = present_mapping[first_output]
+    first_field = first_ds[first_var].squeeze(drop=True)
     first_values = _as_2d_values(first_ds[first_var])
     lat, lon = _lat_lon_for_values(first_ds, first_values.shape)
     mask = (
@@ -424,5 +477,24 @@ def dataset_to_flat_variable_grid(
         values = _as_2d_values(var_ds[var_name])
         if values.shape != first_values.shape:
             raise ValueError(f"HRRR variable {var_name!r} shape does not match coordinate grid.")
+        if tuple(var_ds[var_name].squeeze(drop=True).dims) != tuple(first_field.dims):
+            raise ValueError(f"HRRR variable {var_name!r} spatial dimension order differs.")
+        field_lat, field_lon = _lat_lon_for_values(var_ds, values.shape)
+        if not np.allclose(field_lat, lat, rtol=0, atol=1e-7) or not np.allclose(
+            field_lon, lon, rtol=0, atol=1e-7
+        ):
+            raise ValueError(f"HRRR variable {var_name!r} coordinate grid differs.")
         out[output_name] = values[mask]
+    wind_names = {"u_wind_10m_ms", "v_wind_10m_ms"}
+    if wind_names.intersection(present_mapping):
+        if not wind_names.issubset(present_mapping):
+            raise ValueError("HRRR wind components must be decoded as a pair.")
+        if wind_basis == "grid_relative":
+            u = _as_2d_values(present_mapping["u_wind_10m_ms"][0][present_mapping["u_wind_10m_ms"][1]])
+            v = _as_2d_values(present_mapping["v_wind_10m_ms"][0][present_mapping["v_wind_10m_ms"][1]])
+            east, north = _earth_wind_from_grid(lat, lon, u, v)
+            out["u_wind_10m_ms"] = east[mask]
+            out["v_wind_10m_ms"] = north[mask]
+        elif wind_basis != "earth_relative":
+            raise ValueError("HRRR wind reference basis is missing or unsupported.")
     return out.dropna(subset=["hrrr_lat", "hrrr_lon"]).reset_index(drop=True)

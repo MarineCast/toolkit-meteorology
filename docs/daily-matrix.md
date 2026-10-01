@@ -15,11 +15,14 @@ Day-of-year daylight lookup remains a separate native artifact.
 
 The exporter rejects duplicate/invalid cells, inconsistent resolution, incomplete daily
 support, mismatched date ranges/timezones and existing destinations. It streams yearly
-row groups to a temporary file, then atomically renames the complete product. Embedded
+row groups to a unique temporary file, validates the complete matrix, then promotes it
+with `NEW.parquet.manifest.json` as one recoverable artifact family. Embedded
 `meteorology_daily_matrix` metadata retains native manifests, dates, timezone, source
-identity, source rights, units, formulas, software/method versions, a content-derived release
-ID and limitations. `meteorology validate --daily-matrix NEW.parquet` checks the
-embedded identity, H3/date support and native-resolution nulls, and reports a file checksum.
+identity, source rights, units, formulas, software/method versions, a source-derived release
+ID and limitations. The companion manifest binds that release ID to the Parquet byte checksum.
+`meteorology validate --daily-matrix NEW.parquet` checks the companion checksum, exact
+scientific schema, required values and ranges, per-date H3 membership, conditional wind/lunar
+nulls, and native-resolution nulls.
 The file is local research context;
 its production does not establish forecasting/model integration or authorize redistribution.
 

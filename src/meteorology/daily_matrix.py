@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import uuid
 from pathlib import Path
 
 import h3
@@ -12,6 +14,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from .artifacts import load_manifest, resolve_portable_path, checksum_path, code_state, stable_hash
+from .core.artifacts import TransactionalFamilyPublisher, atomic_write_json
 from ._version import __version__
 from .methods import method_version
 
@@ -120,7 +123,7 @@ def export(manifest_paths: list[Path], output: Path) -> Path:
             raise ValueError("Date range or timezone mismatch")
         coverage, timezone = current, zone
         candidates = [
-            resolve_portable_path(a["path"])
+            resolve_portable_path(a["path"], base=path.parent)
             for a in manifest["artifacts"]
             if "DAILY" in Path(a["path"]).name
         ]
@@ -137,7 +140,9 @@ def export(manifest_paths: list[Path], output: Path) -> Path:
     expected = pd.date_range(coverage["start_date"], coverage["end_date"]).strftime("%Y-%m-%d")
     years = sorted({d[:4] for d in expected})
     output.parent.mkdir(parents=True, exist_ok=True)
-    temporary = output.with_suffix(".parquet.tmp")
+    temporary = output.with_name(f".{output.name}.{uuid.uuid4().hex}.tmp")
+    sidecar = output.with_suffix(output.suffix + ".manifest.json")
+    temporary_sidecar = temporary.with_suffix(temporary.suffix + ".manifest.json")
     writer = None
     try:
         for year in years:
@@ -166,7 +171,7 @@ def export(manifest_paths: list[Path], output: Path) -> Path:
                     pa.field(f"{component}__{f.name}", f.type) for f in native if f.name not in KEYS
                 ]
             metadata = {
-                "schema_version": 1,
+                "schema_version": 2,
                 "software_version": __version__,
                 "method_version": method_version("meteorological.daily_matrix"),
                 "release_id": stable_hash(
@@ -207,12 +212,32 @@ def export(manifest_paths: list[Path], output: Path) -> Path:
             print(f"Exported {year}: {len(frame):,} rows")
         writer.close()
         writer = None
-        temporary.replace(output)
+        atomic_write_json(
+            temporary_sidecar,
+            {
+                "schema_version": 1,
+                "release_id": metadata["release_id"],
+                "matrix_checksum": checksum_path(temporary),
+            },
+            overwrite=False,
+        )
+        from .validation import validate_daily_matrix
+
+        validate_daily_matrix(temporary)
+        with TransactionalFamilyPublisher(output.parent) as publisher:
+            if output.exists() or sidecar.exists():
+                raise FileExistsError(output if output.exists() else sidecar)
+            staged = publisher.stage_path(output)
+            staged_sidecar = publisher.stage_manifest_path(sidecar)
+            os.replace(temporary, staged)
+            os.replace(temporary_sidecar, staged_sidecar)
+            publisher.publish()
     finally:
         if writer is not None:
             writer.close()
         if temporary.exists():
             temporary.unlink()
+        temporary_sidecar.unlink(missing_ok=True)
     return output
 
 

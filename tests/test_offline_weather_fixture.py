@@ -4,6 +4,7 @@ import json
 import shutil
 from pathlib import Path
 
+import h3
 import numpy as np
 import pandas as pd
 import pyarrow as pa
@@ -22,6 +23,7 @@ from meteorology.config import (
     load_meteorological_config,
 )
 from meteorology.daylight.build import build_daylight
+from meteorology.daily_matrix import export as export_daily_matrix
 from meteorology.daylight.inspect import inspect_daylight
 from meteorology.lunar.build import build_lunar
 from meteorology.lunar.inspect import inspect_lunar
@@ -57,6 +59,7 @@ from meteorology.surface_weather.verify import (
     _legacy_field_partial_evidence,
     verify_hrrr_r5_rebuild,
 )
+from meteorology.validation import validate_daily_matrix
 
 
 def _fixture_config(tmp_path: Path, *, end_date: str = "2024-01-02") -> Path:
@@ -93,8 +96,8 @@ def _fixture_config(tmp_path: Path, *, end_date: str = "2024-01-02") -> Path:
     return path
 
 
-def _raw_grid(valid: pd.Timestamp) -> pd.DataFrame:
-    available = valid + pd.Timedelta(hours=6)
+def _raw_grid(valid: pd.Timestamp, availability_lag_hours: int = 6) -> pd.DataFrame:
+    available = valid + pd.Timedelta(hours=availability_lag_hours)
     rows = []
     for index, (lat, lon) in enumerate(
         [(46.5, -125.0), (46.5, -121.0), (50.5, -125.0), (50.5, -121.0)]
@@ -111,6 +114,7 @@ def _raw_grid(valid: pd.Timestamp) -> pd.DataFrame:
                 "SOURCE_PRODUCT": "sfc",
                 "FORECAST_HOUR": 0,
                 "SOURCE_GRID_HASH": "fixture-grid-v1",
+                "SOURCE_WIND_BASIS": "earth_relative",
                 "TEMPERATURE_2M_K": 283.15 + index,
                 "RELATIVE_HUMIDITY_2M_PCT": 75.0,
                 "U_WIND_10M_MS": 3.0,
@@ -131,6 +135,7 @@ def _patch_fetch(
     *,
     failed: set[str] | None = None,
     precip_rate: float = 0.001,
+    availability_lag_hours: int = 6,
 ) -> None:
     from meteorology.surface_weather import download as module
 
@@ -139,7 +144,7 @@ def _patch_fetch(
         calls.append(valid.isoformat())
         if failed and valid.isoformat() in failed:
             raise RuntimeError("fixture acquisition failure")
-        return _raw_grid(valid), hrrr_aws_archive_uri(valid)
+        return _raw_grid(valid, availability_lag_hours), hrrr_aws_archive_uri(valid)
 
     def fetch_precip(**kwargs):
         valid = pd.Timestamp(kwargs["valid_time_utc"]).tz_convert("UTC")
@@ -157,7 +162,7 @@ def _patch_fetch(
     monkeypatch.setattr(module, "fetch_cropped_hrrr_precip_grid", fetch_precip)
 
 
-def test_complete_range_all_zero_forecast_precipitation_is_rejected(
+def test_complete_range_all_zero_forecast_precipitation_is_valid(
     tmp_path: Path, monkeypatch
 ) -> None:
     config_path = _fixture_config(tmp_path)
@@ -165,8 +170,77 @@ def test_complete_range_all_zero_forecast_precipitation_is_rejected(
     _patch_fetch(monkeypatch, [], precip_rate=0.0)
     download_surface_weather(config_path, run_id="fixture-download")
 
-    with pytest.raises(ValueError, match="precipitation is all zero"):
-        build_surface_weather(config_path, run_id="fixture-all-zero-weather")
+    outputs = build_surface_weather(config_path, run_id="fixture-all-zero-weather")
+    daily = ds.dataset(outputs[0], format="parquet", partitioning="hive").to_table().to_pandas()
+    assert (daily["PRECIP_MM_DAY_ESTIMATE"] == 0.0).all()
+
+
+def test_support_rejects_changed_bounding_box(tmp_path: Path) -> None:
+    config_path = _fixture_config(tmp_path)
+    build_meteorological_spatial_support(config_path, run_id="fixture-support")
+    raw = yaml.safe_load(config_path.read_text())
+    raw["surface_weather"]["time"]["end_date"] = "2024-01-03"
+    config_path.write_text(yaml.safe_dump(raw, sort_keys=False))
+    assert not load_meteorological_support(5, config_path).empty
+    changed_bbox = load_meteorological_config(config_path).bbox.copy()
+    changed_bbox["max_lon"] += 0.1
+    raw["spatial_support"]["bbox"] = {"bbox": changed_bbox}
+    config_path.write_text(yaml.safe_dump(raw, sort_keys=False))
+    with pytest.raises(ValueError, match="does not match the current bounding box"):
+        load_meteorological_support(5, config_path)
+
+
+def test_changed_availability_lag_invalidates_cached_samples(tmp_path: Path, monkeypatch) -> None:
+    config_path = _fixture_config(tmp_path)
+    build_meteorological_spatial_support(config_path, run_id="fixture-support")
+    calls: list[str] = []
+    _patch_fetch(monkeypatch, calls)
+    download_surface_weather(config_path, run_id="first")
+    raw = yaml.safe_load(config_path.read_text())
+    raw["surface_weather"]["time"]["availability_lag_hours"] = 8
+    config_path.write_text(yaml.safe_dump(raw, sort_keys=False))
+    calls.clear()
+    _patch_fetch(monkeypatch, calls, availability_lag_hours=8)
+    download_surface_weather(config_path, run_id="changed-lag")
+    assert len(calls) == 6
+    config = load_meteorological_config(config_path)
+    inventory = pq.read_table(config.surface_weather.inventory_path).to_pandas()
+    for row in inventory.itertuples(index=False):
+        sample = config.surface_weather.raw_dir / row.RELATIVE_PATH
+        frame = pq.read_table(sample, columns=["AVAILABLE_AT_UTC"]).to_pandas()
+        assert set(frame["AVAILABLE_AT_UTC"]) == {row.AVAILABLE_AT_UTC}
+
+
+def test_matrix_rejects_same_count_changed_h3_membership(tmp_path: Path, monkeypatch) -> None:
+    config_path = _fixture_config(tmp_path, end_date="2024-01-03")
+    build_meteorological_spatial_support(config_path, run_id="support")
+    _patch_fetch(monkeypatch, [])
+    download_surface_weather(config_path, run_id="download")
+    build_surface_weather(config_path, run_id="weather")
+    build_daylight(config_path, start_date="2024-01-02", end_date="2024-01-03", run_id="daylight")
+    build_lunar(config_path, start_date="2024-01-02", end_date="2024-01-03", run_id="lunar")
+    config = load_meteorological_config(config_path)
+    matrix_path = tmp_path / "matrix.parquet"
+    export_daily_matrix(
+        [config.surface_weather.manifest_path, config.daylight.manifest_path, config.lunar.manifest_path],
+        matrix_path,
+    )
+    assert validate_daily_matrix(matrix_path)["valid"]
+    table = pq.read_table(matrix_path)
+    dates = table["DATE"].to_pylist()
+    resolutions = table["H3_RESOLUTION"].to_pylist()
+    cells = table["H3_INDEX"].to_pylist()
+    index = next(i for i, (date, resolution) in enumerate(zip(dates, resolutions, strict=True)) if date == "2024-01-03" and resolution == 5)
+    cells[index] = h3.latlng_to_cell(0.0, 0.0, 5)
+    changed = table.set_column(
+        table.schema.get_field_index("H3_INDEX"), "H3_INDEX", pa.array(cells, type=pa.string())
+    )
+    pq.write_table(changed, matrix_path)
+    sidecar = matrix_path.with_suffix(".parquet.manifest.json")
+    content = json.loads(sidecar.read_text())
+    sidecar.write_text(json.dumps({**content, "matrix_checksum": sha256_file(matrix_path)}))
+    with pytest.raises(ValueError, match="support membership varies"):
+        validate_daily_matrix(matrix_path)
 
 
 def test_direct_r5_download_build_and_inspect_contract(tmp_path: Path, monkeypatch) -> None:
@@ -281,12 +355,59 @@ def test_direct_r5_download_build_and_inspect_contract(tmp_path: Path, monkeypat
         old=selector_ambiguous, sample_files=sample_files, interval_hours=4
     )
     assert evidence is not None
-    assert evidence["cloud_cover"]["legacy_selector_state"] == "AMBIGUOUS_TCDC_LEVEL"
+    assert evidence["cloud_cover"]["diagnosis"] == "UNEXPLAINED_CLOUD_MISMATCH"
+    pq.write_table(pa.Table.from_pandas(selector_ambiguous, preserve_index=False), legacy_path)
+    unexplained = verify_hrrr_r5_rebuild(
+        config_path,
+        legacy_root=tmp_path / "legacy",
+        output_path=tmp_path / "R5_REBUILD_VERIFICATION_UNEXPLAINED.json",
+    )
+    assert not unexplained["passed"]
+    assert unexplained["legacy_comparison"]["unexplained_cloud_dates"] == 1
+    assert unexplained["legacy_comparison"]["compared_dates"] == 1
+    pq.write_table(pa.Table.from_pandas(legacy, preserve_index=False), legacy_path)
 
     build_daylight(
         config_path, start_date="2024-01-02", end_date="2024-01-02", run_id="fixture-daylight"
     )
     build_lunar(config_path, start_date="2024-01-02", end_date="2024-01-02", run_id="fixture-lunar")
+    matrix_path = tmp_path / "DAILY_MATRIX.parquet"
+    export_daily_matrix(
+        [config.surface_weather.manifest_path, config.daylight.manifest_path, config.lunar.manifest_path],
+        matrix_path,
+    )
+    assert validate_daily_matrix(matrix_path)["valid"]
+    sidecar = matrix_path.with_suffix(".parquet.manifest.json")
+    content = json.loads(sidecar.read_text())
+    sidecar.write_text(json.dumps({**content, "matrix_checksum": "wrong"}))
+    with pytest.raises(ValueError, match="content checksum"):
+        validate_daily_matrix(matrix_path)
+    original_table = pq.read_table(matrix_path)
+    column = "surface_weather__PRECIP_MM_DAY_ESTIMATE"
+    values = original_table[column].to_pylist()
+    values[next(i for i, value in enumerate(values) if value is not None)] = -1.0
+    table = original_table.set_column(
+        original_table.schema.get_field_index(column), column, pa.array(values, type=pa.float64())
+    )
+    pq.write_table(table, matrix_path)
+    sidecar.write_text(json.dumps({**content, "matrix_checksum": sha256_file(matrix_path)}))
+    with pytest.raises(ValueError, match="outside its declared range"):
+        validate_daily_matrix(matrix_path)
+    missing_column = original_table.drop(["surface_weather__TEMPERATURE_2M_C_MEAN"])
+    pq.write_table(missing_column, matrix_path)
+    sidecar.write_text(json.dumps({**content, "matrix_checksum": sha256_file(matrix_path)}))
+    with pytest.raises(ValueError, match="scientific Arrow schema"):
+        validate_daily_matrix(matrix_path)
+    column = "surface_weather__TEMPERATURE_2M_C_MEAN"
+    values = original_table[column].to_pylist()
+    values[next(i for i, value in enumerate(values) if value is not None)] = None
+    native_null = original_table.set_column(
+        original_table.schema.get_field_index(column), column, pa.array(values, type=pa.float64())
+    )
+    pq.write_table(native_null, matrix_path)
+    sidecar.write_text(json.dumps({**content, "matrix_checksum": sha256_file(matrix_path)}))
+    with pytest.raises(ValueError, match="non-nullable fields"):
+        validate_daily_matrix(matrix_path)
     for inspect in (
         lambda: inspect_meteorological_spatial_support(
             config_path, output_path=tmp_path / "support.html"

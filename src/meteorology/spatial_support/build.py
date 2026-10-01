@@ -26,6 +26,8 @@ from ..artifacts import (
 )
 from ..config import DEFAULT_CONFIG_PATH, load_meteorological_config
 
+SUPPORT_METHOD = "centroid_contained_bbox_v1"
+
 
 def _support_frame(bbox: dict[str, float], resolution: int) -> pd.DataFrame:
     geometry = box(bbox["min_lon"], bbox["min_lat"], bbox["max_lon"], bbox["max_lat"])
@@ -62,6 +64,15 @@ def load_meteorological_support(
             f"Meteorological support R{resolution} is missing: {path}. Run the support builder."
         )
     manifest = load_manifest(config.support_manifest_path, verify_artifacts=True)
+    resolved = manifest.get("resolved_config", {})
+    if (
+        resolved.get("bbox") != config.bbox
+        or resolved.get("support_method") != SUPPORT_METHOD
+        or int(resolution) not in resolved.get("resolutions", [])
+    ):
+        raise ValueError(
+            "Meteorological support does not match the current bounding box or inclusion method; rebuild support."
+        )
     expected_path = portable_path(path)
     contracts = [
         artifact for artifact in manifest["artifacts"] if artifact.get("path") == expected_path
@@ -110,6 +121,7 @@ def build_meteorological_spatial_support(
             resolved_config={
                 "bbox": config.bbox,
                 "resolutions": config.support_resolutions,
+                "support_method": SUPPORT_METHOD,
                 "output_dir": str(config.support_output_dir),
             },
             artifacts=contracts,

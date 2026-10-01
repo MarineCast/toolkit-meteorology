@@ -13,6 +13,7 @@ from meteorology.core.data.meteorological_schemas import (
 )
 
 EARTH_RADIUS_M = 6_371_008.8
+AVAILABILITY_POLICY = "assumed_fixed_lag_v1"
 
 
 def make_local_dates(start_date: str, end_date: str) -> list[str]:
@@ -110,10 +111,13 @@ def sample_source_grid(
             "VALID_TIME_UTC": valid.isoformat(),
             "INIT_TIME_UTC": sampled["INIT_TIME_UTC"].astype(str).to_numpy(),
             "AVAILABLE_AT_UTC": sampled["AVAILABLE_AT_UTC"].astype(str).to_numpy(),
+            "AVAILABILITY_POLICY": AVAILABILITY_POLICY,
             "TEMPERATURE_2M_C": sampled["TEMPERATURE_2M_K"].to_numpy(dtype=float) - 273.15,
             "RELATIVE_HUMIDITY_2M_PCT": sampled["RELATIVE_HUMIDITY_2M_PCT"].to_numpy(dtype=float),
             "U_WIND_10M_MS": sampled["U_WIND_10M_MS"].to_numpy(dtype=float),
             "V_WIND_10M_MS": sampled["V_WIND_10M_MS"].to_numpy(dtype=float),
+            "WIND_VECTOR_BASIS": "earth_relative",
+            "SOURCE_WIND_BASIS": sampled["SOURCE_WIND_BASIS"].astype(str).to_numpy(),
             "WIND_GUST_SURFACE_MS": sampled["WIND_GUST_SURFACE_MS"].to_numpy(dtype=float),
             "VISIBILITY_KM": sampled["VISIBILITY_M"].to_numpy(dtype=float) / 1000.0,
             "TOTAL_CLOUD_COVER_PCT": sampled["TOTAL_CLOUD_COVER_PCT"].to_numpy(dtype=float),
