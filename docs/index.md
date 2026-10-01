@@ -1,4 +1,4 @@
-![Illustrated coastal weather systems over the Salish Sea](assets/banner.png)
+![Engraved weather station amid clouds, rain, mountains, and pressure systems](assets/banner.png)
 
 # Reproducible context for environmental modeling
 
