@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
-import shutil
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -34,24 +35,84 @@ LEGACY_RELATIVE_PATHS = (
 )
 
 
-def _recover_interrupted_migrations(migration_root: Path) -> None:
-    if not migration_root.exists():
-        return
-    for journal in sorted(migration_root.glob("*/MIGRATION_JOURNAL.json")):
+@contextmanager
+def _migration_lock(migration_root: Path):
+    migration_root.mkdir(parents=True, exist_ok=True)
+    lock = migration_root / ".migration.lock"
+    with lock.open("a+b") as handle:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise RuntimeError(f"Meteorological migration is already active: {migration_root}") from exc
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def _recover_interrupted_migrations(
+    migration_root: Path, *, archive_root: Path | None = None
+) -> None:
+    journals = set(migration_root.glob("*/MIGRATION_JOURNAL.json")) if migration_root.exists() else set()
+    if archive_root is not None:
+        custom = archive_root / "MIGRATION_JOURNAL.json"
+        if custom.exists():
+            journals.add(custom)
+    for journal in sorted(journals):
         payload = json.loads(journal.read_text(encoding="utf-8"))
         if payload.get("state") == "COMPLETE":
             manifest = journal.with_name("MIGRATION_MANIFEST.json")
+            for item in payload.get("artifacts", []):
+                destination = Path(str(item["destination"]))
+                if not destination.resolve().is_relative_to(journal.parent.resolve()):
+                    raise RuntimeError(
+                        f"Completed migration destination escapes its journal root: {destination}"
+                    )
+                if not destination.exists() or checksum_path(destination) != item.get("checksum"):
+                    raise RuntimeError(
+                        f"Completed legacy migration archive differs from its journal: {destination}"
+                    )
+            if manifest.exists() and json.loads(manifest.read_text(encoding="utf-8")) != payload:
+                raise RuntimeError(f"Completed legacy migration manifest conflicts with journal: {manifest}")
             if not manifest.exists():
                 atomic_write_json(manifest, payload, overwrite=False)
             journal.unlink()
             continue
+        conflicts: list[str] = []
+        for item in payload.get("artifacts", []):
+            source = Path(str(item["source"]))
+            destination = Path(str(item["destination"]))
+            if not destination.resolve().is_relative_to(journal.parent.resolve()):
+                conflicts.append(f"Archive destination escapes its journal root: {destination}")
+                continue
+            expected = item.get("checksum")
+            source_exists, archive_exists = source.exists(), destination.exists()
+            if not source_exists and not archive_exists:
+                conflicts.append(f"Both source and archive are missing: {source}")
+            elif source_exists and archive_exists:
+                if checksum_path(source) != checksum_path(destination):
+                    conflicts.append(f"Source and archive differ: {source} <> {destination}")
+                elif expected is not None and checksum_path(source) != expected:
+                    conflicts.append(f"Equal source/archive copies differ from journal checksum: {source}")
+            elif expected is not None and checksum_path(source if source_exists else destination) != expected:
+                conflicts.append(f"Retained copy differs from journal checksum: {source}")
+        if conflicts:
+            payload["state"] = "CONFLICT"
+            payload["conflicts"] = conflicts
+            atomic_write_json(journal, payload, overwrite=True)
+            raise RuntimeError("Legacy migration recovery conflict; both copies and journal retained: " + conflicts[0])
         for item in reversed(payload.get("artifacts", [])):
             source = Path(str(item["source"]))
             destination = Path(str(item["destination"]))
             if destination.exists() and not source.exists():
                 source.parent.mkdir(parents=True, exist_ok=True)
                 os.replace(destination, source)
-        shutil.rmtree(journal.parent, ignore_errors=True)
+                item["restored"] = True
+                atomic_write_json(journal, payload, overwrite=True)
+        payload["state"] = "ROLLED_BACK"
+        payload.pop("conflicts", None)
+        atomic_write_json(journal.with_name("MIGRATION_RECOVERY.json"), payload, overwrite=True)
+        journal.unlink()
 
 
 def migrate_legacy_meteorological_artifacts(
@@ -97,8 +158,6 @@ def migrate_legacy_meteorological_artifacts(
         raise ValueError("The R5 verification report does not match the current weather manifest.")
     root = project_root()
     migration_root = root / "data/migrations/meteorological_legacy"
-    if execute:
-        _recover_interrupted_migrations(migration_root)
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     archive = (
         Path(archive_root).expanduser().resolve()
@@ -114,6 +173,21 @@ def migrate_legacy_meteorological_artifacts(
     }
     if not execute:
         return plan
+    with _migration_lock(migration_root):
+        _recover_interrupted_migrations(migration_root, archive_root=archive)
+        # Recovery may have restored sources, so do not reuse the pre-lock plan.
+        existing = [root / relative for relative in LEGACY_RELATIVE_PATHS if (root / relative).exists()]
+        plan["artifacts"] = [
+            {"source": str(path), "checksum": checksum_path(path)} for path in existing
+        ]
+        return _execute_migration(root, archive, existing, plan)
+
+
+def _execute_migration(
+    root: Path, archive: Path, existing: list[Path], plan: dict[str, object]
+) -> dict[str, object]:
+    """Move one reviewed plan while its migration-root lock is held."""
+
     archive.parent.mkdir(parents=True, exist_ok=True)
     if archive.parent.stat().st_dev != root.stat().st_dev:
         raise ValueError("Recoverable legacy migration requires an archive on the same filesystem.")

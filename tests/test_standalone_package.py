@@ -24,6 +24,17 @@ def test_initialize_external_workspace_preserves_edits(tmp_path, monkeypatch):
     assert common.read_text().endswith('# user customization\n')
 
 
+def test_offline_example_validates_its_synthetic_acquisition(tmp_path, monkeypatch):
+    from meteorology.offline_example import build_offline_example
+
+    monkeypatch.setenv('METEOROLOGY_WORKSPACE', str(tmp_path))
+    cli.initialize_workspace(tmp_path)
+    result = build_offline_example()
+    assert result['synthetic'] is True
+    assert result['acquisition']['product'] == 'meteorological.surface_weather.download'
+    assert (tmp_path / 'outputs/synthetic-daily-matrix.parquet').exists()
+
+
 def test_workspace_override_restored(tmp_path, monkeypatch):
     monkeypatch.setenv('METEOROLOGY_WORKSPACE', str(tmp_path / 'original'))
     cli.main(['--workspace', str(tmp_path / 'override'), 'init'])

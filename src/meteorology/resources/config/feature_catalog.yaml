@@ -908,10 +908,10 @@ products:
     dependencies:
     - daylight_daily
     grain: one row per H3 cell and day of year
-    feature_count: 2
+    feature_count: 5
     variable_kind_counts:
       feature_variable: 1
-      metadata: 1
+      metadata: 4
     features:
       DAY_OF_YEAR:
         common_name: Day Of Year
@@ -926,6 +926,57 @@ products:
         variable_kind: metadata
         topology: within_cell_or_nonspatial
         scale_group: DAY_OF_YEAR
+        available_resolutions:
+        - 4
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      IS_LEAP_DAY:
+        common_name: Is Leap Day
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: IS_LEAP_DAY
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DOY_RES_4.parquet
+        unit: unitless
+        arrow_type: bool
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: IS_LEAP_DAY
+        available_resolutions:
+        - 4
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      MONTH_DAY:
+        common_name: Month Day
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: MONTH_DAY
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DOY_RES_4.parquet
+        unit: unitless
+        arrow_type: string
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: MONTH_DAY
+        available_resolutions:
+        - 4
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      SOLAR_DAY_365:
+        common_name: Solar Day 365
+        metric_family: meteorological
+        metric_subfamily: daylight
+        column: SOLAR_DAY_365
+        collection_paths:
+          4: data/processed/domain/environmental_layer/meteorological/daylight/H3_DAYLIGHT_DOY_RES_4.parquet
+        unit: unitless
+        arrow_type: int16
+        role: bookkeeping
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SOLAR_DAY_365
         available_resolutions:
         - 4
         modeling_use: excluded_metadata
@@ -1414,10 +1465,10 @@ products:
     producer: meteorology.surface_weather.download
     dependencies: []
     grain: one row per expected HRRR valid time
-    feature_count: 21
+    feature_count: 25
     variable_kind_counts:
       feature_variable: 0
-      metadata: 21
+      metadata: 25
     features:
       AVAILABLE_AT_UTC:
         common_name: Available At Utc
@@ -1606,6 +1657,40 @@ products:
         - 5
         modeling_use: excluded_metadata
         default_ecological_occurrence_model: null
+      PRECIP_OBJECT_URI:
+        common_name: Precip Object Uri
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: PRECIP_OBJECT_URI
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: PRECIP_OBJECT_URI
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      PRECIP_RETRIEVED_AT_UTC:
+        common_name: Precip Retrieved At Utc
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: PRECIP_RETRIEVED_AT_UTC
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: UTC timestamp
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: PRECIP_RETRIEVED_AT_UTC
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
       PRECIP_SOURCE_URI:
         common_name: Precip Source Uri
         metric_family: meteorological
@@ -1708,6 +1793,40 @@ products:
         - 5
         modeling_use: excluded_metadata
         default_ecological_occurrence_model: null
+      SOURCE_OBJECT_URI:
+        common_name: Source Object Uri
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: SOURCE_OBJECT_URI
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SOURCE_OBJECT_URI
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      SOURCE_RETRIEVED_AT_UTC:
+        common_name: Source Retrieved At Utc
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: SOURCE_RETRIEVED_AT_UTC
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: UTC timestamp
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SOURCE_RETRIEVED_AT_UTC
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
       SOURCE_URI:
         common_name: Source Uri
         metric_family: meteorological
@@ -1776,7 +1895,7 @@ products:
         - 5
         modeling_use: excluded_metadata
         default_ecological_occurrence_model: null
-feature_entry_count: 92
+feature_entry_count: 99
 supporting_products: {}
 superseded_products: {}
 catalog_contract:
@@ -1814,7 +1933,7 @@ catalog_contract:
 schema_version: 4
 catalog_id: environment
 product_count: 7
-unique_column_count: 79
+unique_column_count: 83
 family_counts:
   meteorological: 7
 generated_from_materialized_schemas: false

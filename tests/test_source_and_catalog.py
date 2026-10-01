@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 import yaml
+from pyproj import CRS, Proj, Transformer
 
 from meteorology.surface_weather.sampling import (
     build_nearest_grid_crosswalk,
@@ -219,6 +220,69 @@ def test_grid_relative_wind_rotates_to_true_east_and_north() -> None:
     grid["v10"].attrs["GRIB_uvRelativeToGrid"] = 0
     with pytest.raises(ValueError, match="flags disagree"):
         _decoded_wind_basis(mapping)
+
+
+def test_mixed_grid_wind_rotation_preserves_magnitude_and_earth_basis() -> None:
+    grid = xr.Dataset(
+        {
+            "u10": (("y", "x"), np.full((3, 3), 10.0)),
+            "v10": (("y", "x"), np.full((3, 3), 10.0)),
+        },
+        coords={
+            "latitude": (("y", "x"), [
+                [0.0, 0.01, 0.02], [0.01, 0.02, 0.03], [0.02, 0.03, 0.04],
+            ]),
+            "longitude": (("y", "x"), [
+                [0.0, 0.01, 0.02], [-0.01, 0.0, 0.01], [-0.02, -0.01, 0.0],
+            ]),
+        },
+    )
+    mapping = {"u_wind_10m_ms": (grid, "u10"), "v_wind_10m_ms": (grid, "v10")}
+    bbox = BoundingBox(-1.0, 1.0, -1.0, 1.0)
+    rotated = dataset_to_flat_variable_grid(grid, mapping, bbox, wind_basis="grid_relative")
+    assert np.allclose(
+        np.hypot(rotated["u_wind_10m_ms"], rotated["v_wind_10m_ms"]),
+        np.sqrt(200.0), rtol=0, atol=1e-10,
+    )
+    assert np.allclose(rotated["u_wind_10m_ms"], 0.0, atol=0.15)
+    assert np.allclose(rotated["v_wind_10m_ms"], np.sqrt(200.0), atol=0.15)
+    earth = dataset_to_flat_variable_grid(grid, mapping, bbox, wind_basis="earth_relative")
+    assert np.array_equal(earth["u_wind_10m_ms"], np.full(9, 10.0))
+    assert np.array_equal(earth["v_wind_10m_ms"], np.full(9, 10.0))
+
+
+@pytest.mark.parametrize("longitude", [-125.0, -110.0, -97.5, -85.0])
+def test_grid_wind_agrees_with_independent_lambert_convergence(longitude: float) -> None:
+    crs = CRS.from_proj4(
+        "+proj=lcc +lat_1=38.5 +lat_2=38.5 +lat_0=38.5 "
+        "+lon_0=-97.5 +datum=WGS84 +units=m +no_defs"
+    )
+    to_grid = Transformer.from_crs(4326, crs, always_xy=True)
+    to_geo = Transformer.from_crs(crs, 4326, always_xy=True)
+    center_x, center_y = to_grid.transform(longitude, 47.0)
+    x, y = np.meshgrid(center_x + np.array([-3000.0, 0.0, 3000.0]),
+                       center_y + np.array([-3000.0, 0.0, 3000.0]))
+    lon, lat = to_geo.transform(x, y)
+    grid = xr.Dataset(
+        {"u10": (("y", "x"), np.full((3, 3), 10.0)),
+         "v10": (("y", "x"), np.full((3, 3), 5.0))},
+        coords={"latitude": (("y", "x"), lat), "longitude": (("y", "x"), lon)},
+    )
+    mapping = {"u_wind_10m_ms": (grid, "u10"), "v_wind_10m_ms": (grid, "v10")}
+    rotated = dataset_to_flat_variable_grid(
+        grid, mapping, BoundingBox(45.0, 49.0, -127.0, -83.0), wind_basis="grid_relative"
+    )
+    # PROJ computes convergence from the projection definition, independently of
+    # the producer's neighboring-cell geodesic bearings.
+    convergence = np.deg2rad(Proj(crs).get_factors(lon, lat).meridian_convergence)
+    expected_east = 10.0 * np.cos(convergence) + 5.0 * np.sin(convergence)
+    expected_north = -10.0 * np.sin(convergence) + 5.0 * np.cos(convergence)
+    assert np.allclose(rotated["u_wind_10m_ms"], expected_east.ravel(), atol=0.02)
+    assert np.allclose(rotated["v_wind_10m_ms"], expected_north.ravel(), atol=0.02)
+    assert np.allclose(
+        np.hypot(rotated["u_wind_10m_ms"], rotated["v_wind_10m_ms"]),
+        np.hypot(10.0, 5.0), atol=1e-10,
+    )
 
 
 def test_nearest_grid_crosswalk_is_source_row_order_invariant() -> None:

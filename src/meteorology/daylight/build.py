@@ -20,7 +20,7 @@ from ..artifacts import (
     write_table,
     write_year_partitions,
 )
-from ..astronomy import solar_profile_metrics
+from ..astronomy import local_civil_day_hours, solar_profile_metrics
 from ..config import DEFAULT_CONFIG_PATH, load_meteorological_config
 from ..spatial_support.build import load_meteorological_support
 from .features import (
@@ -111,15 +111,21 @@ def _daylight_doy_frame(support: pd.DataFrame, default_weight: str) -> pd.DataFr
         columns={
             "h3": "H3_INDEX",
             "day_of_year": "DAY_OF_YEAR",
+            "month_day": "MONTH_DAY",
+            "is_leap_day": "IS_LEAP_DAY",
+            "solar_day_365": "SOLAR_DAY_365",
             "weight_daylight": "WEIGHT_DAYLIGHT",
         }
     )
     compact["DAY_OF_YEAR"] = compact["DAY_OF_YEAR"].astype("int16")
+    compact["SOLAR_DAY_365"] = compact["SOLAR_DAY_365"].astype("int16")
     compact["WEIGHT_DAYLIGHT"] = compact["WEIGHT_DAYLIGHT"].astype("float64")
-    return compact.sort_values(["DAY_OF_YEAR", "H3_INDEX"]).reset_index(drop=True)
+    return compact[DAYLIGHT_DOY_SCHEMA.names].sort_values(["DAY_OF_YEAR", "H3_INDEX"]).reset_index(drop=True)
 
 
-def validate_daylight_product(frame: pd.DataFrame, support: pd.DataFrame) -> None:
+def validate_daylight_product(
+    frame: pd.DataFrame, support: pd.DataFrame, timezone: str = "UTC"
+) -> None:
     required = frame.drop(columns=["SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG"])
     if frame.duplicated(["H3_INDEX", "DATE"]).any() or required.isna().any().any():
         raise ValueError("Daylight product has duplicate keys or null values.")
@@ -135,7 +141,6 @@ def validate_daylight_product(frame: pd.DataFrame, support: pd.DataFrame) -> Non
         "DAYLIGHT_FRACTION": (0.0, 1.0),
         "SOLAR_ELEVATION_MAX_DEG": (-90.0, 90.0),
         "SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG": (0.0, 90.0),
-        "LOW_SUN_DAYLIGHT_HOURS": (0.0, 25.0),
     }
     for field, (lower, upper) in bounds.items():
         values = pd.to_numeric(frame[field], errors="coerce")
@@ -143,6 +148,14 @@ def validate_daylight_product(frame: pd.DataFrame, support: pd.DataFrame) -> Non
             values = values.dropna()
         if not values.between(lower, upper).all():
             raise ValueError(f"Daylight field {field} is outside [{lower}, {upper}].")
+    local_hours = frame["DATE"].astype(str).map(
+        lambda date: local_civil_day_hours(date, timezone)
+    )
+    if (
+        frame["LOW_SUN_DAYLIGHT_HOURS"].lt(0)
+        | frame["LOW_SUN_DAYLIGHT_HOURS"].gt(local_hours + 1e-8)
+    ).any():
+        raise ValueError("Daylight low-sun hours exceed the local civil-day duration.")
 
 
 def build_daylight(
@@ -167,7 +180,7 @@ def build_daylight(
         default_weight=daylight.default_weight,
     )
     doy = _daylight_doy_frame(support, daylight.default_weight)
-    validate_daylight_product(frame, support)
+    validate_daylight_product(frame, support, daylight.timezone)
     run_id = run_id or f"daylight-{uuid.uuid4().hex[:12]}"
     with TransactionalFamilyPublisher(daylight.daily_output_dir.parent, run_id=run_id) as publisher:
         staged_daily = publisher.stage_path(daylight.daily_output_dir)

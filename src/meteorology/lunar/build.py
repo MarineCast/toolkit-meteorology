@@ -25,8 +25,8 @@ from .compute import compute_lunar_illumination_table
 from .validation import validate_lunar_illumination_features
 
 
-def _normalize_lunar(frame: pd.DataFrame) -> pd.DataFrame:
-    validate_lunar_illumination_features(frame, strict=True)
+def _normalize_lunar(frame: pd.DataFrame, timezone: str) -> pd.DataFrame:
+    validate_lunar_illumination_features(frame, strict=True, timezone_name=timezone)
     out = frame.rename(columns={"h3": "H3_INDEX"})
     out.columns = [str(column).upper() for column in out.columns]
     for field in ["YEAR", "DAY_OF_YEAR"]:
@@ -93,7 +93,7 @@ def build_lunar(
                 dark_sun_altitude_deg=lunar.dark_sun_altitude_deg,
                 moon_altitude_min_deg=lunar.moon_altitude_min_deg,
             )
-            frame = _normalize_lunar(raw)
+            frame = _normalize_lunar(raw, lunar.timezone)
             validate_lunar_support(frame, support)
             year = window_start[:4]
             index = part_index.get(year, 0)

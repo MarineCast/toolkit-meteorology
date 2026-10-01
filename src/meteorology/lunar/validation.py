@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from ..astronomy import local_civil_day_hours
 from .compute import OUTPUT_COLUMNS, SYNODIC_MONTH_DAYS
 
 
@@ -12,6 +13,7 @@ def validate_lunar_illumination_features(
     strict: bool = True,
     start_date: str | pd.Timestamp | None = None,
     end_date: str | pd.Timestamp | None = None,
+    timezone_name: str | None = None,
 ) -> list[str]:
     errors: list[str] = []
     missing = [column for column in OUTPUT_COLUMNS if column not in frame.columns]
@@ -54,7 +56,13 @@ def validate_lunar_illumination_features(
             "moonlit_dark_hours",
         ):
             values = pd.to_numeric(frame[column], errors="coerce")
-            if not values.between(0.0, 26.0).all():
+            if timezone_name:
+                limits = frame["date"].astype(str).map(
+                    lambda date: local_civil_day_hours(date, timezone_name)
+                )
+                if (values.lt(0) | values.gt(limits + 1e-8)).any():
+                    errors.append(f"{column} exceeds the local civil-day duration.")
+            elif not values.between(0.0, 26.0).all():
                 errors.append(f"{column} contains values outside [0, 26].")
         if (frame["moon_visible_dark_hours"] > frame["night_hours"] + 1e-9).any():
             errors.append("moon_visible_dark_hours exceeds night_hours.")

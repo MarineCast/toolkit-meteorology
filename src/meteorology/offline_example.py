@@ -80,7 +80,8 @@ def build_offline_example(config_path: str | Path = "config/data/environment_met
             source_grid_hash=grid_hash,
         )
         row.update(SOURCE_BACKEND="synthetic_fixture", SOURCE_FORMAT="SYNTHETIC_PARQUET",
-                   PRECISION_QC_STATE="DETERMINISTIC_SYNTHETIC")
+                   PRECISION_QC_STATE="DETERMINISTIC_SYNTHETIC",
+                   SOURCE_OBJECT_URI=None, PRECIP_OBJECT_URI=None)
         rows.append(row)
     write_table(weather.inventory_path, pa.Table.from_pylist(rows, schema=HRRR_INVENTORY_SCHEMA), HRRR_INVENTORY_SCHEMA)
     acquisition = manifest_payload(
@@ -88,6 +89,7 @@ def build_offline_example(config_path: str | Path = "config/data/environment_met
         config_path=config.path,
         resolved_config={"start_date": date, "end_date": date, "timezone": weather.timezone,
                          "interval_hours": 4, "h3_resolution": 5,
+                         "availability_lag_hours": 6,
                          "source": {"model": "synthetic_hrrr", "product": "sfc", "forecast_hour": 0,
                                     "precipitation_forecast_hour": 1}},
         artifacts=[parquet_contract(weather.inventory_path)],
@@ -109,6 +111,7 @@ def build_offline_example(config_path: str | Path = "config/data/environment_met
     export([weather_outputs[-1], daylight_outputs[-1], lunar_outputs[-1]], matrix)
     return {
         "synthetic": True,
+        "acquisition": validate_product(weather.acquisition_manifest_path),
         "weather": validate_product(weather_outputs[-1]),
         "daylight": validate_product(daylight_outputs[-1]),
         "lunar": validate_product(lunar_outputs[-1]),

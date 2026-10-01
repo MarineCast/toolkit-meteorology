@@ -19,8 +19,9 @@ from ..artifacts import load_manifest, sha256_file
 from ..config import DEFAULT_CONFIG_PATH, load_meteorological_config
 from ..spatial_support.build import load_meteorological_support
 from .build import DAILY_SCHEMA
-from .download import INVENTORY_SCHEMA, _expected_times
-from .source import hrrr_aws_archive_uri
+from .download import INVENTORY_SCHEMA, _expected_times, retrieval_matches_object, valid_retrieval_time
+from .source import hrrr_logical_object_uri
+from .wind import validate_daily_wind_vectors
 
 LEGACY_DEFAULT = Path(
     "data/processed/domain/environmental_layer/meteorological/surface_weather/hrrr"
@@ -463,8 +464,12 @@ def verify_hrrr_r5_rebuild(
                 "CROSSWALK_CHECKSUM",
                 "SOURCE_GRID_HASH",
                 "SOURCE_URI",
+                "SOURCE_OBJECT_URI",
+                "SOURCE_RETRIEVED_AT_UTC",
                 "PRECIP_INIT_TIME_UTC",
                 "PRECIP_SOURCE_URI",
+                "PRECIP_OBJECT_URI",
+                "PRECIP_RETRIEVED_AT_UTC",
             ]
         ]
         .isna()
@@ -473,25 +478,43 @@ def verify_hrrr_r5_rebuild(
     ):
         errors.append("Canonical acquisition inventory has incomplete per-row provenance.")
     invalid_source_uris = sum(
-        str(row.SOURCE_URI) != hrrr_aws_archive_uri(pd.Timestamp(row.VALID_TIME_UTC))
+        row.SOURCE_OBJECT_URI != hrrr_logical_object_uri(pd.Timestamp(row.VALID_TIME_UTC))
+        or not retrieval_matches_object(
+            row.SOURCE_URI, hrrr_logical_object_uri(pd.Timestamp(row.VALID_TIME_UTC))
+        )
         for row in inventory.itertuples(index=False)
     )
     if invalid_source_uris:
         errors.append(
-            f"Canonical acquisition inventory has {invalid_source_uris} non-authoritative "
-            "source URIs."
+            f"Canonical acquisition inventory has {invalid_source_uris} invalid logical "
+            "or retrieval source URIs."
         )
     invalid_precip_source_uris = sum(
-        str(row.PRECIP_SOURCE_URI)
-        != hrrr_aws_archive_uri(
+        row.PRECIP_OBJECT_URI != hrrr_logical_object_uri(
             pd.Timestamp(row.VALID_TIME_UTC), weather.precipitation_forecast_hour
+        )
+        or not retrieval_matches_object(
+            row.PRECIP_SOURCE_URI,
+            hrrr_logical_object_uri(
+                pd.Timestamp(row.VALID_TIME_UTC), weather.precipitation_forecast_hour
+            ),
         )
         for row in inventory.itertuples(index=False)
     )
     if invalid_precip_source_uris:
         errors.append(
             f"Canonical acquisition inventory has {invalid_precip_source_uris} "
-            "non-authoritative precipitation source URIs."
+            "invalid logical or retrieval precipitation source URIs."
+        )
+    invalid_retrieval_times = sum(
+        not valid_retrieval_time(row.SOURCE_RETRIEVED_AT_UTC)
+        or not valid_retrieval_time(row.PRECIP_RETRIEVED_AT_UTC)
+        for row in inventory.itertuples(index=False)
+    )
+    if invalid_retrieval_times:
+        errors.append(
+            f"Canonical acquisition inventory has {invalid_retrieval_times} invalid UTC "
+            "retrieval timestamps."
         )
 
     sample_checksum_failures = 0
@@ -541,9 +564,12 @@ def verify_hrrr_r5_rebuild(
             or frame.duplicated(["H3_INDEX", "DATE"]).any()
         ):
             errors.append(f"Daily weather support or keys are invalid for {date}.")
-        direction = frame["WIND_DIRECTION_FROM_10M_DEG"].dropna().to_numpy(dtype=float)
-        if required.isna().any().any() or not np.isfinite(numeric).all() or not np.isfinite(direction).all():
+        if required.isna().any().any() or not np.isfinite(numeric).all():
             errors.append(f"Daily weather contains null or non-finite values for {date}.")
+        try:
+            validate_daily_wind_vectors(frame)
+        except ValueError as exc:
+            errors.append(f"Daily weather wind vector is invalid for {date}: {exc}")
         if (
             set(frame["DATE"].astype(str)) != {date}
             or set(frame["SAMPLE_COUNT"].astype(int)) != {6}

@@ -33,7 +33,19 @@ meteorology download surface-weather \
 The acquisition retains one checksum-addressed region-sized sample per timestamp plus the source-grid
 crosswalk. Successful samples and a working inventory survive failures for resumption; the
 canonical acquisition inventory and manifest are published only when the frozen requested range
-is complete.
+is complete. Publication checks the exact six-instant schedule for every local date from the
+declared start through end, with no duplicate or missing instants. It rechecks every retained
+sample, crosswalk, provenance field and configured availability lag, including rows from earlier
+requests. A disjoint request, stale earlier lag, or unrelated failed working row leaves canonical
+metadata unchanged; request the missing or stale dates explicitly to complete the range.
+
+The inventory separates the logical `noaa-hrrr://` object identity from the actual `SOURCE_URI`
+and `PRECIP_SOURCE_URI` retrieval URLs and their retrieval times. HTTPS/S3 retrieval URLs
+must carry the expected object key; a matching path alone does not establish mirror ownership
+or byte equality with another endpoint. Sample and crosswalk checksums cover the
+retained derived files; raw GRIB bytes are not archived or independently checksummed by this
+toolkit. A network-free snapshot requires an existing current acquisition inventory with this
+provenance; sample Parquet files alone cannot reconstruct retrieval history.
 
 Before a full backfill, compare the one-worker cropped-grid baseline with the four-worker direct-R5
 candidate on old, middle, and recent dates:
@@ -63,14 +75,17 @@ of the six `f01` rates multiplied by four hours; it is not a true hourly or accu
 precipitation analysis.
 
 The decoded GRIB wind-reference flag is required for both 10 m components. Grid-relative
-components are rotated using the decoded grid axes before R5 sampling; published U/V and
+components are rotated using an orthonormal local axis basis derived from the decoded grid axes
+before R5 sampling; published U/V and
 FROM direction are earth-relative. Missing or conflicting flags block acquisition. The sample
 schema records `WIND_VECTOR_BASIS=earth_relative`, so older cached samples cannot be reused
 as if they had been rotated. Changing the support bounding box or inclusion method requires
 rebuilding support before acquisition or product builds.
 `AVAILABLE_AT_UTC` is a versioned assumed fixed-lag policy, not a measured provider
 publication timestamp. A changed lag invalidates cached samples; acquisition and build
-check sample timestamps against the current policy and inventory.
+check every retained sample timestamp against the current policy and inventory. The current
+acquisition, weather and daylight method IDs are v3, v4 and v3 respectively; old releases retain
+their original method IDs and require new generation to gain these contracts.
 
 Before recoverably archiving legacy weather artifacts, run the complete-range and shared-core
 parity gate:
@@ -85,6 +100,10 @@ manifest checksum.
 Arithmetic matches to a subset of historical samples are recorded as suspected legacy
 missingness, not evidence sufficient to exclude a date. Unexplained cloud differences remain
 comparison failures; a selector explanation requires independent historical source evidence.
+Execution holds an exclusive migration lock. On interrupted moves, recovery compares the journal
+checksum with retained source/archive copies. Differing copies remain in place with a `CONFLICT`
+journal for manual resolution; successful rollback retains a `MIGRATION_RECOVERY.json` record.
+The configured custom archive root is included in recovery discovery.
 
 Publication is staged and manifest-validated before promotion. Inspectors verify manifest
 checksums before rendering to `outputs/domains/environmental_layer/meteorological/<product>/`.
@@ -107,7 +126,8 @@ versions. The [method registry](methodology.md#provenance-and-reproducibility)
 identifies changes in numerical meaning separately from the software version.
 Known earlier schema-3 methods remain readable with checksum verification. Deep scientific
 validation requires the matching archived validator; the current validator only certifies
-current method IDs.
+current method IDs. See the [archived validator handoff](archived-validation.md) for pinned
+revisions and isolated invocation.
 
 Daily wind direction is meteorological **FROM** direction calculated from the
 mean 10 m U/V vector; its Arrow field is nullable for calm mean vectors.
@@ -115,6 +135,10 @@ mean 10 m U/V vector; its Arrow field is nullable for calm mean vectors.
 Lunar night fractions and their matching weight are null if `NIGHT_HOURS=0`.
 These nulls are not zeros. The [variable inventory](reference/variables.md)
 contains field-level units, source identity, processing and ranges.
+Integrated solar/lunar hour fields are checked against each row's local civil-day duration,
+which can be 23, 24 or 25 hours; geometric `DAYLIGHT_HOURS` retains its 0–24-hour range.
+The compact daylight lookup carries `MONTH_DAY`, `IS_LEAP_DAY` and `SOLAR_DAY_365` beside
+`DAY_OF_YEAR`; its weight preserves the selected daily value without maximum scaling.
 
 The default ecological model matrix is governed separately from the complete scientific products:
 
@@ -124,3 +148,6 @@ python -m meteorology.modeling.feature_policy --check
 ```
 
 That policy excludes metadata and exact deterministic aliases. It does not delete producer columns.
+`apply_feature_policy` accepts the exported matrix's native component prefixes and preserves
+`DATE`, `H3_INDEX` and `H3_RESOLUTION`; R4 and R5 rows remain separate and require an explicit
+downstream alignment decision.

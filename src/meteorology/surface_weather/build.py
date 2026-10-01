@@ -28,6 +28,7 @@ from ..config import DEFAULT_CONFIG_PATH, load_meteorological_config
 from ..spatial_support.build import load_meteorological_support
 from .download import INVENTORY_SCHEMA
 from .sampling import AVAILABILITY_POLICY, CROSSWALK_SCHEMA, SAMPLE_SCHEMA, make_sample_times_for_local_date
+from .wind import validate_daily_wind_vectors
 
 
 def _snapshot_replaced_manifest(manifest_path: Path) -> Path | None:
@@ -237,6 +238,7 @@ def validate_surface_weather_daily(
     numeric = required.select_dtypes(include=[np.number]).to_numpy(dtype=float)
     if not np.isfinite(numeric).all():
         raise ValueError("Daily R5 weather contains non-finite values.")
+    validate_daily_wind_vectors(daily)
     if set(daily["QC_STATE"].astype(str)) != {"COMPLETE"}:
         raise ValueError("Daily R5 weather contains a non-complete QC state.")
     if set(daily["EXPECTED_SAMPLE_COUNT"].astype(int)) != {expected_samples}:
@@ -270,6 +272,12 @@ def build_surface_weather(
     source_model = str(acquisition_manifest.get("resolved_config", {}).get("source", {}).get("model", "hrrr"))
     if source_model not in {"hrrr", "synthetic_hrrr"}:
         raise ValueError(f"Unsupported acquisition source model: {source_model}")
+    acquisition_settings = acquisition_manifest.get("resolved_config", {})
+    if source_model == "hrrr" and (
+        acquisition_settings.get("availability_lag_hours") != weather.availability_lag_hours
+        or acquisition_settings.get("availability_policy") != AVAILABILITY_POLICY
+    ):
+        raise ValueError("HRRR acquisition release availability policy differs from the build configuration.")
     frozen = acquisition_manifest.get("temporal_coverage", {})
     frozen_start = str(frozen.get("start_date") or "")
     frozen_end = str(frozen.get("end_date") or "")
@@ -284,6 +292,13 @@ def build_surface_weather(
     if not dates:
         raise ValueError("Surface-weather build date range is empty.")
     inventory = _load_inventory(inventory_source)
+    for row in inventory.itertuples(index=False):
+        valid = pd.Timestamp(row.VALID_TIME_UTC)
+        expected_available = (
+            valid + pd.Timedelta(hours=weather.availability_lag_hours)
+        ).isoformat()
+        if row.AVAILABLE_AT_UTC != expected_available:
+            raise ValueError(f"HRRR inventory availability differs from release policy: {valid}.")
     inventory_by_time = {
         pd.Timestamp(row.VALID_TIME_UTC).tz_convert("UTC"): row
         for row in inventory.itertuples(index=False)

@@ -46,6 +46,9 @@ DAYLIGHT_DOY_SCHEMA = pa.schema(
     [
         pa.field("H3_INDEX", pa.string(), nullable=False),
         pa.field("DAY_OF_YEAR", pa.int16(), nullable=False),
+        pa.field("MONTH_DAY", pa.string(), nullable=False),
+        pa.field("IS_LEAP_DAY", pa.bool_(), nullable=False),
+        pa.field("SOLAR_DAY_365", pa.int16(), nullable=False),
         pa.field("WEIGHT_DAYLIGHT", pa.float64(), nullable=False),
     ]
 )
@@ -149,12 +152,22 @@ PRE_F01_INVENTORY_SCHEMA = pa.schema(
     ]
 )
 
-HRRR_INVENTORY_SCHEMA = pa.schema(
+LEGACY_HRRR_INVENTORY_SCHEMA = pa.schema(
     [
         *PRE_F01_INVENTORY_SCHEMA,
         pa.field("PRECIP_INIT_TIME_UTC", pa.string(), nullable=True),
         pa.field("PRECIP_FORECAST_HOUR", pa.int16(), nullable=True),
         pa.field("PRECIP_SOURCE_URI", pa.string(), nullable=True),
+    ]
+)
+
+HRRR_INVENTORY_SCHEMA = pa.schema(
+    [
+        *LEGACY_HRRR_INVENTORY_SCHEMA,
+        pa.field("SOURCE_OBJECT_URI", pa.string(), nullable=True),
+        pa.field("SOURCE_RETRIEVED_AT_UTC", pa.string(), nullable=True),
+        pa.field("PRECIP_OBJECT_URI", pa.string(), nullable=True),
+        pa.field("PRECIP_RETRIEVED_AT_UTC", pa.string(), nullable=True),
     ]
 )
 

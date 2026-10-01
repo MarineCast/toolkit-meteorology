@@ -185,24 +185,23 @@ def build_daylight_day_of_year_features(
 
 
 def compact_daylight_weight_output(features: pd.DataFrame) -> pd.DataFrame:
-    """Return final daylight weight columns for model joins."""
-    required = {"h3", "day_of_year", "daylight_weight"}
+    """Retain the selected daily weight with an explicit reference-calendar key."""
+    required = {
+        "h3", "day_of_year", "month_day", "is_leap_day",
+        "solar_day_365", "daylight_weight",
+    }
     missing = sorted(required - set(features.columns))
     if missing:
         raise ValueError(f"Daylight features are missing required columns: {missing}")
-
-    weights = pd.to_numeric(features["daylight_weight"], errors="coerce")
-    max_weight = weights.max()
-    if pd.isna(max_weight) or float(max_weight) <= 0.0:
-        relative = pd.Series(0.0, index=features.index)
-    else:
-        relative = weights / float(max_weight)
 
     return pd.DataFrame(
         {
             "h3": features["h3"].astype("string"),
             "day_of_year": pd.to_numeric(features["day_of_year"], errors="raise").astype("int64"),
-            "weight_daylight": relative.clip(0.0, 1.0).astype("float32"),
+            "month_day": features["month_day"].astype("string"),
+            "is_leap_day": features["is_leap_day"].astype(bool),
+            "solar_day_365": pd.to_numeric(features["solar_day_365"], errors="raise").astype("int64"),
+            "weight_daylight": pd.to_numeric(features["daylight_weight"], errors="raise").astype("float64"),
         }
     )
 

@@ -18,6 +18,7 @@ from meteorology.artifacts import (
     write_table,
 )
 from meteorology.migration import (
+    _migration_lock,
     _recover_interrupted_migrations,
 )
 from meteorology.validation import validate_product
@@ -253,7 +254,112 @@ def test_legacy_migration_journal_rolls_back_interrupted_moves(tmp_path: Path) -
     )
     _recover_interrupted_migrations(tmp_path / "migrations")
     assert source.read_text() == "legacy"
-    assert not archive.exists()
+    assert not (archive / "MIGRATION_JOURNAL.json").exists()
+    assert json.loads((archive / "MIGRATION_RECOVERY.json").read_text())["state"] == "ROLLED_BACK"
+
+
+def test_legacy_recovery_preserves_different_conflicting_copies(tmp_path: Path) -> None:
+    source = tmp_path / "data/legacy/product.txt"
+    source.parent.mkdir(parents=True)
+    source.write_text("regenerated")
+    archive = tmp_path / "migrations/run"
+    destination = archive / "data/legacy/product.txt"
+    destination.parent.mkdir(parents=True)
+    destination.write_text("original")
+    journal = archive / "MIGRATION_JOURNAL.json"
+    journal.write_text(json.dumps({"state": "MOVING", "artifacts": [{
+        "source": str(source), "destination": str(destination),
+        "checksum": checksum_path(destination), "moved": True,
+    }]}))
+    with pytest.raises(RuntimeError, match="both copies and journal retained"):
+        _recover_interrupted_migrations(tmp_path / "migrations")
+    assert source.read_text() == "regenerated"
+    assert destination.read_text() == "original"
+    assert json.loads(journal.read_text())["state"] == "CONFLICT"
+
+
+def test_legacy_recovery_rejects_archive_symlink_escape(tmp_path: Path) -> None:
+    outside = tmp_path / "outside.txt"
+    outside.write_text("original")
+    archive = tmp_path / "migrations/run"
+    archive.mkdir(parents=True)
+    destination = archive / "link.txt"
+    destination.symlink_to(outside)
+    source = tmp_path / "data/legacy/product.txt"
+    journal = archive / "MIGRATION_JOURNAL.json"
+    journal.write_text(json.dumps({"state": "MOVING", "artifacts": [{
+        "source": str(source), "destination": str(destination),
+        "checksum": checksum_path(outside), "moved": True,
+    }]}))
+    with pytest.raises(RuntimeError, match="both copies and journal retained"):
+        _recover_interrupted_migrations(tmp_path / "migrations")
+    assert outside.read_text() == "original"
+    assert destination.is_symlink()
+    assert json.loads(journal.read_text())["state"] == "CONFLICT"
+
+
+def test_legacy_recovery_records_equal_copies_without_erasing_archive(tmp_path: Path) -> None:
+    source = tmp_path / "data/legacy/product.txt"
+    source.parent.mkdir(parents=True)
+    source.write_text("same")
+    archive = tmp_path / "migrations/run"
+    destination = archive / "data/legacy/product.txt"
+    destination.parent.mkdir(parents=True)
+    destination.write_text("same")
+    (archive / "MIGRATION_JOURNAL.json").write_text(json.dumps({"state": "MOVING", "artifacts": [{
+        "source": str(source), "destination": str(destination),
+        "checksum": checksum_path(destination), "moved": True,
+    }]}))
+    _recover_interrupted_migrations(tmp_path / "migrations")
+    assert source.read_text() == destination.read_text() == "same"
+    assert json.loads((archive / "MIGRATION_RECOVERY.json").read_text())["state"] == "ROLLED_BACK"
+
+
+def test_legacy_recovery_discovers_custom_archive_root(tmp_path: Path) -> None:
+    source = tmp_path / "data/legacy/product.txt"
+    archive = tmp_path / "custom-archive"
+    destination = archive / "data/legacy/product.txt"
+    destination.parent.mkdir(parents=True)
+    destination.write_text("original")
+    (archive / "MIGRATION_JOURNAL.json").write_text(json.dumps({"state": "MOVING", "artifacts": [{
+        "source": str(source), "destination": str(destination),
+        "checksum": checksum_path(destination), "moved": True,
+    }]}))
+    _recover_interrupted_migrations(tmp_path / "migrations", archive_root=archive)
+    assert source.read_text() == "original"
+    assert (archive / "MIGRATION_RECOVERY.json").exists()
+
+
+def test_legacy_recovery_handles_move_before_and_after_journal_update(tmp_path: Path) -> None:
+    archive = tmp_path / "migrations/run"
+    moved_source = tmp_path / "data/legacy/moved.txt"
+    moved_destination = archive / "data/legacy/moved.txt"
+    moved_destination.parent.mkdir(parents=True)
+    moved_destination.write_text("first")
+    pending_source = tmp_path / "data/legacy/pending.txt"
+    pending_source.parent.mkdir(parents=True)
+    pending_source.write_text("second")
+    (archive / "MIGRATION_JOURNAL.json").write_text(json.dumps({
+        "state": "MOVING",
+        "artifacts": [
+            {"source": str(moved_source), "destination": str(moved_destination),
+             "checksum": checksum_path(moved_destination), "moved": False},
+            {"source": str(pending_source),
+             "destination": str(archive / "data/legacy/pending.txt"),
+             "checksum": checksum_path(pending_source), "moved": False},
+        ],
+    }))
+    _recover_interrupted_migrations(tmp_path / "migrations")
+    assert moved_source.read_text() == "first"
+    assert pending_source.read_text() == "second"
+    assert json.loads((archive / "MIGRATION_RECOVERY.json").read_text())["state"] == "ROLLED_BACK"
+
+
+def test_legacy_migration_lock_rejects_overlapping_owners(tmp_path: Path) -> None:
+    with _migration_lock(tmp_path / "migrations"):
+        with pytest.raises(RuntimeError, match="already active"):
+            with _migration_lock(tmp_path / "migrations"):
+                pass
 
 
 def test_complete_legacy_migration_journal_is_finalized(tmp_path: Path) -> None:

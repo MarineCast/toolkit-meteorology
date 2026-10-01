@@ -433,8 +433,12 @@ def _earth_wind_from_grid(
     i_rad, j_rad = np.deg2rad(az_i), np.deg2rad(az_j)
     if (np.abs(np.cos(i_rad - j_rad)) > 0.05).any():
         raise ValueError("HRRR wind grid axes are not locally orthogonal.")
-    east = u * np.sin(i_rad) + v * np.sin(j_rad)
-    north = u * np.cos(i_rad) + v * np.cos(j_rad)
+    # Use the decoded i axis as the local tangent and the j bearing only to
+    # select handedness. Independent geodesic bearings are not exactly 90
+    # degrees apart, so combining both directly changes vector magnitude.
+    handedness = np.sign(np.sin(j_rad - i_rad))
+    east = u * np.sin(i_rad) + handedness * v * np.cos(i_rad)
+    north = u * np.cos(i_rad) - handedness * v * np.sin(i_rad)
     return east, north
 
 
