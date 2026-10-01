@@ -1,0 +1,2 @@
+# Preserve the exact NDBC source response, including trailing spaces in data rows.
+validation/references/ndbc_46088_2024-01-02.txt whitespace=-blank-at-eol

@@ -1,0 +1,1936 @@
+{
+  "cases": [
+    {
+      "body": "sun",
+      "date": "2024-01-02",
+      "hours": [
+        {
+          "error_deg": 0.006766839542404757,
+          "model_altitude_deg": 3.2421808395424048,
+          "reference_airless_altitude_deg": 3.235414,
+          "timestamp_utc": "2024-01-02T00:00:00+00:00"
+        },
+        {
+          "error_deg": 0.006843299803335867,
+          "model_altitude_deg": -4.919656700196664,
+          "reference_airless_altitude_deg": -4.9265,
+          "timestamp_utc": "2024-01-02T01:00:00+00:00"
+        },
+        {
+          "error_deg": 0.006816284525786642,
+          "model_altitude_deg": -14.009234715474213,
+          "reference_airless_altitude_deg": -14.016051,
+          "timestamp_utc": "2024-01-02T02:00:00+00:00"
+        },
+        {
+          "error_deg": 0.006699766034152788,
+          "model_altitude_deg": -23.687856233965846,
+          "reference_airless_altitude_deg": -23.694556,
+          "timestamp_utc": "2024-01-02T03:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0065071154434264145,
+          "model_altitude_deg": -33.635495884556576,
+          "reference_airless_altitude_deg": -33.642003,
+          "timestamp_utc": "2024-01-02T04:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0062543520480673465,
+          "model_altitude_deg": -43.485715647951935,
+          "reference_airless_altitude_deg": -43.49197,
+          "timestamp_utc": "2024-01-02T05:00:00+00:00"
+        },
+        {
+          "error_deg": 0.005935072159786614,
+          "model_altitude_deg": -52.693457927840214,
+          "reference_airless_altitude_deg": -52.699393,
+          "timestamp_utc": "2024-01-02T06:00:00+00:00"
+        },
+        {
+          "error_deg": 0.005460376953891455,
+          "model_altitude_deg": -60.26073462304611,
+          "reference_airless_altitude_deg": -60.266195,
+          "timestamp_utc": "2024-01-02T07:00:00+00:00"
+        },
+        {
+          "error_deg": 0.00456690839529017,
+          "model_altitude_deg": -64.40461309160472,
+          "reference_airless_altitude_deg": -64.40918,
+          "timestamp_utc": "2024-01-02T08:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0032608427714322374,
+          "model_altitude_deg": -63.359709157228565,
+          "reference_airless_altitude_deg": -63.36297,
+          "timestamp_utc": "2024-01-02T09:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0022570935997450192,
+          "model_altitude_deg": -57.64503390640026,
+          "reference_airless_altitude_deg": -57.647291,
+          "timestamp_utc": "2024-01-02T10:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0018413519457709526,
+          "model_altitude_deg": -49.28244064805423,
+          "reference_airless_altitude_deg": -49.284282,
+          "timestamp_utc": "2024-01-02T11:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0018196210810259572,
+          "model_altitude_deg": -39.739908378918976,
+          "reference_airless_altitude_deg": -39.741728,
+          "timestamp_utc": "2024-01-02T12:00:00+00:00"
+        },
+        {
+          "error_deg": 0.002007727463517739,
+          "model_altitude_deg": -29.79715727253648,
+          "reference_airless_altitude_deg": -29.799165,
+          "timestamp_utc": "2024-01-02T13:00:00+00:00"
+        },
+        {
+          "error_deg": 0.002303832442112963,
+          "model_altitude_deg": -19.907861167557886,
+          "reference_airless_altitude_deg": -19.910165,
+          "timestamp_utc": "2024-01-02T14:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0026641843665196063,
+          "model_altitude_deg": -10.40972181563348,
+          "reference_airless_altitude_deg": -10.412386,
+          "timestamp_utc": "2024-01-02T15:00:00+00:00"
+        },
+        {
+          "error_deg": 0.00308053606073333,
+          "model_altitude_deg": -1.6242654639392666,
+          "reference_airless_altitude_deg": -1.627346,
+          "timestamp_utc": "2024-01-02T16:00:00+00:00"
+        },
+        {
+          "error_deg": 0.003557890904554384,
+          "model_altitude_deg": 6.092958890904554,
+          "reference_airless_altitude_deg": 6.089401,
+          "timestamp_utc": "2024-01-02T17:00:00+00:00"
+        },
+        {
+          "error_deg": 0.004102964863864855,
+          "model_altitude_deg": 12.334415964863865,
+          "reference_airless_altitude_deg": 12.330313,
+          "timestamp_utc": "2024-01-02T18:00:00+00:00"
+        },
+        {
+          "error_deg": 0.004705406234680964,
+          "model_altitude_deg": 16.66425540623468,
+          "reference_airless_altitude_deg": 16.65955,
+          "timestamp_utc": "2024-01-02T19:00:00+00:00"
+        },
+        {
+          "error_deg": 0.005324211907165477,
+          "model_altitude_deg": 18.699118211907166,
+          "reference_airless_altitude_deg": 18.693794,
+          "timestamp_utc": "2024-01-02T20:00:00+00:00"
+        },
+        {
+          "error_deg": 0.005893898696335498,
+          "model_altitude_deg": 18.229270898696335,
+          "reference_airless_altitude_deg": 18.223377,
+          "timestamp_utc": "2024-01-02T21:00:00+00:00"
+        },
+        {
+          "error_deg": 0.006357970787485456,
+          "model_altitude_deg": 15.305090970787486,
+          "reference_airless_altitude_deg": 15.298733,
+          "timestamp_utc": "2024-01-02T22:00:00+00:00"
+        },
+        {
+          "error_deg": 0.00669051265934506,
+          "model_altitude_deg": 10.215014512659344,
+          "reference_airless_altitude_deg": 10.208324,
+          "timestamp_utc": "2024-01-02T23:00:00+00:00"
+        }
+      ],
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "reference_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%2710%27&OBJ_DATA=%27NO%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&CENTER=%27coord%40399%27&COORD_TYPE=%27GEODETIC%27&SITE_COORD=%27-123.7%2C48.275%2C0%27&START_TIME=%272024-01-02+00%3A00%27&STOP_TIME=%272024-01-02+23%3A00%27&STEP_SIZE=%2760+m%27&QUANTITIES=%274%27&CSV_FORMAT=%27YES%27&APPARENT=%27AIRLESS%27&TIME_TYPE=%27UT%27&ELEV_CUT=%27-90%27",
+      "response_sha256": "393c906e508e7a0d74c97acff7adbf5b3f92e7be6425897dcfaa33721bc30cde"
+    },
+    {
+      "body": "moon",
+      "date": "2024-01-02",
+      "hours": [
+        {
+          "error_deg": 0.5871462711409379,
+          "model_altitude_deg": -33.45228772885906,
+          "reference_airless_altitude_deg": -34.039434,
+          "timestamp_utc": "2024-01-02T00:00:00+00:00"
+        },
+        {
+          "error_deg": 0.5046111551915331,
+          "model_altitude_deg": -34.785510844808464,
+          "reference_airless_altitude_deg": -35.290122,
+          "timestamp_utc": "2024-01-02T01:00:00+00:00"
+        },
+        {
+          "error_deg": 0.45984636215532504,
+          "model_altitude_deg": -33.167587637844676,
+          "reference_airless_altitude_deg": -33.627434,
+          "timestamp_utc": "2024-01-02T02:00:00+00:00"
+        },
+        {
+          "error_deg": 0.4539149249706469,
+          "model_altitude_deg": -28.859183075029353,
+          "reference_airless_altitude_deg": -29.313098,
+          "timestamp_utc": "2024-01-02T03:00:00+00:00"
+        },
+        {
+          "error_deg": 0.4736425251255696,
+          "model_altitude_deg": -22.42875747487443,
+          "reference_airless_altitude_deg": -22.9024,
+          "timestamp_utc": "2024-01-02T04:00:00+00:00"
+        },
+        {
+          "error_deg": 0.5008426568244815,
+          "model_altitude_deg": -14.502340343175518,
+          "reference_airless_altitude_deg": -15.003183,
+          "timestamp_utc": "2024-01-02T05:00:00+00:00"
+        },
+        {
+          "error_deg": 0.5198418829215363,
+          "model_altitude_deg": -5.622013117078463,
+          "reference_airless_altitude_deg": -6.141855,
+          "timestamp_utc": "2024-01-02T06:00:00+00:00"
+        },
+        {
+          "error_deg": 0.5202905006847476,
+          "model_altitude_deg": 3.7720505006847476,
+          "reference_airless_altitude_deg": 3.25176,
+          "timestamp_utc": "2024-01-02T07:00:00+00:00"
+        },
+        {
+          "error_deg": 0.49762023934768784,
+          "model_altitude_deg": 13.300328239347689,
+          "reference_airless_altitude_deg": 12.802708,
+          "timestamp_utc": "2024-01-02T08:00:00+00:00"
+        },
+        {
+          "error_deg": 0.4532168712615068,
+          "model_altitude_deg": 22.582519871261507,
+          "reference_airless_altitude_deg": 22.129303,
+          "timestamp_utc": "2024-01-02T09:00:00+00:00"
+        },
+        {
+          "error_deg": 0.3951824485842863,
+          "model_altitude_deg": 31.164352448584285,
+          "reference_airless_altitude_deg": 30.76917,
+          "timestamp_utc": "2024-01-02T10:00:00+00:00"
+        },
+        {
+          "error_deg": 0.3397575495375875,
+          "model_altitude_deg": 38.43662054953759,
+          "reference_airless_altitude_deg": 38.096863,
+          "timestamp_utc": "2024-01-02T11:00:00+00:00"
+        },
+        {
+          "error_deg": 0.31131819246763115,
+          "model_altitude_deg": 43.591883192467634,
+          "reference_airless_altitude_deg": 43.280565,
+          "timestamp_utc": "2024-01-02T12:00:00+00:00"
+        },
+        {
+          "error_deg": 0.33411104068088093,
+          "model_altitude_deg": 45.76510404068088,
+          "reference_airless_altitude_deg": 45.430993,
+          "timestamp_utc": "2024-01-02T13:00:00+00:00"
+        },
+        {
+          "error_deg": 0.4128018075406459,
+          "model_altitude_deg": 44.47403680754065,
+          "reference_airless_altitude_deg": 44.061235,
+          "timestamp_utc": "2024-01-02T14:00:00+00:00"
+        },
+        {
+          "error_deg": 0.5249721802783256,
+          "model_altitude_deg": 39.98762218027832,
+          "reference_airless_altitude_deg": 39.46265,
+          "timestamp_utc": "2024-01-02T15:00:00+00:00"
+        },
+        {
+          "error_deg": 0.6403380958408675,
+          "model_altitude_deg": 33.10142109584087,
+          "reference_airless_altitude_deg": 32.461083,
+          "timestamp_utc": "2024-01-02T16:00:00+00:00"
+        },
+        {
+          "error_deg": 0.7371874279472976,
+          "model_altitude_deg": 24.6524624279473,
+          "reference_airless_altitude_deg": 23.915275,
+          "timestamp_utc": "2024-01-02T17:00:00+00:00"
+        },
+        {
+          "error_deg": 0.8032028371711117,
+          "model_altitude_deg": 15.291285837171111,
+          "reference_airless_altitude_deg": 14.488083,
+          "timestamp_utc": "2024-01-02T18:00:00+00:00"
+        },
+        {
+          "error_deg": 0.8320583417997183,
+          "model_altitude_deg": 5.490298341799718,
+          "reference_airless_altitude_deg": 4.65824,
+          "timestamp_utc": "2024-01-02T19:00:00+00:00"
+        },
+        {
+          "error_deg": 0.8214259757700821,
+          "model_altitude_deg": -4.379723024229918,
+          "reference_airless_altitude_deg": -5.201149,
+          "timestamp_utc": "2024-01-02T20:00:00+00:00"
+        },
+        {
+          "error_deg": 0.7723156077294338,
+          "model_altitude_deg": -13.973504392270566,
+          "reference_airless_altitude_deg": -14.74582,
+          "timestamp_utc": "2024-01-02T21:00:00+00:00"
+        },
+        {
+          "error_deg": 0.6892118030849019,
+          "model_altitude_deg": -22.9021651969151,
+          "reference_airless_altitude_deg": -23.591377,
+          "timestamp_utc": "2024-01-02T22:00:00+00:00"
+        },
+        {
+          "error_deg": 0.58107719799591,
+          "model_altitude_deg": -30.66801480200409,
+          "reference_airless_altitude_deg": -31.249092,
+          "timestamp_utc": "2024-01-02T23:00:00+00:00"
+        }
+      ],
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "reference_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27301%27&OBJ_DATA=%27NO%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&CENTER=%27coord%40399%27&COORD_TYPE=%27GEODETIC%27&SITE_COORD=%27-123.7%2C48.275%2C0%27&START_TIME=%272024-01-02+00%3A00%27&STOP_TIME=%272024-01-02+23%3A00%27&STEP_SIZE=%2760+m%27&QUANTITIES=%274%27&CSV_FORMAT=%27YES%27&APPARENT=%27AIRLESS%27&TIME_TYPE=%27UT%27&ELEV_CUT=%27-90%27",
+      "response_sha256": "5d3fd600c283d284316152e3248d7db943f9f3c6d4b5e2f2c48f4269d0a17f5f"
+    },
+    {
+      "body": "sun",
+      "date": "2024-03-10",
+      "hours": [
+        {
+          "error_deg": 0.006721718010794575,
+          "model_altitude_deg": 19.921565718010793,
+          "reference_airless_altitude_deg": 19.914844,
+          "timestamp_utc": "2024-03-10T00:00:00+00:00"
+        },
+        {
+          "error_deg": 0.006911276655680254,
+          "model_altitude_deg": 10.89368027665568,
+          "reference_airless_altitude_deg": 10.886769,
+          "timestamp_utc": "2024-03-10T01:00:00+00:00"
+        },
+        {
+          "error_deg": 0.006988569698023417,
+          "model_altitude_deg": 1.1929865696980235,
+          "reference_airless_altitude_deg": 1.185998,
+          "timestamp_utc": "2024-03-10T02:00:00+00:00"
+        },
+        {
+          "error_deg": 0.006959925146022172,
+          "model_altitude_deg": -8.759621074853978,
+          "reference_airless_altitude_deg": -8.766581,
+          "timestamp_utc": "2024-03-10T03:00:00+00:00"
+        },
+        {
+          "error_deg": 0.006825292845690001,
+          "model_altitude_deg": -18.57375570715431,
+          "reference_airless_altitude_deg": -18.580581,
+          "timestamp_utc": "2024-03-10T04:00:00+00:00"
+        },
+        {
+          "error_deg": 0.00657734286352607,
+          "model_altitude_deg": -27.809908657136475,
+          "reference_airless_altitude_deg": -27.816486,
+          "timestamp_utc": "2024-03-10T05:00:00+00:00"
+        },
+        {
+          "error_deg": 0.006191747576998807,
+          "model_altitude_deg": -35.889701252423,
+          "reference_airless_altitude_deg": -35.895893,
+          "timestamp_utc": "2024-03-10T06:00:00+00:00"
+        },
+        {
+          "error_deg": 0.005622068437673988,
+          "model_altitude_deg": -42.02164993156233,
+          "reference_airless_altitude_deg": -42.027272,
+          "timestamp_utc": "2024-03-10T07:00:00+00:00"
+        },
+        {
+          "error_deg": 0.004838092203563349,
+          "model_altitude_deg": -45.26799890779644,
+          "reference_airless_altitude_deg": -45.272837,
+          "timestamp_utc": "2024-03-10T08:00:00+00:00"
+        },
+        {
+          "error_deg": 0.003928154515016047,
+          "model_altitude_deg": -44.942855845484985,
+          "reference_airless_altitude_deg": -44.946784,
+          "timestamp_utc": "2024-03-10T09:00:00+00:00"
+        },
+        {
+          "error_deg": 0.003113010427085783,
+          "model_altitude_deg": -41.12106598957291,
+          "reference_airless_altitude_deg": -41.124179,
+          "timestamp_utc": "2024-03-10T10:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0025491251974116835,
+          "model_altitude_deg": -34.57377387480259,
+          "reference_airless_altitude_deg": -34.576323,
+          "timestamp_utc": "2024-03-10T11:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0022389384442718097,
+          "model_altitude_deg": -26.230113061555727,
+          "reference_airless_altitude_deg": -26.232352,
+          "timestamp_utc": "2024-03-10T12:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0021127708123422906,
+          "model_altitude_deg": -16.841370229187657,
+          "reference_airless_altitude_deg": -16.843483,
+          "timestamp_utc": "2024-03-10T13:00:00+00:00"
+        },
+        {
+          "error_deg": 0.002104481995226948,
+          "model_altitude_deg": -6.953743518004773,
+          "reference_airless_altitude_deg": -6.955848,
+          "timestamp_utc": "2024-03-10T14:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0021781597044654433,
+          "model_altitude_deg": 3.0096801597044656,
+          "reference_airless_altitude_deg": 3.007502,
+          "timestamp_utc": "2024-03-10T15:00:00+00:00"
+        },
+        {
+          "error_deg": 0.002329990601609211,
+          "model_altitude_deg": 12.66067099060161,
+          "reference_airless_altitude_deg": 12.658341,
+          "timestamp_utc": "2024-03-10T16:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0025849324564504172,
+          "model_altitude_deg": 21.567619932456452,
+          "reference_airless_altitude_deg": 21.565035,
+          "timestamp_utc": "2024-03-10T17:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0029841659867066994,
+          "model_altitude_deg": 29.18738216598671,
+          "reference_airless_altitude_deg": 29.184398,
+          "timestamp_utc": "2024-03-10T18:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0035564411312094535,
+          "model_altitude_deg": 34.83460944113121,
+          "reference_airless_altitude_deg": 34.831053,
+          "timestamp_utc": "2024-03-10T19:00:00+00:00"
+        },
+        {
+          "error_deg": 0.004264723848670826,
+          "model_altitude_deg": 37.77360272384867,
+          "reference_airless_altitude_deg": 37.769338,
+          "timestamp_utc": "2024-03-10T20:00:00+00:00"
+        },
+        {
+          "error_deg": 0.004990551382284991,
+          "model_altitude_deg": 37.507326551382285,
+          "reference_airless_altitude_deg": 37.502336,
+          "timestamp_utc": "2024-03-10T21:00:00+00:00"
+        },
+        {
+          "error_deg": 0.005603313615509364,
+          "model_altitude_deg": 34.08574631361551,
+          "reference_airless_altitude_deg": 34.080143,
+          "timestamp_utc": "2024-03-10T22:00:00+00:00"
+        },
+        {
+          "error_deg": 0.006053607353088353,
+          "model_altitude_deg": 28.07116060735309,
+          "reference_airless_altitude_deg": 28.065107,
+          "timestamp_utc": "2024-03-10T23:00:00+00:00"
+        }
+      ],
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "reference_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%2710%27&OBJ_DATA=%27NO%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&CENTER=%27coord%40399%27&COORD_TYPE=%27GEODETIC%27&SITE_COORD=%27-123.7%2C48.275%2C0%27&START_TIME=%272024-03-10+00%3A00%27&STOP_TIME=%272024-03-10+23%3A00%27&STEP_SIZE=%2760+m%27&QUANTITIES=%274%27&CSV_FORMAT=%27YES%27&APPARENT=%27AIRLESS%27&TIME_TYPE=%27UT%27&ELEV_CUT=%27-90%27",
+      "response_sha256": "2d93936be4444202eb29ec2796aade486178638b79b6f0001a6daa7fec0aecd8"
+    },
+    {
+      "body": "moon",
+      "date": "2024-03-10",
+      "hours": [
+        {
+          "error_deg": 1.3122995281562577,
+          "model_altitude_deg": 14.256335528156258,
+          "reference_airless_altitude_deg": 12.944036,
+          "timestamp_utc": "2024-03-10T00:00:00+00:00"
+        },
+        {
+          "error_deg": 1.3215678135065527,
+          "model_altitude_deg": 5.7408548135065525,
+          "reference_airless_altitude_deg": 4.419287,
+          "timestamp_utc": "2024-03-10T01:00:00+00:00"
+        },
+        {
+          "error_deg": 1.2999279851937957,
+          "model_altitude_deg": -3.4129090148062047,
+          "reference_airless_altitude_deg": -4.712837,
+          "timestamp_utc": "2024-03-10T02:00:00+00:00"
+        },
+        {
+          "error_deg": 1.2457893677709873,
+          "model_altitude_deg": -12.829058632229012,
+          "reference_airless_altitude_deg": -14.074848,
+          "timestamp_utc": "2024-03-10T03:00:00+00:00"
+        },
+        {
+          "error_deg": 1.1607977563646337,
+          "model_altitude_deg": -22.143189243635366,
+          "reference_airless_altitude_deg": -23.303987,
+          "timestamp_utc": "2024-03-10T04:00:00+00:00"
+        },
+        {
+          "error_deg": 1.0503236727631702,
+          "model_altitude_deg": -30.93441832723683,
+          "reference_airless_altitude_deg": -31.984742,
+          "timestamp_utc": "2024-03-10T05:00:00+00:00"
+        },
+        {
+          "error_deg": 0.9242514356357887,
+          "model_altitude_deg": -38.64173556436421,
+          "reference_airless_altitude_deg": -39.565987,
+          "timestamp_utc": "2024-03-10T06:00:00+00:00"
+        },
+        {
+          "error_deg": 0.7985769745052238,
+          "model_altitude_deg": -44.490869025494774,
+          "reference_airless_altitude_deg": -45.289446,
+          "timestamp_utc": "2024-03-10T07:00:00+00:00"
+        },
+        {
+          "error_deg": 0.6969080067029481,
+          "model_altitude_deg": -47.55760299329705,
+          "reference_airless_altitude_deg": -48.254511,
+          "timestamp_utc": "2024-03-10T08:00:00+00:00"
+        },
+        {
+          "error_deg": 0.6449651986631579,
+          "model_altitude_deg": -47.162341801336844,
+          "reference_airless_altitude_deg": -47.807307,
+          "timestamp_utc": "2024-03-10T09:00:00+00:00"
+        },
+        {
+          "error_deg": 0.6527324576743609,
+          "model_altitude_deg": -43.37697254232564,
+          "reference_airless_altitude_deg": -44.029705,
+          "timestamp_utc": "2024-03-10T10:00:00+00:00"
+        },
+        {
+          "error_deg": 0.7053297407928625,
+          "model_altitude_deg": -36.954506259207136,
+          "reference_airless_altitude_deg": -37.659836,
+          "timestamp_utc": "2024-03-10T11:00:00+00:00"
+        },
+        {
+          "error_deg": 0.7766407635394614,
+          "model_altitude_deg": -28.791709236460537,
+          "reference_airless_altitude_deg": -29.56835,
+          "timestamp_utc": "2024-03-10T12:00:00+00:00"
+        },
+        {
+          "error_deg": 0.8436507243785947,
+          "model_altitude_deg": -19.602565275621405,
+          "reference_airless_altitude_deg": -20.446216,
+          "timestamp_utc": "2024-03-10T13:00:00+00:00"
+        },
+        {
+          "error_deg": 0.8905493428113846,
+          "model_altitude_deg": -9.895125657188615,
+          "reference_airless_altitude_deg": -10.785675,
+          "timestamp_utc": "2024-03-10T14:00:00+00:00"
+        },
+        {
+          "error_deg": 0.9081375633473152,
+          "model_altitude_deg": -0.04997743665268479,
+          "reference_airless_altitude_deg": -0.958115,
+          "timestamp_utc": "2024-03-10T15:00:00+00:00"
+        },
+        {
+          "error_deg": 0.8927604631817729,
+          "model_altitude_deg": 9.599362463181773,
+          "reference_airless_altitude_deg": 8.706602,
+          "timestamp_utc": "2024-03-10T16:00:00+00:00"
+        },
+        {
+          "error_deg": 0.8457641126656377,
+          "model_altitude_deg": 18.69811011266564,
+          "reference_airless_altitude_deg": 17.852346,
+          "timestamp_utc": "2024-03-10T17:00:00+00:00"
+        },
+        {
+          "error_deg": 0.7735225553508478,
+          "model_altitude_deg": 26.808491555350848,
+          "reference_airless_altitude_deg": 26.034969,
+          "timestamp_utc": "2024-03-10T18:00:00+00:00"
+        },
+        {
+          "error_deg": 0.6879319673462234,
+          "model_altitude_deg": 33.36283296734622,
+          "reference_airless_altitude_deg": 32.674901,
+          "timestamp_utc": "2024-03-10T19:00:00+00:00"
+        },
+        {
+          "error_deg": 0.6065736004552775,
+          "model_altitude_deg": 37.681567600455274,
+          "reference_airless_altitude_deg": 37.074994,
+          "timestamp_utc": "2024-03-10T20:00:00+00:00"
+        },
+        {
+          "error_deg": 0.5495883038871341,
+          "model_altitude_deg": 39.14684030388713,
+          "reference_airless_altitude_deg": 38.597252,
+          "timestamp_utc": "2024-03-10T21:00:00+00:00"
+        },
+        {
+          "error_deg": 0.5301303267348842,
+          "model_altitude_deg": 37.516283326734886,
+          "reference_airless_altitude_deg": 36.986153,
+          "timestamp_utc": "2024-03-10T22:00:00+00:00"
+        },
+        {
+          "error_deg": 0.5450423355041778,
+          "model_altitude_deg": 33.08912033550418,
+          "reference_airless_altitude_deg": 32.544078,
+          "timestamp_utc": "2024-03-10T23:00:00+00:00"
+        }
+      ],
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "reference_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27301%27&OBJ_DATA=%27NO%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&CENTER=%27coord%40399%27&COORD_TYPE=%27GEODETIC%27&SITE_COORD=%27-123.7%2C48.275%2C0%27&START_TIME=%272024-03-10+00%3A00%27&STOP_TIME=%272024-03-10+23%3A00%27&STEP_SIZE=%2760+m%27&QUANTITIES=%274%27&CSV_FORMAT=%27YES%27&APPARENT=%27AIRLESS%27&TIME_TYPE=%27UT%27&ELEV_CUT=%27-90%27",
+      "response_sha256": "3efecc182eeebffa6440c651369fd875e0e142095afa2fe6e8ca1d3cf320e117"
+    },
+    {
+      "body": "sun",
+      "date": "2024-06-20",
+      "hours": [
+        {
+          "error_deg": 0.00021651080052009775,
+          "model_altitude_deg": 39.72965951080052,
+          "reference_airless_altitude_deg": 39.729443,
+          "timestamp_utc": "2024-06-20T00:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0004997356526743602,
+          "model_altitude_deg": 29.778559735652674,
+          "reference_airless_altitude_deg": 29.77806,
+          "timestamp_utc": "2024-06-20T01:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0006300184384535612,
+          "model_altitude_deg": 19.908431018438453,
+          "reference_airless_altitude_deg": 19.907801,
+          "timestamp_utc": "2024-06-20T02:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0006190538361234843,
+          "model_altitude_deg": 10.451852053836124,
+          "reference_airless_altitude_deg": 10.451233,
+          "timestamp_utc": "2024-06-20T03:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0004869113244456713,
+          "model_altitude_deg": 1.7284699113244457,
+          "reference_airless_altitude_deg": 1.727983,
+          "timestamp_utc": "2024-06-20T04:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0002609096208230355,
+          "model_altitude_deg": -5.9071550903791765,
+          "reference_airless_altitude_deg": -5.907416,
+          "timestamp_utc": "2024-06-20T05:00:00+00:00"
+        },
+        {
+          "error_deg": -1.7860004399850027e-05,
+          "model_altitude_deg": -12.0498898600044,
+          "reference_airless_altitude_deg": -12.049872,
+          "timestamp_utc": "2024-06-20T06:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0002905238008743538,
+          "model_altitude_deg": -16.270092523800873,
+          "reference_airless_altitude_deg": -16.269802,
+          "timestamp_utc": "2024-06-20T07:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0004951833455884014,
+          "model_altitude_deg": -18.19543718334559,
+          "reference_airless_altitude_deg": -18.194942,
+          "timestamp_utc": "2024-06-20T08:00:00+00:00"
+        },
+        {
+          "error_deg": -0.000584890748989153,
+          "model_altitude_deg": -17.629319890748988,
+          "reference_airless_altitude_deg": -17.628735,
+          "timestamp_utc": "2024-06-20T09:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0005572509003517467,
+          "model_altitude_deg": -14.631493250900352,
+          "reference_airless_altitude_deg": -14.630936,
+          "timestamp_utc": "2024-06-20T10:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0004486276744977147,
+          "model_altitude_deg": -9.492232627674499,
+          "reference_airless_altitude_deg": -9.491784,
+          "timestamp_utc": "2024-06-20T11:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0003153555858221857,
+          "model_altitude_deg": -2.623316355585822,
+          "reference_airless_altitude_deg": -2.623001,
+          "timestamp_utc": "2024-06-20T12:00:00+00:00"
+        },
+        {
+          "error_deg": -0.00021323834606956638,
+          "model_altitude_deg": 5.55003376165393,
+          "reference_airless_altitude_deg": 5.550247,
+          "timestamp_utc": "2024-06-20T13:00:00+00:00"
+        },
+        {
+          "error_deg": -0.00018213008039147383,
+          "model_altitude_deg": 14.645183869919608,
+          "reference_airless_altitude_deg": 14.645366,
+          "timestamp_utc": "2024-06-20T14:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0002513350441653017,
+          "model_altitude_deg": 24.327204664955836,
+          "reference_airless_altitude_deg": 24.327456,
+          "timestamp_utc": "2024-06-20T15:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0004396864284359481,
+          "model_altitude_deg": 34.27869431357156,
+          "reference_airless_altitude_deg": 34.279134,
+          "timestamp_utc": "2024-06-20T16:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0007538456660967086,
+          "model_altitude_deg": 44.1342541543339,
+          "reference_airless_altitude_deg": 44.135008,
+          "timestamp_utc": "2024-06-20T17:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0011849389112512654,
+          "model_altitude_deg": 53.34524206108875,
+          "reference_airless_altitude_deg": 53.346427,
+          "timestamp_utc": "2024-06-20T18:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0016525894200611901,
+          "model_altitude_deg": 60.89380941057994,
+          "reference_airless_altitude_deg": 60.895462,
+          "timestamp_utc": "2024-06-20T19:00:00+00:00"
+        },
+        {
+          "error_deg": -0.001853944459881518,
+          "model_altitude_deg": 64.94341005554011,
+          "reference_airless_altitude_deg": 64.945264,
+          "timestamp_utc": "2024-06-20T20:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0014278511126804005,
+          "model_altitude_deg": 63.71034514888732,
+          "reference_airless_altitude_deg": 63.711773,
+          "timestamp_utc": "2024-06-20T21:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0006759346675764277,
+          "model_altitude_deg": 57.82055806533242,
+          "reference_airless_altitude_deg": 57.821234,
+          "timestamp_utc": "2024-06-20T22:00:00+00:00"
+        },
+        {
+          "error_deg": -1.8826362413904008e-05,
+          "model_altitude_deg": 49.355214173637584,
+          "reference_airless_altitude_deg": 49.355233,
+          "timestamp_utc": "2024-06-20T23:00:00+00:00"
+        }
+      ],
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "reference_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%2710%27&OBJ_DATA=%27NO%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&CENTER=%27coord%40399%27&COORD_TYPE=%27GEODETIC%27&SITE_COORD=%27-123.7%2C48.275%2C0%27&START_TIME=%272024-06-20+00%3A00%27&STOP_TIME=%272024-06-20+23%3A00%27&STEP_SIZE=%2760+m%27&QUANTITIES=%274%27&CSV_FORMAT=%27YES%27&APPARENT=%27AIRLESS%27&TIME_TYPE=%27UT%27&ELEV_CUT=%27-90%27",
+      "response_sha256": "8659a705ed2286f8f15b929cb62e9461cd05bb15b5408bdad31d947a62ff7d2e"
+    },
+    {
+      "body": "moon",
+      "date": "2024-06-20",
+      "hours": [
+        {
+          "error_deg": 1.2768174908788303,
+          "model_altitude_deg": -21.82490650912117,
+          "reference_airless_altitude_deg": -23.101724,
+          "timestamp_utc": "2024-06-20T00:00:00+00:00"
+        },
+        {
+          "error_deg": 1.2904544153346595,
+          "model_altitude_deg": -12.79965658466534,
+          "reference_airless_altitude_deg": -14.090111,
+          "timestamp_utc": "2024-06-20T01:00:00+00:00"
+        },
+        {
+          "error_deg": 1.258866601104109,
+          "model_altitude_deg": -4.456539398895891,
+          "reference_airless_altitude_deg": -5.715406,
+          "timestamp_utc": "2024-06-20T02:00:00+00:00"
+        },
+        {
+          "error_deg": 1.1847168071482264,
+          "model_altitude_deg": 2.8977918071482263,
+          "reference_airless_altitude_deg": 1.713075,
+          "timestamp_utc": "2024-06-20T03:00:00+00:00"
+        },
+        {
+          "error_deg": 1.0734928259254293,
+          "model_altitude_deg": 8.91964682592543,
+          "reference_airless_altitude_deg": 7.846154,
+          "timestamp_utc": "2024-06-20T04:00:00+00:00"
+        },
+        {
+          "error_deg": 0.9348346730946204,
+          "model_altitude_deg": 13.24579667309462,
+          "reference_airless_altitude_deg": 12.310962,
+          "timestamp_utc": "2024-06-20T05:00:00+00:00"
+        },
+        {
+          "error_deg": 0.7830963937640227,
+          "model_altitude_deg": 15.550406393764023,
+          "reference_airless_altitude_deg": 14.76731,
+          "timestamp_utc": "2024-06-20T06:00:00+00:00"
+        },
+        {
+          "error_deg": 0.635288730792281,
+          "model_altitude_deg": 15.631473730792282,
+          "reference_airless_altitude_deg": 14.996185,
+          "timestamp_utc": "2024-06-20T07:00:00+00:00"
+        },
+        {
+          "error_deg": 0.5056951846904774,
+          "model_altitude_deg": 13.481556184690477,
+          "reference_airless_altitude_deg": 12.975861,
+          "timestamp_utc": "2024-06-20T08:00:00+00:00"
+        },
+        {
+          "error_deg": 0.40033261638197715,
+          "model_altitude_deg": 9.290270616381978,
+          "reference_airless_altitude_deg": 8.889938,
+          "timestamp_utc": "2024-06-20T09:00:00+00:00"
+        },
+        {
+          "error_deg": 0.3157814973687554,
+          "model_altitude_deg": 3.3762864973687554,
+          "reference_airless_altitude_deg": 3.060505,
+          "timestamp_utc": "2024-06-20T10:00:00+00:00"
+        },
+        {
+          "error_deg": 0.2426722553303602,
+          "model_altitude_deg": -3.9004867446696396,
+          "reference_airless_altitude_deg": -4.143159,
+          "timestamp_utc": "2024-06-20T11:00:00+00:00"
+        },
+        {
+          "error_deg": 0.1704492585242523,
+          "model_altitude_deg": -12.199460741475749,
+          "reference_airless_altitude_deg": -12.36991,
+          "timestamp_utc": "2024-06-20T12:00:00+00:00"
+        },
+        {
+          "error_deg": 0.09086928071922529,
+          "model_altitude_deg": -21.220998719280775,
+          "reference_airless_altitude_deg": -21.311868,
+          "timestamp_utc": "2024-06-20T13:00:00+00:00"
+        },
+        {
+          "error_deg": 5.748873269340038e-05,
+          "model_altitude_deg": -30.698113511267305,
+          "reference_airless_altitude_deg": -30.698171,
+          "timestamp_utc": "2024-06-20T14:00:00+00:00"
+        },
+        {
+          "error_deg": -0.09972344440691927,
+          "model_altitude_deg": -40.36486744440692,
+          "reference_airless_altitude_deg": -40.265144,
+          "timestamp_utc": "2024-06-20T15:00:00+00:00"
+        },
+        {
+          "error_deg": -0.1962878959289327,
+          "model_altitude_deg": -49.890366895928935,
+          "reference_airless_altitude_deg": -49.694079,
+          "timestamp_utc": "2024-06-20T16:00:00+00:00"
+        },
+        {
+          "error_deg": -0.25627975853743834,
+          "model_altitude_deg": -58.72730075853744,
+          "reference_airless_altitude_deg": -58.471021,
+          "timestamp_utc": "2024-06-20T17:00:00+00:00"
+        },
+        {
+          "error_deg": -0.19699869885158705,
+          "model_altitude_deg": -65.75226969885159,
+          "reference_airless_altitude_deg": -65.555271,
+          "timestamp_utc": "2024-06-20T18:00:00+00:00"
+        },
+        {
+          "error_deg": 0.10519977667789249,
+          "model_altitude_deg": -68.8368392233221,
+          "reference_airless_altitude_deg": -68.942039,
+          "timestamp_utc": "2024-06-20T19:00:00+00:00"
+        },
+        {
+          "error_deg": 0.5562434417239928,
+          "model_altitude_deg": -66.32836455827601,
+          "reference_airless_altitude_deg": -66.884608,
+          "timestamp_utc": "2024-06-20T20:00:00+00:00"
+        },
+        {
+          "error_deg": 0.9093296688085246,
+          "model_altitude_deg": -59.64147633119148,
+          "reference_airless_altitude_deg": -60.550806,
+          "timestamp_utc": "2024-06-20T21:00:00+00:00"
+        },
+        {
+          "error_deg": 1.144164737437528,
+          "model_altitude_deg": -50.99398226256247,
+          "reference_airless_altitude_deg": -52.138147,
+          "timestamp_utc": "2024-06-20T22:00:00+00:00"
+        },
+        {
+          "error_deg": 1.3029251651409908,
+          "model_altitude_deg": -41.60491683485901,
+          "reference_airless_altitude_deg": -42.907842,
+          "timestamp_utc": "2024-06-20T23:00:00+00:00"
+        }
+      ],
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "reference_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27301%27&OBJ_DATA=%27NO%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&CENTER=%27coord%40399%27&COORD_TYPE=%27GEODETIC%27&SITE_COORD=%27-123.7%2C48.275%2C0%27&START_TIME=%272024-06-20+00%3A00%27&STOP_TIME=%272024-06-20+23%3A00%27&STEP_SIZE=%2760+m%27&QUANTITIES=%274%27&CSV_FORMAT=%27YES%27&APPARENT=%27AIRLESS%27&TIME_TYPE=%27UT%27&ELEV_CUT=%27-90%27",
+      "response_sha256": "ffa91480116109652e06738b106a9f5f52d42f6cccc99981b68ec328814715ac"
+    },
+    {
+      "body": "sun",
+      "date": "2024-11-03",
+      "hours": [
+        {
+          "error_deg": 0.004681370622839687,
+          "model_altitude_deg": 7.02132237062284,
+          "reference_airless_altitude_deg": 7.016641,
+          "timestamp_utc": "2024-11-03T00:00:00+00:00"
+        },
+        {
+          "error_deg": 0.004729704420121772,
+          "model_altitude_deg": -1.9103902955798782,
+          "reference_airless_altitude_deg": -1.91512,
+          "timestamp_utc": "2024-11-03T01:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0046963814106888435,
+          "model_altitude_deg": -11.532176618589311,
+          "reference_airless_altitude_deg": -11.536873,
+          "timestamp_utc": "2024-11-03T02:00:00+00:00"
+        },
+        {
+          "error_deg": 0.004582682209282041,
+          "model_altitude_deg": -21.47928831779072,
+          "reference_airless_altitude_deg": -21.483871,
+          "timestamp_utc": "2024-11-03T03:00:00+00:00"
+        },
+        {
+          "error_deg": 0.004396461138902907,
+          "model_altitude_deg": -31.383165538861096,
+          "reference_airless_altitude_deg": -31.387562,
+          "timestamp_utc": "2024-11-03T04:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0041462597914119215,
+          "model_altitude_deg": -40.781638740208585,
+          "reference_airless_altitude_deg": -40.785785,
+          "timestamp_utc": "2024-11-03T05:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0038373818209436195,
+          "model_altitude_deg": -48.97407261817906,
+          "reference_airless_altitude_deg": -48.97791,
+          "timestamp_utc": "2024-11-03T06:00:00+00:00"
+        },
+        {
+          "error_deg": 0.003446186070540591,
+          "model_altitude_deg": -54.843189813929456,
+          "reference_airless_altitude_deg": -54.846636,
+          "timestamp_utc": "2024-11-03T07:00:00+00:00"
+        },
+        {
+          "error_deg": 0.002957126903787355,
+          "model_altitude_deg": -56.97039487309621,
+          "reference_airless_altitude_deg": -56.973352,
+          "timestamp_utc": "2024-11-03T08:00:00+00:00"
+        },
+        {
+          "error_deg": 0.002491785675353242,
+          "model_altitude_deg": -54.63093421432465,
+          "reference_airless_altitude_deg": -54.633426,
+          "timestamp_utc": "2024-11-03T09:00:00+00:00"
+        },
+        {
+          "error_deg": 0.002230888251524732,
+          "model_altitude_deg": -48.617554111748476,
+          "reference_airless_altitude_deg": -48.619785,
+          "timestamp_utc": "2024-11-03T10:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0021926700176848613,
+          "model_altitude_deg": -40.350588329982315,
+          "reference_airless_altitude_deg": -40.352781,
+          "timestamp_utc": "2024-11-03T11:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0022927300590218636,
+          "model_altitude_deg": -30.924796269940977,
+          "reference_airless_altitude_deg": -30.927089,
+          "timestamp_utc": "2024-11-03T12:00:00+00:00"
+        },
+        {
+          "error_deg": 0.002454368622345271,
+          "model_altitude_deg": -21.025166631377655,
+          "reference_airless_altitude_deg": -21.027621,
+          "timestamp_utc": "2024-11-03T13:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0026313853148884903,
+          "model_altitude_deg": -11.107141614685112,
+          "reference_airless_altitude_deg": -11.109773,
+          "timestamp_utc": "2024-11-03T14:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0028059491183036744,
+          "model_altitude_deg": -1.5382740508816963,
+          "reference_airless_altitude_deg": -1.54108,
+          "timestamp_utc": "2024-11-03T15:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0029819328269535816,
+          "model_altitude_deg": 7.3142679328269535,
+          "reference_airless_altitude_deg": 7.311286,
+          "timestamp_utc": "2024-11-03T16:00:00+00:00"
+        },
+        {
+          "error_deg": 0.003171301556125883,
+          "model_altitude_deg": 15.029151301556126,
+          "reference_airless_altitude_deg": 15.02598,
+          "timestamp_utc": "2024-11-03T17:00:00+00:00"
+        },
+        {
+          "error_deg": 0.003392547768804377,
+          "model_altitude_deg": 21.109333547768806,
+          "reference_airless_altitude_deg": 21.105941,
+          "timestamp_utc": "2024-11-03T18:00:00+00:00"
+        },
+        {
+          "error_deg": 0.003650417967907771,
+          "model_altitude_deg": 25.02084941796791,
+          "reference_airless_altitude_deg": 25.017199,
+          "timestamp_utc": "2024-11-03T19:00:00+00:00"
+        },
+        {
+          "error_deg": 0.00392512038856907,
+          "model_altitude_deg": 26.32246312038857,
+          "reference_airless_altitude_deg": 26.318538,
+          "timestamp_utc": "2024-11-03T20:00:00+00:00"
+        },
+        {
+          "error_deg": 0.004184196948411767,
+          "model_altitude_deg": 24.845426196948413,
+          "reference_airless_altitude_deg": 24.841242,
+          "timestamp_utc": "2024-11-03T21:00:00+00:00"
+        },
+        {
+          "error_deg": 0.004398005835060559,
+          "model_altitude_deg": 20.77959500583506,
+          "reference_airless_altitude_deg": 20.775197,
+          "timestamp_utc": "2024-11-03T22:00:00+00:00"
+        },
+        {
+          "error_deg": 0.004554091544282102,
+          "model_altitude_deg": 14.576968091544282,
+          "reference_airless_altitude_deg": 14.572414,
+          "timestamp_utc": "2024-11-03T23:00:00+00:00"
+        }
+      ],
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "reference_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%2710%27&OBJ_DATA=%27NO%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&CENTER=%27coord%40399%27&COORD_TYPE=%27GEODETIC%27&SITE_COORD=%27-123.7%2C48.275%2C0%27&START_TIME=%272024-11-03+00%3A00%27&STOP_TIME=%272024-11-03+23%3A00%27&STEP_SIZE=%2760+m%27&QUANTITIES=%274%27&CSV_FORMAT=%27YES%27&APPARENT=%27AIRLESS%27&TIME_TYPE=%27UT%27&ELEV_CUT=%27-90%27",
+      "response_sha256": "de9118b31aefd605ccdda8714f7aa7d9e5507ff7361add2c1cf8481f894d9256"
+    },
+    {
+      "body": "moon",
+      "date": "2024-11-03",
+      "hours": [
+        {
+          "error_deg": 0.4829796769844643,
+          "model_altitude_deg": 7.280452676984464,
+          "reference_airless_altitude_deg": 6.797473,
+          "timestamp_utc": "2024-11-03T00:00:00+00:00"
+        },
+        {
+          "error_deg": 0.4184294423002868,
+          "model_altitude_deg": 0.07727844230028677,
+          "reference_airless_altitude_deg": -0.341151,
+          "timestamp_utc": "2024-11-03T01:00:00+00:00"
+        },
+        {
+          "error_deg": 0.3578150688434718,
+          "model_altitude_deg": -8.216017931156529,
+          "reference_airless_altitude_deg": -8.573833,
+          "timestamp_utc": "2024-11-03T02:00:00+00:00"
+        },
+        {
+          "error_deg": 0.29232136838563605,
+          "model_altitude_deg": -17.272209631614363,
+          "reference_airless_altitude_deg": -17.564531,
+          "timestamp_utc": "2024-11-03T03:00:00+00:00"
+        },
+        {
+          "error_deg": 0.21728495088602529,
+          "model_altitude_deg": -26.804495049113974,
+          "reference_airless_altitude_deg": -27.02178,
+          "timestamp_utc": "2024-11-03T04:00:00+00:00"
+        },
+        {
+          "error_deg": 0.13382452119473243,
+          "model_altitude_deg": -36.535071478805264,
+          "reference_airless_altitude_deg": -36.668896,
+          "timestamp_utc": "2024-11-03T05:00:00+00:00"
+        },
+        {
+          "error_deg": 0.05152281929576219,
+          "model_altitude_deg": -46.133414180704236,
+          "reference_airless_altitude_deg": -46.184937,
+          "timestamp_utc": "2024-11-03T06:00:00+00:00"
+        },
+        {
+          "error_deg": -0.004687893191999137,
+          "model_altitude_deg": -55.087422893192,
+          "reference_airless_altitude_deg": -55.082735,
+          "timestamp_utc": "2024-11-03T07:00:00+00:00"
+        },
+        {
+          "error_deg": 0.02038331929640691,
+          "model_altitude_deg": -62.42353168070359,
+          "reference_airless_altitude_deg": -62.443915,
+          "timestamp_utc": "2024-11-03T08:00:00+00:00"
+        },
+        {
+          "error_deg": 0.20719347949417966,
+          "model_altitude_deg": -66.35081152050581,
+          "reference_airless_altitude_deg": -66.558005,
+          "timestamp_utc": "2024-11-03T09:00:00+00:00"
+        },
+        {
+          "error_deg": 0.5239437371922406,
+          "model_altitude_deg": -65.12213226280775,
+          "reference_airless_altitude_deg": -65.646076,
+          "timestamp_utc": "2024-11-03T10:00:00+00:00"
+        },
+        {
+          "error_deg": 0.8062622999206681,
+          "model_altitude_deg": -59.39623770007933,
+          "reference_airless_altitude_deg": -60.2025,
+          "timestamp_utc": "2024-11-03T11:00:00+00:00"
+        },
+        {
+          "error_deg": 1.0082239496130825,
+          "model_altitude_deg": -51.23005405038692,
+          "reference_airless_altitude_deg": -52.238278,
+          "timestamp_utc": "2024-11-03T12:00:00+00:00"
+        },
+        {
+          "error_deg": 1.1514695615219495,
+          "model_altitude_deg": -42.02126743847805,
+          "reference_airless_altitude_deg": -43.172737,
+          "timestamp_utc": "2024-11-03T13:00:00+00:00"
+        },
+        {
+          "error_deg": 1.249245749142652,
+          "model_altitude_deg": -32.486033250857346,
+          "reference_airless_altitude_deg": -33.735279,
+          "timestamp_utc": "2024-11-03T14:00:00+00:00"
+        },
+        {
+          "error_deg": 1.3054692873538265,
+          "model_altitude_deg": -23.033849712646173,
+          "reference_airless_altitude_deg": -24.339319,
+          "timestamp_utc": "2024-11-03T15:00:00+00:00"
+        },
+        {
+          "error_deg": 1.3210523248059811,
+          "model_altitude_deg": -13.964947675194018,
+          "reference_airless_altitude_deg": -15.286,
+          "timestamp_utc": "2024-11-03T16:00:00+00:00"
+        },
+        {
+          "error_deg": 1.2970214100941817,
+          "model_altitude_deg": -5.558938589905818,
+          "reference_airless_altitude_deg": -6.85596,
+          "timestamp_utc": "2024-11-03T17:00:00+00:00"
+        },
+        {
+          "error_deg": 1.2360178328024984,
+          "model_altitude_deg": 1.8830458328024986,
+          "reference_airless_altitude_deg": 0.647028,
+          "timestamp_utc": "2024-11-03T18:00:00+00:00"
+        },
+        {
+          "error_deg": 1.1432989272008571,
+          "model_altitude_deg": 8.023334927200857,
+          "reference_airless_altitude_deg": 6.880036,
+          "timestamp_utc": "2024-11-03T19:00:00+00:00"
+        },
+        {
+          "error_deg": 1.0276218668125665,
+          "model_altitude_deg": 12.502366866812567,
+          "reference_airless_altitude_deg": 11.474745,
+          "timestamp_utc": "2024-11-03T20:00:00+00:00"
+        },
+        {
+          "error_deg": 0.9014894146892072,
+          "model_altitude_deg": 14.991574414689207,
+          "reference_airless_altitude_deg": 14.090085,
+          "timestamp_utc": "2024-11-03T21:00:00+00:00"
+        },
+        {
+          "error_deg": 0.7794062695523465,
+          "model_altitude_deg": 15.277105269552347,
+          "reference_airless_altitude_deg": 14.497699,
+          "timestamp_utc": "2024-11-03T22:00:00+00:00"
+        },
+        {
+          "error_deg": 0.6735073136426433,
+          "model_altitude_deg": 13.332917313642643,
+          "reference_airless_altitude_deg": 12.65941,
+          "timestamp_utc": "2024-11-03T23:00:00+00:00"
+        }
+      ],
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "reference_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27301%27&OBJ_DATA=%27NO%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&CENTER=%27coord%40399%27&COORD_TYPE=%27GEODETIC%27&SITE_COORD=%27-123.7%2C48.275%2C0%27&START_TIME=%272024-11-03+00%3A00%27&STOP_TIME=%272024-11-03+23%3A00%27&STEP_SIZE=%2760+m%27&QUANTITIES=%274%27&CSV_FORMAT=%27YES%27&APPARENT=%27AIRLESS%27&TIME_TYPE=%27UT%27&ELEV_CUT=%27-90%27",
+      "response_sha256": "cd2198f6f8ab7bc5e8aa398bd9dc55bc99b9ec1da9238c85b570eef4cd65a521"
+    },
+    {
+      "body": "sun",
+      "date": "2024-06-20",
+      "hours": [
+        {
+          "error_deg": -0.0008627489975836511,
+          "model_altitude_deg": 40.28196525100242,
+          "reference_airless_altitude_deg": 40.282828,
+          "timestamp_utc": "2024-06-20T00:00:00+00:00"
+        },
+        {
+          "error_deg": -0.00068375843498103,
+          "model_altitude_deg": 36.66576324156502,
+          "reference_airless_altitude_deg": 36.666447,
+          "timestamp_utc": "2024-06-20T01:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0005088833695410244,
+          "model_altitude_deg": 32.17581211663046,
+          "reference_airless_altitude_deg": 32.176321,
+          "timestamp_utc": "2024-06-20T02:00:00+00:00"
+        },
+        {
+          "error_deg": -0.00036707848364869733,
+          "model_altitude_deg": 27.19833092151635,
+          "reference_airless_altitude_deg": 27.198698,
+          "timestamp_utc": "2024-06-20T03:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0002720809727030371,
+          "model_altitude_deg": 22.082747919027298,
+          "reference_airless_altitude_deg": 22.08302,
+          "timestamp_utc": "2024-06-20T04:00:00+00:00"
+        },
+        {
+          "error_deg": -0.00022698057777148506,
+          "model_altitude_deg": 17.13750601942223,
+          "reference_airless_altitude_deg": 17.137733,
+          "timestamp_utc": "2024-06-20T05:00:00+00:00"
+        },
+        {
+          "error_deg": -0.00022642054314481186,
+          "model_altitude_deg": 12.636891579456854,
+          "reference_airless_altitude_deg": 12.637118,
+          "timestamp_utc": "2024-06-20T06:00:00+00:00"
+        },
+        {
+          "error_deg": -0.00025898268082080733,
+          "model_altitude_deg": 8.825918017319179,
+          "reference_airless_altitude_deg": 8.826177,
+          "timestamp_utc": "2024-06-20T07:00:00+00:00"
+        },
+        {
+          "error_deg": -0.00031167302874735014,
+          "model_altitude_deg": 5.917784326971253,
+          "reference_airless_altitude_deg": 5.918096,
+          "timestamp_utc": "2024-06-20T08:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0003666154516075437,
+          "model_altitude_deg": 4.083256384548393,
+          "reference_airless_altitude_deg": 4.083623,
+          "timestamp_utc": "2024-06-20T09:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0004129004728121721,
+          "model_altitude_deg": 3.435217099527188,
+          "reference_airless_altitude_deg": 3.43563,
+          "timestamp_utc": "2024-06-20T10:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0004421038718724901,
+          "model_altitude_deg": 4.014687896128128,
+          "reference_airless_altitude_deg": 4.01513,
+          "timestamp_utc": "2024-06-20T11:00:00+00:00"
+        },
+        {
+          "error_deg": -0.00045510636126966375,
+          "model_altitude_deg": 5.78496789363873,
+          "reference_airless_altitude_deg": 5.785423,
+          "timestamp_utc": "2024-06-20T12:00:00+00:00"
+        },
+        {
+          "error_deg": -0.00046139980022985583,
+          "model_altitude_deg": 8.63689860019977,
+          "reference_airless_altitude_deg": 8.63736,
+          "timestamp_utc": "2024-06-20T13:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0004719373145132266,
+          "model_altitude_deg": 12.402547062685487,
+          "reference_airless_altitude_deg": 12.403019,
+          "timestamp_utc": "2024-06-20T14:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0004997592566233777,
+          "model_altitude_deg": 16.870760240743376,
+          "reference_airless_altitude_deg": 16.87126,
+          "timestamp_utc": "2024-06-20T15:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0005561454773364005,
+          "model_altitude_deg": 21.798176854522662,
+          "reference_airless_altitude_deg": 21.798733,
+          "timestamp_utc": "2024-06-20T16:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0006450047328421249,
+          "model_altitude_deg": 26.912243995267158,
+          "reference_airless_altitude_deg": 26.912889,
+          "timestamp_utc": "2024-06-20T17:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0007632376569262078,
+          "model_altitude_deg": 31.906657762343073,
+          "reference_airless_altitude_deg": 31.907421,
+          "timestamp_utc": "2024-06-20T18:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0008952133996871225,
+          "model_altitude_deg": 36.43438178660031,
+          "reference_airless_altitude_deg": 36.435277,
+          "timestamp_utc": "2024-06-20T19:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0010130651231250454,
+          "model_altitude_deg": 40.110705934876876,
+          "reference_airless_altitude_deg": 40.111719,
+          "timestamp_utc": "2024-06-20T20:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0010812285715502412,
+          "model_altitude_deg": 42.54741277142845,
+          "reference_airless_altitude_deg": 42.548494,
+          "timestamp_utc": "2024-06-20T21:00:00+00:00"
+        },
+        {
+          "error_deg": -0.0010659275090247888,
+          "model_altitude_deg": 43.434653072490974,
+          "reference_airless_altitude_deg": 43.435719,
+          "timestamp_utc": "2024-06-20T22:00:00+00:00"
+        },
+        {
+          "error_deg": -0.000958417718507576,
+          "model_altitude_deg": 42.64665258228149,
+          "reference_airless_altitude_deg": 42.647611,
+          "timestamp_utc": "2024-06-20T23:00:00+00:00"
+        }
+      ],
+      "latitude": 70.0,
+      "longitude": -150.0,
+      "reference_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%2710%27&OBJ_DATA=%27NO%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&CENTER=%27coord%40399%27&COORD_TYPE=%27GEODETIC%27&SITE_COORD=%27-150.0%2C70.0%2C0%27&START_TIME=%272024-06-20+00%3A00%27&STOP_TIME=%272024-06-20+23%3A00%27&STEP_SIZE=%2760+m%27&QUANTITIES=%274%27&CSV_FORMAT=%27YES%27&APPARENT=%27AIRLESS%27&TIME_TYPE=%27UT%27&ELEV_CUT=%27-90%27",
+      "response_sha256": "44c892108a7d673eda50ec25c2ee5637e642a327788bd1eb9b098d39c3c804d6"
+    },
+    {
+      "body": "moon",
+      "date": "2024-06-20",
+      "hours": [
+        {
+          "error_deg": 0.8351259974759415,
+          "model_altitude_deg": -34.06796100252406,
+          "reference_airless_altitude_deg": -34.903087,
+          "timestamp_utc": "2024-06-20T00:00:00+00:00"
+        },
+        {
+          "error_deg": 0.9024356222223879,
+          "model_altitude_deg": -29.39848937777761,
+          "reference_airless_altitude_deg": -30.300925,
+          "timestamp_utc": "2024-06-20T01:00:00+00:00"
+        },
+        {
+          "error_deg": 0.9452249519508058,
+          "model_altitude_deg": -24.577651048049194,
+          "reference_airless_altitude_deg": -25.522876,
+          "timestamp_utc": "2024-06-20T02:00:00+00:00"
+        },
+        {
+          "error_deg": 0.9629644639979773,
+          "model_altitude_deg": -19.888718536002024,
+          "reference_airless_altitude_deg": -20.851683,
+          "timestamp_utc": "2024-06-20T03:00:00+00:00"
+        },
+        {
+          "error_deg": 0.9566064295307974,
+          "model_altitude_deg": -15.581105570469202,
+          "reference_airless_altitude_deg": -16.537712,
+          "timestamp_utc": "2024-06-20T04:00:00+00:00"
+        },
+        {
+          "error_deg": 0.9284094430459433,
+          "model_altitude_deg": -11.875667556954056,
+          "reference_airless_altitude_deg": -12.804077,
+          "timestamp_utc": "2024-06-20T05:00:00+00:00"
+        },
+        {
+          "error_deg": 0.8818428249341288,
+          "model_altitude_deg": -8.964520175065871,
+          "reference_airless_altitude_deg": -9.846363,
+          "timestamp_utc": "2024-06-20T06:00:00+00:00"
+        },
+        {
+          "error_deg": 0.8213744492881743,
+          "model_altitude_deg": -7.0045505507118255,
+          "reference_airless_altitude_deg": -7.825925,
+          "timestamp_utc": "2024-06-20T07:00:00+00:00"
+        },
+        {
+          "error_deg": 0.7520290699327301,
+          "model_altitude_deg": -6.10665493006727,
+          "reference_airless_altitude_deg": -6.858684,
+          "timestamp_utc": "2024-06-20T08:00:00+00:00"
+        },
+        {
+          "error_deg": 0.6787197872681991,
+          "model_altitude_deg": -6.324902212731801,
+          "reference_airless_altitude_deg": -7.003622,
+          "timestamp_utc": "2024-06-20T09:00:00+00:00"
+        },
+        {
+          "error_deg": 0.605510834046175,
+          "model_altitude_deg": -7.650447165953825,
+          "reference_airless_altitude_deg": -8.255958,
+          "timestamp_utc": "2024-06-20T10:00:00+00:00"
+        },
+        {
+          "error_deg": 0.5351213847852136,
+          "model_altitude_deg": -10.013177615214786,
+          "reference_airless_altitude_deg": -10.548299,
+          "timestamp_utc": "2024-06-20T11:00:00+00:00"
+        },
+        {
+          "error_deg": 0.4688957751133831,
+          "model_altitude_deg": -13.290437224886617,
+          "reference_airless_altitude_deg": -13.759333,
+          "timestamp_utc": "2024-06-20T12:00:00+00:00"
+        },
+        {
+          "error_deg": 0.40729577753462465,
+          "model_altitude_deg": -17.318942222465374,
+          "reference_airless_altitude_deg": -17.726238,
+          "timestamp_utc": "2024-06-20T13:00:00+00:00"
+        },
+        {
+          "error_deg": 0.35074581522149373,
+          "model_altitude_deg": -21.905022184778506,
+          "reference_airless_altitude_deg": -22.255768,
+          "timestamp_utc": "2024-06-20T14:00:00+00:00"
+        },
+        {
+          "error_deg": 0.3006374841307142,
+          "model_altitude_deg": -26.829512515869286,
+          "reference_airless_altitude_deg": -27.13015,
+          "timestamp_utc": "2024-06-20T15:00:00+00:00"
+        },
+        {
+          "error_deg": 0.26026992074780253,
+          "model_altitude_deg": -31.845812079252198,
+          "reference_airless_altitude_deg": -32.106082,
+          "timestamp_utc": "2024-06-20T16:00:00+00:00"
+        },
+        {
+          "error_deg": 0.23555043886666738,
+          "model_altitude_deg": -36.67221756113333,
+          "reference_airless_altitude_deg": -36.907768,
+          "timestamp_utc": "2024-06-20T17:00:00+00:00"
+        },
+        {
+          "error_deg": 0.23501129335075888,
+          "model_altitude_deg": -40.98374170664924,
+          "reference_airless_altitude_deg": -41.218753,
+          "timestamp_utc": "2024-06-20T18:00:00+00:00"
+        },
+        {
+          "error_deg": 0.26821812717751925,
+          "model_altitude_deg": -44.41622687282248,
+          "reference_airless_altitude_deg": -44.684445,
+          "timestamp_utc": "2024-06-20T19:00:00+00:00"
+        },
+        {
+          "error_deg": 0.3415072998019042,
+          "model_altitude_deg": -46.6045387001981,
+          "reference_airless_altitude_deg": -46.946046,
+          "timestamp_utc": "2024-06-20T20:00:00+00:00"
+        },
+        {
+          "error_deg": 0.45204015369176176,
+          "model_altitude_deg": -47.26979984630824,
+          "reference_airless_altitude_deg": -47.72184,
+          "timestamp_utc": "2024-06-20T21:00:00+00:00"
+        },
+        {
+          "error_deg": 0.5855538374109699,
+          "model_altitude_deg": -46.32427416258903,
+          "reference_airless_altitude_deg": -46.909828,
+          "timestamp_utc": "2024-06-20T22:00:00+00:00"
+        },
+        {
+          "error_deg": 0.7221614451074316,
+          "model_altitude_deg": -43.91240755489257,
+          "reference_airless_altitude_deg": -44.634569,
+          "timestamp_utc": "2024-06-20T23:00:00+00:00"
+        }
+      ],
+      "latitude": 70.0,
+      "longitude": -150.0,
+      "reference_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27301%27&OBJ_DATA=%27NO%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&CENTER=%27coord%40399%27&COORD_TYPE=%27GEODETIC%27&SITE_COORD=%27-150.0%2C70.0%2C0%27&START_TIME=%272024-06-20+00%3A00%27&STOP_TIME=%272024-06-20+23%3A00%27&STEP_SIZE=%2760+m%27&QUANTITIES=%274%27&CSV_FORMAT=%27YES%27&APPARENT=%27AIRLESS%27&TIME_TYPE=%27UT%27&ELEV_CUT=%27-90%27",
+      "response_sha256": "9e84b62aa34e36677d10523f1588ed810f6640bb013d10ef8448b64d3fbe9aa5"
+    },
+    {
+      "body": "sun",
+      "date": "2024-12-21",
+      "hours": [
+        {
+          "error_deg": 0.006079861471575576,
+          "model_altitude_deg": -5.928829138528425,
+          "reference_airless_altitude_deg": -5.934909,
+          "timestamp_utc": "2024-12-21T00:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0062904345437981846,
+          "model_altitude_deg": -8.841024565456202,
+          "reference_airless_altitude_deg": -8.847315,
+          "timestamp_utc": "2024-12-21T01:00:00+00:00"
+        },
+        {
+          "error_deg": 0.006431397127197869,
+          "model_altitude_deg": -12.654868602872803,
+          "reference_airless_altitude_deg": -12.6613,
+          "timestamp_utc": "2024-12-21T02:00:00+00:00"
+        },
+        {
+          "error_deg": 0.00649929525840065,
+          "model_altitude_deg": -17.157138704741598,
+          "reference_airless_altitude_deg": -17.163638,
+          "timestamp_utc": "2024-12-21T03:00:00+00:00"
+        },
+        {
+          "error_deg": 0.006492671778286052,
+          "model_altitude_deg": -22.102854328221714,
+          "reference_airless_altitude_deg": -22.109347,
+          "timestamp_utc": "2024-12-21T04:00:00+00:00"
+        },
+        {
+          "error_deg": 0.006410833401758964,
+          "model_altitude_deg": -27.21778116659824,
+          "reference_airless_altitude_deg": -27.224192,
+          "timestamp_utc": "2024-12-21T05:00:00+00:00"
+        },
+        {
+          "error_deg": 0.006253170239688188,
+          "model_altitude_deg": -32.19352782976031,
+          "reference_airless_altitude_deg": -32.199781,
+          "timestamp_utc": "2024-12-21T06:00:00+00:00"
+        },
+        {
+          "error_deg": 0.006013531599457167,
+          "model_altitude_deg": -36.68073046840054,
+          "reference_airless_altitude_deg": -36.686744,
+          "timestamp_utc": "2024-12-21T07:00:00+00:00"
+        },
+        {
+          "error_deg": 0.005689433397222388,
+          "model_altitude_deg": -40.29330656660278,
+          "reference_airless_altitude_deg": -40.298996,
+          "timestamp_utc": "2024-12-21T08:00:00+00:00"
+        },
+        {
+          "error_deg": 0.005284087779720892,
+          "model_altitude_deg": -42.64515591222028,
+          "reference_airless_altitude_deg": -42.65044,
+          "timestamp_utc": "2024-12-21T09:00:00+00:00"
+        },
+        {
+          "error_deg": 0.004826799821358918,
+          "model_altitude_deg": -43.434639200178644,
+          "reference_airless_altitude_deg": -43.439466,
+          "timestamp_utc": "2024-12-21T10:00:00+00:00"
+        },
+        {
+          "error_deg": 0.00437661039047299,
+          "model_altitude_deg": -42.549515389609525,
+          "reference_airless_altitude_deg": -42.553892,
+          "timestamp_utc": "2024-12-21T11:00:00+00:00"
+        },
+        {
+          "error_deg": 0.004001427551777681,
+          "model_altitude_deg": -40.11521857244822,
+          "reference_airless_altitude_deg": -40.11922,
+          "timestamp_utc": "2024-12-21T12:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0037480151388962213,
+          "model_altitude_deg": -36.4412389848611,
+          "reference_airless_altitude_deg": -36.444987,
+          "timestamp_utc": "2024-12-21T13:00:00+00:00"
+        },
+        {
+          "error_deg": 0.00363066267701484,
+          "model_altitude_deg": -31.915524337322985,
+          "reference_airless_altitude_deg": -31.919155,
+          "timestamp_utc": "2024-12-21T14:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0036374546743864755,
+          "model_altitude_deg": -26.922610545325615,
+          "reference_airless_altitude_deg": -26.926248,
+          "timestamp_utc": "2024-12-21T15:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0037475277166727494,
+          "model_altitude_deg": -21.809414472283326,
+          "reference_airless_altitude_deg": -21.813162,
+          "timestamp_utc": "2024-12-21T16:00:00+00:00"
+        },
+        {
+          "error_deg": 0.003940183153879673,
+          "model_altitude_deg": -16.88214181684612,
+          "reference_airless_altitude_deg": -16.886082,
+          "timestamp_utc": "2024-12-21T17:00:00+00:00"
+        },
+        {
+          "error_deg": 0.004198587563012168,
+          "model_altitude_deg": -12.413258412436988,
+          "reference_airless_altitude_deg": -12.417457,
+          "timestamp_utc": "2024-12-21T18:00:00+00:00"
+        },
+        {
+          "error_deg": 0.004507899645938451,
+          "model_altitude_deg": -8.646059100354062,
+          "reference_airless_altitude_deg": -8.650567,
+          "timestamp_utc": "2024-12-21T19:00:00+00:00"
+        },
+        {
+          "error_deg": 0.0048512237792674995,
+          "model_altitude_deg": -5.791675776220733,
+          "reference_airless_altitude_deg": -5.796527,
+          "timestamp_utc": "2024-12-21T20:00:00+00:00"
+        },
+        {
+          "error_deg": 0.00520895542858657,
+          "model_altitude_deg": -4.018095044571414,
+          "reference_airless_altitude_deg": -4.023304,
+          "timestamp_utc": "2024-12-21T21:00:00+00:00"
+        },
+        {
+          "error_deg": 0.005562365777426859,
+          "model_altitude_deg": -3.434622634222573,
+          "reference_airless_altitude_deg": -3.440185,
+          "timestamp_utc": "2024-12-21T22:00:00+00:00"
+        },
+        {
+          "error_deg": 0.005887411625348449,
+          "model_altitude_deg": -4.078195588374651,
+          "reference_airless_altitude_deg": -4.084083,
+          "timestamp_utc": "2024-12-21T23:00:00+00:00"
+        }
+      ],
+      "latitude": 70.0,
+      "longitude": -150.0,
+      "reference_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%2710%27&OBJ_DATA=%27NO%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&CENTER=%27coord%40399%27&COORD_TYPE=%27GEODETIC%27&SITE_COORD=%27-150.0%2C70.0%2C0%27&START_TIME=%272024-12-21+00%3A00%27&STOP_TIME=%272024-12-21+23%3A00%27&STEP_SIZE=%2760+m%27&QUANTITIES=%274%27&CSV_FORMAT=%27YES%27&APPARENT=%27AIRLESS%27&TIME_TYPE=%27UT%27&ELEV_CUT=%27-90%27",
+      "response_sha256": "bc0a234ad21e212dd334489cd1e4bfe23d0a7b63284a5efa82ee09ade8d3e85b"
+    },
+    {
+      "body": "moon",
+      "date": "2024-12-21",
+      "hours": [
+        {
+          "error_deg": 1.3589422572431014,
+          "model_altitude_deg": -4.537084742756899,
+          "reference_airless_altitude_deg": -5.896027,
+          "timestamp_utc": "2024-12-21T00:00:00+00:00"
+        },
+        {
+          "error_deg": 1.364288303355555,
+          "model_altitude_deg": -7.4673476966444445,
+          "reference_airless_altitude_deg": -8.831636,
+          "timestamp_utc": "2024-12-21T01:00:00+00:00"
+        },
+        {
+          "error_deg": 1.3697676923089457,
+          "model_altitude_deg": -9.290051307691055,
+          "reference_airless_altitude_deg": -10.659819,
+          "timestamp_utc": "2024-12-21T02:00:00+00:00"
+        },
+        {
+          "error_deg": 1.3758227943233443,
+          "model_altitude_deg": -9.886407205676656,
+          "reference_airless_altitude_deg": -11.26223,
+          "timestamp_utc": "2024-12-21T03:00:00+00:00"
+        },
+        {
+          "error_deg": 1.3822466197932624,
+          "model_altitude_deg": -9.223942380206738,
+          "reference_airless_altitude_deg": -10.606189,
+          "timestamp_utc": "2024-12-21T04:00:00+00:00"
+        },
+        {
+          "error_deg": 1.388223262328883,
+          "model_altitude_deg": -7.3638447376711165,
+          "reference_airless_altitude_deg": -8.752068,
+          "timestamp_utc": "2024-12-21T05:00:00+00:00"
+        },
+        {
+          "error_deg": 1.3924993650593604,
+          "model_altitude_deg": -4.45101663494064,
+          "reference_airless_altitude_deg": -5.843516,
+          "timestamp_utc": "2024-12-21T06:00:00+00:00"
+        },
+        {
+          "error_deg": 1.3936238234845377,
+          "model_altitude_deg": -0.6923291765154621,
+          "reference_airless_altitude_deg": -2.085953,
+          "timestamp_utc": "2024-12-21T07:00:00+00:00"
+        },
+        {
+          "error_deg": 1.3902759783839067,
+          "model_altitude_deg": 3.666554978383907,
+          "reference_airless_altitude_deg": 2.276279,
+          "timestamp_utc": "2024-12-21T08:00:00+00:00"
+        },
+        {
+          "error_deg": 1.3816277595598052,
+          "model_altitude_deg": 8.357763759559806,
+          "reference_airless_altitude_deg": 6.976136,
+          "timestamp_utc": "2024-12-21T09:00:00+00:00"
+        },
+        {
+          "error_deg": 1.3676327567318207,
+          "model_altitude_deg": 13.099016756731821,
+          "reference_airless_altitude_deg": 11.731384,
+          "timestamp_utc": "2024-12-21T10:00:00+00:00"
+        },
+        {
+          "error_deg": 1.3491435496811484,
+          "model_altitude_deg": 17.595617549681148,
+          "reference_airless_altitude_deg": 16.246474,
+          "timestamp_utc": "2024-12-21T11:00:00+00:00"
+        },
+        {
+          "error_deg": 1.3278076855208454,
+          "model_altitude_deg": 21.543013685520844,
+          "reference_airless_altitude_deg": 20.215206,
+          "timestamp_utc": "2024-12-21T12:00:00+00:00"
+        },
+        {
+          "error_deg": 1.3057614903624142,
+          "model_altitude_deg": 24.638293490362415,
+          "reference_airless_altitude_deg": 23.332532,
+          "timestamp_utc": "2024-12-21T13:00:00+00:00"
+        },
+        {
+          "error_deg": 1.2852537221300366,
+          "model_altitude_deg": 26.608102722130038,
+          "reference_airless_altitude_deg": 25.322849,
+          "timestamp_utc": "2024-12-21T14:00:00+00:00"
+        },
+        {
+          "error_deg": 1.2683126540270848,
+          "model_altitude_deg": 27.252721654027084,
+          "reference_airless_altitude_deg": 25.984409,
+          "timestamp_utc": "2024-12-21T15:00:00+00:00"
+        },
+        {
+          "error_deg": 1.2564703330839109,
+          "model_altitude_deg": 26.49099333308391,
+          "reference_airless_altitude_deg": 25.234523,
+          "timestamp_utc": "2024-12-21T16:00:00+00:00"
+        },
+        {
+          "error_deg": 1.2504163038821225,
+          "model_altitude_deg": 24.380781303882124,
+          "reference_airless_altitude_deg": 23.130365,
+          "timestamp_utc": "2024-12-21T17:00:00+00:00"
+        },
+        {
+          "error_deg": 1.249670197173245,
+          "model_altitude_deg": 21.101170197173246,
+          "reference_airless_altitude_deg": 19.8515,
+          "timestamp_utc": "2024-12-21T18:00:00+00:00"
+        },
+        {
+          "error_deg": 1.2526270918884848,
+          "model_altitude_deg": 16.908652091888484,
+          "reference_airless_altitude_deg": 15.656025,
+          "timestamp_utc": "2024-12-21T19:00:00+00:00"
+        },
+        {
+          "error_deg": 1.2570789618512794,
+          "model_altitude_deg": 12.092654961851279,
+          "reference_airless_altitude_deg": 10.835576,
+          "timestamp_utc": "2024-12-21T20:00:00+00:00"
+        },
+        {
+          "error_deg": 1.260980509896882,
+          "model_altitude_deg": 6.946923509896882,
+          "reference_airless_altitude_deg": 5.685943,
+          "timestamp_utc": "2024-12-21T21:00:00+00:00"
+        },
+        {
+          "error_deg": 1.2630859367360818,
+          "model_altitude_deg": 1.7581779367360817,
+          "reference_airless_altitude_deg": 0.495092,
+          "timestamp_utc": "2024-12-21T22:00:00+00:00"
+        },
+        {
+          "error_deg": 1.2632486593590664,
+          "model_altitude_deg": -3.1948053406409334,
+          "reference_airless_altitude_deg": -4.458054,
+          "timestamp_utc": "2024-12-21T23:00:00+00:00"
+        }
+      ],
+      "latitude": 70.0,
+      "longitude": -150.0,
+      "reference_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27301%27&OBJ_DATA=%27NO%27&MAKE_EPHEM=%27YES%27&EPHEM_TYPE=%27OBSERVER%27&CENTER=%27coord%40399%27&COORD_TYPE=%27GEODETIC%27&SITE_COORD=%27-150.0%2C70.0%2C0%27&START_TIME=%272024-12-21+00%3A00%27&STOP_TIME=%272024-12-21+23%3A00%27&STEP_SIZE=%2760+m%27&QUANTITIES=%274%27&CSV_FORMAT=%27YES%27&APPARENT=%27AIRLESS%27&TIME_TYPE=%27UT%27&ELEV_CUT=%27-90%27",
+      "response_sha256": "7ecf5088c7bd1ce295252cbef86cdf11cf87124a3866c2c31943aa61b405f64d"
+    }
+  ],
+  "comparison_method": "jpl-horizons-airless-altitude-hourly-v1",
+  "dark_visible_hourly": [
+    {
+      "date": "2024-01-02",
+      "hourly_count_difference": 0,
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "model_hourly_dark_visible_count": 9,
+      "reference_hourly_dark_visible_count": 9
+    },
+    {
+      "date": "2024-03-10",
+      "hourly_count_difference": 0,
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "model_hourly_dark_visible_count": 0,
+      "reference_hourly_dark_visible_count": 0
+    },
+    {
+      "date": "2024-06-20",
+      "hourly_count_difference": 0,
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "model_hourly_dark_visible_count": 5,
+      "reference_hourly_dark_visible_count": 5
+    },
+    {
+      "date": "2024-11-03",
+      "hourly_count_difference": 0,
+      "latitude": 48.275,
+      "longitude": -123.7,
+      "model_hourly_dark_visible_count": 0,
+      "reference_hourly_dark_visible_count": 0
+    },
+    {
+      "date": "2024-06-20",
+      "hourly_count_difference": 0,
+      "latitude": 70.0,
+      "longitude": -150.0,
+      "model_hourly_dark_visible_count": 0,
+      "reference_hourly_dark_visible_count": 0
+    },
+    {
+      "date": "2024-12-21",
+      "hourly_count_difference": 0,
+      "latitude": 70.0,
+      "longitude": -150.0,
+      "model_hourly_dark_visible_count": 12,
+      "reference_hourly_dark_visible_count": 12
+    }
+  ],
+  "limitations": [
+    "Horizons airless apparent altitude includes high-precision effects absent from the toolkit approximations.",
+    "Zero-meter geodetic observer height and no terrain horizon are assumed.",
+    "Hourly samples at two locations on four regional and two polar dates do not establish multiyear regional accuracy.",
+    "Dark-visible counts use hourly UTC snapshots, not the product's 30-minute local-civil-day integration."
+  ],
+  "metrics": {
+    "moon": {
+      "bias_deg": 0.764242023871329,
+      "count": 144,
+      "mae_deg": 0.7747139362451745,
+      "max_absolute_error_deg": 1.3936238234845377,
+      "passes_prespecified_limits": true,
+      "prespecified_limits_deg": {
+        "mae": 6.0,
+        "max_absolute_error": 12.0
+      }
+    },
+    "sun": {
+      "bias_deg": 0.0028186785189672106,
+      "count": 144,
+      "mae_deg": 0.003168271329611889,
+      "max_absolute_error_deg": 0.006988569698023417,
+      "passes_prespecified_limits": true,
+      "prespecified_limits_deg": {
+        "mae": 2.0,
+        "max_absolute_error": 5.0
+      }
+    }
+  },
+  "reference_retrieved_at_utc": "2026-10-01T21:03:22.450829+00:00",
+  "reference_sha256": "51b416064922c8fd36f8600d68dd6149334ed6399fb8962e25bc1bbd5438a555",
+  "reference_source": "NASA JPL Horizons observer ephemeris, airless apparent azimuth/elevation, quantity 4"
+}

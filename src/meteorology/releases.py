@@ -6,14 +6,19 @@ import argparse
 import json
 import shutil
 import uuid
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
 import pyarrow.parquet as pq
 
-from .artifacts import checksum_path, resolve_portable_path, stable_hash, write_manifest
+from .artifacts import (
+    checksum_path, family_publication_parent, resolve_portable_path, stable_hash,
+    write_manifest,
+)
+from .core.artifacts import TransactionalFamilyPublisher
 from .validation import validate_product
-from .surface_weather.storage import resolve_raw_relative
+from .surface_weather.storage import acquisition_read_locks, inventory_raw_root, resolve_raw_relative
 
 
 def _copy_verified(source: Path, destination: Path, checksum: str) -> None:
@@ -39,6 +44,23 @@ def freeze_release(manifest_path: str | Path, output_root: str | Path) -> Path:
     For surface weather, also copy every sample and crosswalk addressed by the
     canonical acquisition inventory. This is an explicit potentially large copy.
     """
+
+    source_manifest = Path(manifest_path).resolve()
+    preview = json.loads(source_manifest.read_text(encoding="utf-8"))
+    product = preview.get("product")
+    with ExitStack() as stack:
+        if product == "meteorological.surface_weather.download" and not preview.get("archived_hrrr_samples"):
+            inventory = resolve_portable_path(preview["artifacts"][0]["path"], base=source_manifest.parent)
+            stack.enter_context(acquisition_read_locks(source_manifest.parent, inventory_raw_root(inventory)))
+        else:
+            parent = family_publication_parent(source_manifest, preview)
+            if (parent / ".publication.lock").exists():
+                stack.enter_context(TransactionalFamilyPublisher.read_locks([parent]))
+        return _freeze_locked(source_manifest, output_root)
+
+
+def _freeze_locked(manifest_path: Path, output_root: str | Path) -> Path:
+    """Copy a single already pinned manifest generation."""
 
     validate_product(manifest_path)
     source_manifest = Path(manifest_path).resolve()
@@ -83,7 +105,7 @@ def freeze_release(manifest_path: str | Path, output_root: str | Path) -> Path:
         if inventory_source is not None:
             assert inventory_archive is not None
             inventory = pq.read_table(inventory_source).to_pandas()
-            raw_root = inventory_source.parent
+            raw_root = inventory_raw_root(inventory_source)
             count = 0
             for row in inventory.itertuples(index=False):
                 for relative_field, checksum_field in (("RELATIVE_PATH", "CHECKSUM"), ("CROSSWALK_RELATIVE_PATH", "CROSSWALK_CHECKSUM")):

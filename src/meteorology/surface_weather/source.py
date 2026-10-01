@@ -13,8 +13,10 @@ import pyarrow as pa
 
 from .source_validation import (
     BoundingBox,
+    _lat_lon_for_values,
     dataset_to_flat_variable_grid,
     infer_required_hrrr_variables,
+    validate_grid_coverage,
     validate_decoded_source_times,
 )
 
@@ -289,7 +291,9 @@ def normalize_flat_grid(
     if output[RAW_COLUMNS].isna().any().any():
         null_columns = output.columns[output.isna().any()].tolist()
         raise ValueError(f"HRRR raw source grid contains null values: {null_columns}")
-    return output[RAW_COLUMNS]
+    result = output[RAW_COLUMNS]
+    result.attrs.update(flat.attrs)
+    return result
 
 
 def fetch_cropped_hrrr_fields(
@@ -346,6 +350,18 @@ def fetch_cropped_hrrr_fields(
         flat = dataset_to_flat_variable_grid(
             dataset, mapping, padded, pad_deg=0.0, wind_basis=wind_basis
         )
+        first_dataset, first_variable = next(iter(mapping.values()))
+        first_values = first_dataset[first_variable].squeeze(drop=True).values
+        native_lat, native_lon = _lat_lon_for_values(first_dataset, first_values.shape)
+        requested_bounds = BoundingBox(
+            min_lat=float(bbox["min_lat"]), max_lat=float(bbox["max_lat"]),
+            min_lon=float(bbox["min_lon"]), max_lon=float(bbox["max_lon"]),
+        )
+        coverage = validate_grid_coverage(
+            native_lat, native_lon, flat, requested_bounds
+        )
+        flat.attrs["max_nearest_distance_m"] = coverage.max_nearest_distance_m
+        flat.attrs["native_footprint"] = coverage.native_footprint
         if wind_basis is not None:
             flat.attrs["source_wind_basis"] = wind_basis
         units_by_variable: dict[str, str] = {}
@@ -455,7 +471,9 @@ def replace_source_grid_precipitation(
     ):
         raise ValueError("The f00 core and f01 precipitation grid coordinates do not match.")
     left["PRECIP_RATE_KG_M2_S"] = right["PRECIP_RATE_KG_M2_S"].to_numpy(dtype=float)
-    return left[RAW_COLUMNS]
+    result = left[RAW_COLUMNS]
+    result.attrs.update(source_grid.attrs)
+    return result
 
 
 def fetch_cropped_hrrr_grid(

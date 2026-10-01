@@ -13,6 +13,7 @@ from .config import load_meteorological_config
 from .core.data.meteorological_schemas import HRRR_CROSSWALK_SCHEMA, HRRR_INVENTORY_SCHEMA, HRRR_SAMPLE_SCHEMA
 from .core.config.paths import project_root
 from .daily_matrix import export
+from .field_contracts import FIELD_CONTRACT_VERSION
 from .daylight.build import build_daylight
 from .lunar.build import build_lunar
 from .spatial_support.build import build_meteorological_spatial_support, load_meteorological_support
@@ -87,7 +88,8 @@ def build_offline_example(config_path: str | Path = "config/data/environment_met
     acquisition = manifest_payload(
         product="meteorological.surface_weather.download", run_id="synthetic-offline-acquisition",
         config_path=config.path,
-        resolved_config={"start_date": date, "end_date": date, "timezone": weather.timezone,
+        resolved_config={"field_contract_version": FIELD_CONTRACT_VERSION,
+                         "start_date": date, "end_date": date, "timezone": weather.timezone,
                          "interval_hours": 4, "h3_resolution": 5,
                          "availability_lag_hours": 6,
                          "source": {"model": "synthetic_hrrr", "product": "sfc", "forecast_hour": 0,

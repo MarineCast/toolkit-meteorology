@@ -198,6 +198,22 @@ def test_complete_range_all_zero_forecast_precipitation_is_valid(
     assert (daily["PRECIP_MM_DAY_ESTIMATE"] == 0.0).all()
 
 
+def test_spatial_policy_migration_requires_full_overwrite(tmp_path: Path, monkeypatch) -> None:
+    config_path = _fixture_config(tmp_path)
+    build_meteorological_spatial_support(config_path, run_id="fixture-support")
+    calls: list[str] = []
+    _patch_fetch(monkeypatch, calls)
+    download_surface_weather(config_path, run_id="fixture-download")
+    weather = load_meteorological_config(config_path).surface_weather
+    (weather.raw_dir / "SPATIAL_ACCEPTANCE_POLICY.json").unlink()
+    calls.clear()
+    with pytest.raises(ValueError, match="predate spatial acceptance"):
+        download_surface_weather(config_path, run_id="fixture-reuse")
+    assert calls == []
+    download_surface_weather(config_path, run_id="fixture-migrated", overwrite=True)
+    assert len(calls) == 6
+
+
 def test_support_rejects_changed_bounding_box(tmp_path: Path) -> None:
     config_path = _fixture_config(tmp_path)
     build_meteorological_spatial_support(config_path, run_id="fixture-support")
@@ -575,6 +591,190 @@ def test_full_refresh_keeps_old_objects_and_frozen_releases_relocatable(
         assert validate_product(relocated / "weather" / "MANIFEST.json")["valid"]
     finally:
         hidden_raw.rename(config.surface_weather.raw_dir)
+
+
+def test_weather_build_pins_consumed_acquisition_generation_during_refresh(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from importlib import import_module
+    from meteorology.releases import freeze_release
+
+    config_path = _fixture_config(tmp_path)
+    build_meteorological_spatial_support(config_path, run_id="support")
+    _patch_fetch(monkeypatch, [])
+    download_surface_weather(config_path, run_id="generation-a", max_workers=1)
+    config = load_meteorological_config(config_path)
+    old_inventory = pq.read_table(config.surface_weather.inventory_path).to_pandas()
+    old_references = set(old_inventory["RELATIVE_PATH"])
+    build_module = import_module("meteorology.surface_weather.build")
+    download_module = import_module("meteorology.surface_weather.download")
+    original_reader = build_module._read_validated_sample
+    original_fetch = download_module.fetch_cropped_hrrr_grid
+    refreshed = False
+
+    def refresh_before_first_sample(**kwargs):
+        nonlocal refreshed
+        if not refreshed:
+            refreshed = True
+
+            def warmer(**fetch_kwargs):
+                frame, uri = original_fetch(**fetch_kwargs)
+                frame["TEMPERATURE_2M_K"] += 2.0
+                return frame, uri
+
+            monkeypatch.setattr(download_module, "fetch_cropped_hrrr_grid", warmer)
+            download_surface_weather(
+                config_path, run_id="generation-b", overwrite=True, max_workers=1
+            )
+        return original_reader(**kwargs)
+
+    monkeypatch.setattr(build_module, "_read_validated_sample", refresh_before_first_sample)
+    weather_manifest = build_surface_weather(config_path, run_id="consumed-a")[-1]
+    assert refreshed
+    new_inventory = pq.read_table(config.surface_weather.inventory_path).to_pandas()
+    assert old_references.isdisjoint(set(new_inventory["RELATIVE_PATH"]))
+    payload = load_manifest(weather_manifest, verify_artifacts=True)
+    pinned_inventory = Path(payload["inputs"][0]["path"])
+    assert pinned_inventory != config.surface_weather.inventory_path
+    assert set(pq.read_table(pinned_inventory).to_pandas()["RELATIVE_PATH"]) == old_references
+    build_meteorological_spatial_support(config_path, run_id="support-b")
+    assert Path(payload["inputs"][3]["path"]) != config.support_manifest_path
+    load_manifest(Path(payload["inputs"][1]["path"]), verify_artifacts=True)
+    assert validate_product(weather_manifest)["valid"]
+    frozen = freeze_release(weather_manifest, tmp_path / "releases")
+    relocated = tmp_path / "relocated-weather"
+    shutil.move(frozen.parent, relocated)
+    hidden_raw = config.surface_weather.raw_dir.with_name("raw-hidden")
+    config.surface_weather.raw_dir.rename(hidden_raw)
+    try:
+        assert validate_product(relocated / "MANIFEST.json")["valid"]
+    finally:
+        hidden_raw.rename(config.surface_weather.raw_dir)
+
+
+@pytest.mark.parametrize("pressure_pa", [75_000.0, 115_000.0])
+def test_pressure_hard_contract_agrees_through_build_validate_and_freeze(
+    tmp_path: Path, monkeypatch, pressure_pa: float
+) -> None:
+    from meteorology.releases import freeze_release
+    from meteorology.field_contracts import regional_warning_counts
+    from meteorology.surface_weather import download as download_module
+
+    config_path = _fixture_config(tmp_path)
+    build_meteorological_spatial_support(config_path, run_id="support")
+    _patch_fetch(monkeypatch, [])
+    original_fetch = download_module.fetch_cropped_hrrr_grid
+
+    def unusual_pressure(**kwargs):
+        frame, uri = original_fetch(**kwargs)
+        frame["MEAN_SEA_LEVEL_PRESSURE_PA"] = pressure_pa
+        return frame, uri
+
+    monkeypatch.setattr(download_module, "fetch_cropped_hrrr_grid", unusual_pressure)
+    download_surface_weather(config_path, run_id="unusual-pressure", max_workers=1)
+    manifest = build_surface_weather(config_path, run_id="unusual-pressure-weather")[-1]
+    assert validate_product(manifest)["valid"]
+    config = load_meteorological_config(config_path)
+    daily = ds.dataset(config.surface_weather.daily_output_dir, format="parquet", partitioning="hive").to_table().to_pandas()
+    assert set(daily["MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN"]) == {pressure_pa / 100.0}
+    assert regional_warning_counts(daily)["MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN"] == len(daily)
+    assert validate_product(manifest)["regional_warning_counts"]["MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN"] == len(daily)
+    assert validate_product(freeze_release(manifest, tmp_path / "releases"))["valid"]
+
+
+def test_matrix_and_freeze_pin_product_generations_during_refresh(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from importlib import import_module
+    from meteorology.releases import freeze_release
+
+    config_path = _fixture_config(tmp_path)
+    raw_config = yaml.safe_load(config_path.read_text())
+    raw_config["surface_weather"]["output"]["manifest_path"] = str(
+        tmp_path / "custom-manifests/weather.json"
+    )
+    config_path.write_text(yaml.safe_dump(raw_config, sort_keys=False))
+    build_meteorological_spatial_support(config_path, run_id="support")
+    _patch_fetch(monkeypatch, [])
+    download_surface_weather(config_path, run_id="acquisition-a", max_workers=1)
+    weather_manifest = build_surface_weather(config_path, run_id="weather-a")[-1]
+    daylight_manifest = build_daylight(config_path, run_id="daylight")[-1]
+    lunar_manifest = build_lunar(config_path, run_id="lunar")[-1]
+    config = load_meteorological_config(config_path)
+    original_weather = ds.dataset(
+        config.surface_weather.daily_output_dir, format="parquet", partitioning="hive"
+    ).to_table().to_pandas()
+    matrix_module = import_module("meteorology.daily_matrix")
+    download_module = import_module("meteorology.surface_weather.download")
+    original_combine = matrix_module.combine_frames
+    original_fetch = download_module.fetch_cropped_hrrr_grid
+    refreshed = False
+
+    def refresh_during_export(frames):
+        nonlocal refreshed
+        if not refreshed:
+            refreshed = True
+
+            def warmer(**kwargs):
+                frame, uri = original_fetch(**kwargs)
+                frame["TEMPERATURE_2M_K"] += 2.0
+                return frame, uri
+
+            monkeypatch.setattr(download_module, "fetch_cropped_hrrr_grid", warmer)
+            download_surface_weather(config_path, overwrite=True, run_id="acquisition-b", max_workers=1)
+        return original_combine(frames)
+
+    monkeypatch.setattr(matrix_module, "combine_frames", refresh_during_export)
+    matrix_path = export_daily_matrix(
+        [weather_manifest, daylight_manifest, lunar_manifest], tmp_path / "matrix.parquet"
+    )
+    assert refreshed and validate_daily_matrix(matrix_path)["valid"]
+    matrix = pq.read_table(matrix_path).to_pandas()
+    weather_rows = matrix[matrix["H3_RESOLUTION"] == 5].sort_values("H3_INDEX")
+    assert weather_rows["surface_weather__TEMPERATURE_2M_C_MEAN"].tolist() == (
+        original_weather.sort_values("H3_INDEX")["TEMPERATURE_2M_C_MEAN"].tolist()
+    )
+
+    releases_module = import_module("meteorology.releases")
+    original_copy = releases_module._copy_verified
+    tried_rebuild = False
+
+    def rebuild_during_freeze(source, destination, checksum):
+        nonlocal tried_rebuild
+        if not tried_rebuild:
+            tried_rebuild = True
+            with pytest.raises(RuntimeError, match="Publication parent is busy"):
+                build_surface_weather(config_path, run_id="weather-b")
+        return original_copy(source, destination, checksum)
+
+    monkeypatch.setattr(releases_module, "_copy_verified", rebuild_during_freeze)
+    frozen = freeze_release(weather_manifest, tmp_path / "releases")
+    assert tried_rebuild and validate_product(frozen)["valid"]
+
+
+def test_interrupted_metadata_snapshot_does_not_publish_weather(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from importlib import import_module
+
+    config_path = _fixture_config(tmp_path)
+    build_meteorological_spatial_support(config_path, run_id="support")
+    _patch_fetch(monkeypatch, [])
+    download_surface_weather(config_path, run_id="acquisition", max_workers=1)
+    config = load_meteorological_config(config_path)
+    storage = import_module("meteorology.surface_weather.storage")
+    original_copy = storage.shutil.copy2
+
+    def interrupted_copy(*_args, **_kwargs):
+        raise RuntimeError("injected snapshot interruption")
+
+    monkeypatch.setattr(storage.shutil, "copy2", interrupted_copy)
+    with pytest.raises(RuntimeError, match="injected snapshot interruption"):
+        build_surface_weather(config_path, run_id="interrupted")
+    assert not config.surface_weather.manifest_path.exists()
+    assert not list((config.surface_weather.raw_dir / "support_snapshots").glob(".*.part"))
+    monkeypatch.setattr(storage.shutil, "copy2", original_copy)
+    assert validate_product(build_surface_weather(config_path, run_id="recovered")[-1])["valid"]
 
 
 def test_disjoint_acquisitions_do_not_claim_a_complete_interval(tmp_path: Path, monkeypatch) -> None:
@@ -1021,7 +1221,7 @@ def test_custom_acquisition_destination_copies_references(tmp_path: Path, monkey
     _patch_fetch(monkeypatch, [])
     candidate = tmp_path / "candidate-raw"
     inventory = candidate / "HRRR_R5_SOURCE_INVENTORY.parquet"
-    manifest = candidate / "R5_DOWNLOAD_MANIFEST.json"
+    manifest = candidate / "custom-acquisition.json"
     result = download_surface_weather(
         config_path, max_workers=1,
         working_inventory_path=candidate / "HRRR_R5_WORKING_INVENTORY.parquet",
@@ -1029,12 +1229,21 @@ def test_custom_acquisition_destination_copies_references(tmp_path: Path, monkey
     )
     assert result["complete_times"] == 6
     assert validate_product(manifest)["valid"]
+    from meteorology.surface_weather.storage import acquisition_lock
+    with acquisition_lock(candidate, writer=True):
+        with pytest.raises(RuntimeError, match="workspace is busy"):
+            validate_product(manifest)
     references = pq.read_table(inventory).to_pandas()
     assert all(
         (candidate / str(relative)).is_file()
         for field in ("RELATIVE_PATH", "CROSSWALK_RELATIVE_PATH")
         for relative in references[field]
     )
+    weather_manifest = build_surface_weather(
+        config_path, inventory_path=inventory, acquisition_manifest_path=manifest,
+        run_id="custom-consumer",
+    )[-1]
+    assert validate_product(weather_manifest)["valid"]
 
 
 def test_failed_extension_preserves_canonical_and_resumes_working_inventory(

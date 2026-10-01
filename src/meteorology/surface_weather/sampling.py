@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from sklearn.neighbors import BallTree
+from shapely import covers, points
 
 from meteorology.core.data.meteorological_schemas import HRRR_CROSSWALK_SCHEMA as CROSSWALK_SCHEMA
 from meteorology.core.data.meteorological_schemas import HRRR_SAMPLE_SCHEMA as SAMPLE_SCHEMA
@@ -14,6 +15,7 @@ from meteorology.core.data.meteorological_schemas import (
 
 EARTH_RADIUS_M = 6_371_008.8
 AVAILABILITY_POLICY = "assumed_fixed_lag_v1"
+SPATIAL_ACCEPTANCE_POLICY = "decoded-native-footprint-and-spacing-v1"
 
 
 def make_local_dates(start_date: str, end_date: str) -> list[str]:
@@ -76,7 +78,30 @@ def build_nearest_grid_crosswalk(
         or not np.isfinite(frame["SOURCE_GRID_DISTANCE_M"].to_numpy(dtype=float)).all()
     ):
         raise ValueError("Generated HRRR crosswalk is invalid.")
+    validate_crosswalk_distance(frame, source_grid, support)
     return frame[CROSSWALK_SCHEMA.names]
+
+
+def validate_crosswalk_distance(
+    crosswalk: pd.DataFrame, source_grid: pd.DataFrame, support: pd.DataFrame | None = None
+) -> None:
+    """Apply the decoded native grid's distance allowance to new or reused mappings."""
+
+    allowance = source_grid.attrs.get("max_nearest_distance_m")
+    if allowance is not None and (
+        not np.isfinite(float(allowance))
+        or float(allowance) <= 0
+        or (crosswalk["SOURCE_GRID_DISTANCE_M"] > float(allowance)).any()
+    ):
+        raise ValueError("HRRR cropped grid is too far from one or more support centroids.")
+    footprint = source_grid.attrs.get("native_footprint")
+    if footprint is not None and support is not None:
+        sites = points(
+            support["CENTROID_LON"].to_numpy(dtype=float),
+            support["CENTROID_LAT"].to_numpy(dtype=float),
+        )
+        if not covers(footprint, sites).all():
+            raise ValueError("Meteorological support extends beyond the decoded HRRR native footprint.")
 
 
 def sample_source_grid(

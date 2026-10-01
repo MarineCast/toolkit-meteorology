@@ -3,17 +3,21 @@
 from __future__ import annotations
 
 import fcntl
+import json
 import os
 import shutil
 import uuid
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
 import pandas as pd
 import pyarrow as pa
 
-from ..artifacts import sha256_file, write_table
+from ..artifacts import (
+    checksum_path, load_manifest, resolve_portable_path, sha256_file, stable_hash,
+    write_manifest, write_table,
+)
 
 
 def _fsync_directory(path: Path) -> None:
@@ -22,6 +26,18 @@ def _fsync_directory(path: Path) -> None:
         os.fsync(descriptor)
     finally:
         os.close(descriptor)
+
+
+def _fsync_tree(root: Path) -> None:
+    """Make copied snapshot bytes and directory entries durable before promotion."""
+
+    for path in sorted(root.rglob("*"), key=lambda item: len(item.parts), reverse=True):
+        if path.is_file():
+            with path.open("rb") as handle:
+                os.fsync(handle.fileno())
+        elif path.is_dir():
+            _fsync_directory(path)
+    _fsync_directory(root)
 
 
 def publication_needs_recovery(parent: Path) -> bool:
@@ -69,6 +85,134 @@ def acquisition_lock(raw_dir: Path, *, writer: bool) -> Iterator[None]:
             yield
         finally:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+@contextmanager
+def acquisition_read_locks(*roots: Path) -> Iterator[None]:
+    """Read several acquisition publication roots in deterministic order."""
+
+    with ExitStack() as stack:
+        for root in sorted({path.resolve() for path in roots}):
+            stack.enter_context(acquisition_lock(root, writer=False))
+        yield
+
+
+def inventory_raw_root(inventory_path: Path) -> Path:
+    """Find object storage beside a canonical or immutable metadata inventory."""
+
+    parent = inventory_path.resolve().parent
+    if parent.parent.name == "snapshots" and len(parent.name) == 64:
+        try:
+            int(parent.name, 16)
+        except ValueError:
+            pass
+        else:
+            return parent.parent.parent
+    return parent
+
+
+def snapshot_acquisition_metadata(
+    *, raw_dir: Path, inventory_path: Path, manifest_path: Path, manifest: dict,
+    pinned_inputs: dict[Path, Path] | None = None,
+) -> tuple[Path, Path]:
+    """Pin the verified metadata bytes consumed by a weather build.
+
+    The caller holds the acquisition reader locks. Referenced sample objects are
+    already immutable and therefore need no duplicate copies here.
+    """
+
+    inventory_path = inventory_path.resolve()
+    manifest_path = manifest_path.resolve()
+    inventory_checksum = checksum_path(inventory_path)
+    if len(manifest["artifacts"]) != 1 or manifest["artifacts"][0]["checksum"] != inventory_checksum:
+        raise ValueError("Acquisition manifest does not describe the consumed inventory.")
+    key = stable_hash({
+        "inventory": inventory_checksum,
+        "manifest": checksum_path(manifest_path),
+        "pinned_inputs": {str(source): checksum_path(target) for source, target in (pinned_inputs or {}).items()},
+    })
+    snapshots = raw_dir.resolve() / "snapshots"
+    if snapshots.is_symlink():
+        raise ValueError("Acquisition snapshot directory cannot be a symlink.")
+    snapshots.mkdir(parents=True, exist_ok=True)
+    destination = snapshots / key
+    frozen_inventory = destination / inventory_path.name
+    frozen_manifest = destination / manifest_path.name
+    if not destination.exists():
+        temporary = snapshots / f".{uuid.uuid4().hex}.part"
+        temporary.mkdir()
+        try:
+            inventory_copy = temporary / inventory_path.name
+            shutil.copy2(inventory_path, inventory_copy)
+            if checksum_path(inventory_copy) != inventory_checksum:
+                raise ValueError("Acquisition inventory changed while taking its snapshot.")
+            payload = json.loads(json.dumps(manifest))
+            payload["artifacts"][0]["path"] = str(frozen_inventory)
+            for item in payload["inputs"]:
+                source = resolve_portable_path(item["path"], base=manifest_path.parent).resolve()
+                if pinned_inputs and source in pinned_inputs:
+                    item["path"] = str(pinned_inputs[source])
+            contract = payload["artifacts"][0]
+            contract["contract_hash"] = stable_hash(
+                {field: value for field, value in contract.items() if field != "contract_hash"}
+            )
+            write_manifest(temporary / manifest_path.name, payload)
+            _fsync_tree(temporary)
+            try:
+                temporary.rename(destination)
+            except OSError:
+                if not destination.exists():
+                    raise
+            _fsync_directory(snapshots)
+        finally:
+            if temporary.exists():
+                shutil.rmtree(temporary)
+    if checksum_path(frozen_inventory) != inventory_checksum:
+        raise ValueError("Existing acquisition snapshot inventory has changed.")
+    load_manifest(frozen_manifest, verify_artifacts=True)
+    return frozen_inventory, frozen_manifest
+
+
+def snapshot_support_inputs(
+    *, raw_dir: Path, support_path: Path, support_manifest_path: Path
+) -> tuple[Path, Path]:
+    """Retain the exact support artifact and metadata read by a weather build."""
+
+    support_path = support_path.resolve()
+    support_manifest_path = support_manifest_path.resolve()
+    checksums = {path: checksum_path(path) for path in (support_path, support_manifest_path)}
+    key = stable_hash({str(path): value for path, value in checksums.items()})
+    snapshots = raw_dir.resolve() / "support_snapshots"
+    if snapshots.is_symlink():
+        raise ValueError("Support snapshot directory cannot be a symlink.")
+    snapshots.mkdir(parents=True, exist_ok=True)
+    destination = snapshots / key
+    if not destination.exists():
+        temporary = snapshots / f".{uuid.uuid4().hex}.part"
+        temporary.mkdir()
+        try:
+            for source, checksum in checksums.items():
+                target = temporary / source.name
+                if source.is_dir():
+                    shutil.copytree(source, target)
+                else:
+                    shutil.copy2(source, target)
+                if checksum_path(target) != checksum:
+                    raise ValueError(f"Support changed while taking its snapshot: {source}")
+            _fsync_tree(temporary)
+            try:
+                temporary.rename(destination)
+            except OSError:
+                if not destination.exists():
+                    raise
+            _fsync_directory(snapshots)
+        finally:
+            if temporary.exists():
+                shutil.rmtree(temporary)
+    for source, checksum in checksums.items():
+        if checksum_path(destination / source.name) != checksum:
+            raise ValueError(f"Existing support snapshot has changed: {source}")
+    return destination / support_path.name, destination / support_manifest_path.name
 
 
 def write_immutable_table(

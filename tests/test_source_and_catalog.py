@@ -20,6 +20,7 @@ from meteorology.surface_weather.source import (
 )
 from meteorology.surface_weather.source_validation import (
     BoundingBox,
+    validate_grid_coverage,
     dataset_to_flat_variable_grid,
     infer_required_hrrr_variables,
     validate_decoded_source_times,
@@ -310,6 +311,50 @@ def test_nearest_grid_crosswalk_is_source_row_order_invariant() -> None:
         .reset_index(drop=True)
     )
     pd.testing.assert_frame_equal(first, second)
+
+
+def test_native_footprint_and_crop_reject_uncovered_bounds() -> None:
+    lat = np.array([[48.0, 48.0, 48.0], [49.0, 49.0, 49.0], [50.0, 50.0, 50.0]])
+    lon = np.array([[-125.0, -124.0, -123.0]] * 3)
+    cropped = pd.DataFrame({"hrrr_lat": lat.ravel(), "hrrr_lon": lon.ravel()})
+    inside = BoundingBox(48.1, 49.9, -124.9, -123.1)
+    assert validate_grid_coverage(lat, lon, cropped, inside).max_nearest_distance_m > 0
+    outside = BoundingBox(48.1, 50.1, -124.9, -123.1)
+    with pytest.raises(ValueError, match="native footprint"):
+        validate_grid_coverage(lat, lon, cropped, outside)
+    with pytest.raises(ValueError, match="crop is insufficient"):
+        validate_grid_coverage(lat, lon, cropped.iloc[:3], inside)
+
+
+def test_crosswalk_rejects_distance_beyond_decoded_grid_allowance() -> None:
+    support = pd.DataFrame({
+        "H3_INDEX": ["outside"], "CENTROID_LAT": [51.0], "CENTROID_LON": [-124.0]
+    })
+    source = pd.DataFrame({
+        "SOURCE_GRID_INDEX": [0], "SOURCE_LAT": [49.0], "SOURCE_LON": [-124.0],
+        "SOURCE_GRID_HASH": ["fixture"],
+    })
+    source.attrs["max_nearest_distance_m"] = 5000.0
+    with pytest.raises(ValueError, match="too far"):
+        build_nearest_grid_crosswalk(support, source)
+
+
+def test_crosswalk_rejects_centroid_outside_native_footprint() -> None:
+    from shapely.geometry import box
+
+    support = pd.DataFrame({
+        "H3_INDEX": ["outside"], "CENTROID_LAT": [49.1], "CENTROID_LON": [-124.0]
+    })
+    source = pd.DataFrame({
+        "SOURCE_GRID_INDEX": [0], "SOURCE_LAT": [49.0], "SOURCE_LON": [-124.0],
+        "SOURCE_GRID_HASH": ["fixture"],
+    })
+    source.attrs.update({
+        "max_nearest_distance_m": 20000.0,
+        "native_footprint": box(-125.0, 48.0, -123.0, 49.0),
+    })
+    with pytest.raises(ValueError, match="native footprint"):
+        build_nearest_grid_crosswalk(support, source)
 
 
 def test_environment_catalog_never_promotes_metadata_to_features() -> None:

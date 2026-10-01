@@ -14,6 +14,7 @@ from typing import Any
 import pyarrow as pa
 
 from .core.data import meteorological_schemas as schemas
+from .field_contracts import display_range
 from .methods import method_version
 
 
@@ -231,6 +232,10 @@ def catalog() -> dict[str, list[dict[str, Any]]]:
                     "categorical" if field.name == "MOON_PHASE_NAME" else "continuous"
                 )
                 predictor = field.name not in {"DAYLIGHT_WEIGHT", "WEIGHT_DAYLIGHT", "WEIGHT_LUNAR_ILLUMINATION", "WEIGHT_MOONLIT_DARK_HOURS"}
+            shared_range = display_range(field.name)
+            valid_range = (
+                f"{shared_range} or null" if shared_range and field.nullable else shared_range or valid_range
+            )
             rows.append({
                 "name": field.name,
                 "human_name": field.name.replace("_", " ").title(),

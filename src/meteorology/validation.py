@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -18,11 +17,16 @@ import pyarrow.parquet as pq
 from .artifacts import checksum_path, load_manifest, parquet_contract, parquet_files, resolve_portable_path, stable_hash
 from .astronomy import local_civil_day_hours as _local_civil_day_hours
 from .core.data import meteorological_schemas as schemas
+from .field_contracts import (
+    FIELD_CONTRACT_VERSION, INTEGRATED_HOUR_FIELDS, regional_warning_counts,
+    validate_fields,
+)
 from .methods import METHOD_VERSIONS
+from .surface_weather.sampling import SPATIAL_ACCEPTANCE_POLICY
 from .surface_weather.wind import validate_daily_wind_vectors
 from .surface_weather.download import _expected_times, retrieval_matches_object, valid_retrieval_time
 from .surface_weather.source import hrrr_logical_object_uri
-from .surface_weather.storage import acquisition_lock, resolve_raw_relative
+from .surface_weather.storage import acquisition_read_locks, inventory_raw_root, resolve_raw_relative
 
 
 EXPECTED: dict[str, tuple[pa.Schema, ...]] = {
@@ -32,44 +36,6 @@ EXPECTED: dict[str, tuple[pa.Schema, ...]] = {
     "meteorological.daylight": (schemas.DAYLIGHT_SCHEMA, schemas.DAYLIGHT_DOY_SCHEMA),
     "meteorological.lunar": (schemas.LUNAR_SCHEMA,),
 }
-
-RANGES = {
-    "TEMPERATURE_2M_C_MEAN": (-100.0, 70.0),
-    "RELATIVE_HUMIDITY_2M_PCT_MEAN": (0.0, 100.0),
-    "TOTAL_CLOUD_COVER_PCT_MEAN": (0.0, 100.0),
-    "WIND_DIRECTION_FROM_10M_DEG": (0.0, 360.0),
-    "WIND_SPEED_10M_MS_MEAN": (0.0, math.inf),
-    "WIND_SPEED_10M_MS_MAX": (0.0, math.inf),
-    "WIND_VECTOR_SPEED_10M_MS": (0.0, math.inf),
-    "WIND_GUST_SURFACE_MS_MEAN": (0.0, math.inf),
-    "WIND_GUST_SURFACE_MS_MAX": (0.0, math.inf),
-    "VISIBILITY_KM_MEAN": (0.0, math.inf),
-    "VISIBILITY_KM_MIN": (0.0, math.inf),
-    "SOURCE_GRID_DISTANCE_M_MEAN": (0.0, math.inf),
-    "SOURCE_GRID_DISTANCE_M_MAX": (0.0, math.inf),
-    "PRECIP_MM_DAY_ESTIMATE": (0.0, math.inf),
-    "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN": (800.0, 1100.0),
-    "MEAN_SEA_LEVEL_PRESSURE_HPA_MIN": (800.0, 1100.0),
-    "DAYLIGHT_HOURS": (0.0, 24.0),
-    "DAYLIGHT_FRACTION": (0.0, 1.0),
-    "SOLAR_ELEVATION_MAX_DEG": (-90.0, 90.0),
-    "SOLAR_ELEVATION_DAYLIGHT_MEAN_DEG": (0.0, 90.0),
-    "LOW_SUN_DAYLIGHT_HOURS": (0.0, math.inf),
-    "LUNAR_PHASE_ANGLE_DEG": (0.0, 360.0),
-    "LUNAR_ILLUMINATION_FRACTION": (0.0, 1.0),
-    "NIGHT_HOURS": (0.0, math.inf),
-    "MOON_VISIBLE_HOURS": (0.0, math.inf),
-    "MOON_VISIBLE_DARK_HOURS": (0.0, math.inf),
-    "MOONLIT_DARK_HOURS": (0.0, math.inf),
-    "MOON_VISIBLE_DARK_FRACTION": (0.0, 1.0),
-    "MOONLIT_DARK_FRACTION": (0.0, 1.0),
-}
-
-INTEGRATED_HOUR_FIELDS = frozenset({
-    "LOW_SUN_DAYLIGHT_HOURS", "NIGHT_HOURS", "MOON_VISIBLE_HOURS",
-    "MOON_VISIBLE_DARK_HOURS", "MOONLIT_DARK_HOURS",
-})
-
 
 def _validate_frame(
     frame: pd.DataFrame,
@@ -83,17 +49,7 @@ def _validate_frame(
 ) -> None:
     if frame.empty:
         raise ValueError(f"{product}: an artifact partition is empty.")
-    required = [field.name for field in schema if not field.nullable]
-    if frame[required].isna().any().any():
-        raise ValueError(f"{product}: non-nullable fields contain null values.")
-    numeric = frame.select_dtypes(include="number")
-    if np.isinf(numeric.to_numpy(dtype=float)).any():
-        raise ValueError(f"{product}: non-finite numeric value.")
-    for column, (lower, upper) in RANGES.items():
-        if column in frame:
-            values = frame[column].dropna()
-            if (values < lower).any() or (values >= upper if column == "WIND_DIRECTION_FROM_10M_DEG" else values > upper).any():
-                raise ValueError(f"{product}: {column} is outside its declared range.")
+    validate_fields(frame, schema, context=product)
     integrated = INTEGRATED_HOUR_FIELDS.intersection(frame.columns)
     if integrated:
         if not timezone or "DATE" not in frame:
@@ -149,9 +105,15 @@ def validate_product(manifest_path: str | Path) -> dict[str, Any]:
     """Validate manifest, checksums, schemas, primary keys, ranges and coverage."""
 
     path = Path(manifest_path)
-    if path.name == "R5_DOWNLOAD_MANIFEST.json":
-        with acquisition_lock(path.parent, writer=False):
-            return _validate_product_unlocked(path)
+    # The filename is configurable. A frozen release has its own immutable copy
+    # and can be validated without creating a lock file in the archive.
+    preview = json.loads(path.read_text(encoding="utf-8"))
+    if preview.get("product") == "meteorological.surface_weather.download" and not preview.get("archived_hrrr_samples"):
+        with acquisition_read_locks(path.parent):
+            payload = load_manifest(path, verify_artifacts=False)
+            inventory = resolve_portable_path(payload["artifacts"][0]["path"], base=path.parent)
+            with acquisition_read_locks(inventory_raw_root(inventory)):
+                return _validate_product_unlocked(path)
     return _validate_product_unlocked(path)
 
 
@@ -169,6 +131,18 @@ def _validate_product_unlocked(manifest_path: str | Path) -> dict[str, Any]:
         raise ValueError(f"Unsupported product for deep validation: {product}")
     if manifest.get("method_version") != METHOD_VERSIONS[product]:
         raise ValueError(f"{product}: archived method requires its archived deep validator.")
+    if product in {"meteorological.surface_weather.download", "meteorological.surface_weather"} and (
+        manifest.get("resolved_config", {}).get("field_contract_version") != FIELD_CONTRACT_VERSION
+    ):
+        raise ValueError(f"{product}: archived field contract requires its archived deep validator.")
+    if product in {"meteorological.surface_weather.download", "meteorological.surface_weather"}:
+        settings = manifest.get("resolved_config", {})
+        if product == "meteorological.surface_weather.download":
+            model = settings.get("source", {}).get("model", "hrrr")
+        else:
+            model = settings.get("source_model", "hrrr")
+        if model == "hrrr" and settings.get("spatial_acceptance_policy") != SPATIAL_ACCEPTANCE_POLICY:
+            raise ValueError(f"{product}: archived spatial policy requires its archived deep validator.")
     seen_by_schema: dict[tuple[str, ...], set[tuple[str, ...]]] = defaultdict(set)
     dates_by_schema: dict[tuple[str, ...], dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
     artifact_count = 0
@@ -176,6 +150,7 @@ def _validate_product_unlocked(manifest_path: str | Path) -> dict[str, Any]:
     acquisition_frames: list[pd.DataFrame] = []
     acquisition_inventory_source: Path | None = None
     checked_crosswalks: dict[tuple[Path, str, str], set[str]] = {}
+    regional_warnings: dict[str, int] = defaultdict(int)
     for declared in manifest["artifacts"]:
         path = resolve_portable_path(declared["path"], base=Path(manifest_path).parent)
         if manifest["product"] == "meteorological.surface_weather.download":
@@ -199,6 +174,8 @@ def _validate_product_unlocked(manifest_path: str | Path) -> dict[str, Any]:
             _validate_frame(frame, product=product, schema=schema, resolution=resolution,
                             timezone=manifest.get("resolved_config", {}).get("timezone"),
                             seen=seen_by_schema[key], dates=dates_by_schema[key])
+            for field, count in regional_warning_counts(frame).items():
+                regional_warnings[field] += count
             if product == "meteorological.surface_weather.download":
                 acquisition_frames.append(frame)
             total_rows += len(frame)
@@ -221,7 +198,7 @@ def _validate_product_unlocked(manifest_path: str | Path) -> dict[str, Any]:
         synthetic = resolved["source"].get("model") == "synthetic_hrrr"
         if acquisition_inventory_source is None:
             raise ValueError("Acquisition inventory artifact is missing.")
-        raw_root = acquisition_inventory_source.parent
+        raw_root = inventory_raw_root(acquisition_inventory_source)
         for row in inventory.itertuples(index=False):
             valid = pd.Timestamp(row.VALID_TIME_UTC)
             invalid = row.AVAILABLE_AT_UTC != (
@@ -258,6 +235,9 @@ def _validate_product_unlocked(manifest_path: str | Path) -> dict[str, Any]:
             if not sample_file.schema_arrow.equals(schemas.HRRR_SAMPLE_SCHEMA, check_metadata=False):
                 raise ValueError(f"Acquisition sample schema is invalid: {sample}")
             sample_frame = sample_file.read().to_pandas()
+            validate_fields(sample_frame, schemas.HRRR_SAMPLE_SCHEMA, context="Acquisition sample")
+            for field, count in regional_warning_counts(sample_frame).items():
+                regional_warnings[field] += count
             if (
                 len(sample_frame) != int(row.H3_CELL_COUNT)
                 or sample_frame["H3_INDEX"].duplicated().any()
@@ -301,6 +281,7 @@ def _validate_product_unlocked(manifest_path: str | Path) -> dict[str, Any]:
         "artifact_count": artifact_count,
         "row_count": total_rows,
         "manifest_checksum": checksum_path(manifest_path),
+        "regional_warning_counts": dict(regional_warnings),
     }
 
 
@@ -319,6 +300,8 @@ def validate_daily_matrix(path: str | Path) -> dict[str, Any]:
     }
     if metadata.get("schema_version") != 2 or set(metadata.get("native_manifests", {})) != set(native_schemas):
         raise ValueError("Daily matrix has incompatible schema or source manifests.")
+    if metadata.get("field_contract_version") != FIELD_CONTRACT_VERSION:
+        raise ValueError("Daily matrix requires its archived field-contract validator.")
     if metadata.get("method_version") != METHOD_VERSIONS["meteorological.daily_matrix"]:
         raise ValueError("Daily matrix has an incompatible scientific method version.")
     if not isinstance(metadata.get("software_version"), str) or not metadata["software_version"]:
@@ -361,8 +344,11 @@ def validate_daily_matrix(path: str | Path) -> dict[str, Any]:
     native_seen: dict[str, set[tuple[str, ...]]] = defaultdict(set)
     native_dates: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
     rows = 0
+    regional_warnings: dict[str, int] = defaultdict(int)
     for index in range(parquet.num_row_groups):
         frame = parquet.read_row_group(index).to_pandas()
+        for column, count in regional_warning_counts(frame.rename(columns=lambda name: name.split("__", 1)[-1])).items():
+            regional_warnings[column] += count
         for record in frame[["DATE", "H3_INDEX", "H3_RESOLUTION"]].itertuples(index=False, name=None):
             date, cell, resolution = str(record[0]), str(record[1]), int(record[2])
             if not h3.is_valid_cell(cell) or h3.get_resolution(cell) != resolution or resolution not in {4, 5}:
@@ -415,7 +401,7 @@ def validate_daily_matrix(path: str | Path) -> dict[str, Any]:
             raise ValueError(f"Daily matrix R{resolution} support membership varies by date.")
     return {"valid": True, "product": "meteorological.daily_matrix", "row_count": rows,
             "date_count": len(dates), "h3_cell_counts": {str(k): next(iter(v.values())) for k, v in counts.items()},
-            "checksum": checksum_path(path)}
+            "checksum": checksum_path(path), "regional_warning_counts": dict(regional_warnings)}
 
 
 def main() -> int:

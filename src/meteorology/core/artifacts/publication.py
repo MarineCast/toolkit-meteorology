@@ -9,7 +9,7 @@ import re
 import shutil
 import uuid
 from collections.abc import Mapping
-from contextlib import AbstractContextManager, contextmanager
+from contextlib import AbstractContextManager, ExitStack, contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -59,6 +59,31 @@ class TransactionalFamilyPublisher(AbstractContextManager["TransactionalFamilyPu
     """
 
     JOURNAL_SCHEMA_VERSION = 2
+
+    @staticmethod
+    @contextmanager
+    def read_locks(parents):
+        """Pin published families while a consumer reads their files.
+
+        Producers use the same publication lock exclusively. A pending journal
+        requires producer recovery before its files can be consumed.
+        """
+
+        with ExitStack() as stack:
+            for parent in sorted({Path(value).resolve() for value in parents}):
+                lock = parent / ".publication.lock"
+                if not lock.exists():
+                    # A producer creates this file before publishing any family.
+                    raise FileNotFoundError(f"Publication lock is missing: {lock}")
+                handle = stack.enter_context(lock.open("rb"))
+                try:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
+                except BlockingIOError as exc:
+                    raise RuntimeError(f"Publication parent is busy: {parent}") from exc
+                transactions = parent / ".transactions"
+                if transactions.exists() and any(transactions.iterdir()):
+                    raise RuntimeError(f"Publication requires recovery before reading: {parent}")
+            yield
 
     def __init__(self, parent: str | Path, run_id: str | None = None):
         self.parent = Path(parent).resolve()

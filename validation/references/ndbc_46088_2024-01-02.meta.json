@@ -1,0 +1,16 @@
+{
+  "source_url": "https://www.ndbc.noaa.gov/data/historical/stdmet/46088h2024.txt.gz",
+  "retrieved_at_utc": "2026-10-01T20:16:15.596618+00:00",
+  "source_archive_sha256": "1f1aeb24aff4ad6c425fda59e54b2efdbe2de5179a48e17a2ef9dd66421d6813",
+  "selected_records": 144,
+  "station": "46088",
+  "reported_coordinates": [
+    48.332,
+    -123.179
+  ],
+  "reported_anemometer_height_m": 3.8,
+  "reported_air_temperature_height_m": 3.4,
+  "reported_barometer_elevation_m": 2.4,
+  "station_metadata_url": "https://www.ndbc.noaa.gov/station_page.php?station=46088",
+  "measurement_description_url": "https://www.ndbc.noaa.gov/faq/measdes.shtml"
+}

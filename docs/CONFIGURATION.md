@@ -34,6 +34,10 @@ spatial_support:
 
 Bounds are longitude/latitude in degrees. Atmospheric support includes land and water. A very small
 box can contain no H3 centers at the coarsest resolution; the support build rejects empty support.
+The shipped `example_area` ends at 49.70°N because its former northwest corner at
+50.00°N, 125.80°W lies outside the decoded NOAA CONUS HRRR grid. The acquisition now
+checks the native grid footprint and the selected crop before it samples H3 cells.
+Changing the example bounds requires rebuilding spatial support and reacquiring weather.
 
 ## Fixed product contracts
 
