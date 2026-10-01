@@ -35,6 +35,7 @@ from ..artifacts import (
 from ..config import DEFAULT_CONFIG_PATH, load_meteorological_config
 from ..spatial_support.build import load_meteorological_support
 from .sampling import (
+    AVAILABILITY_POLICY,
     CROSSWALK_SCHEMA,
     PRE_F01_SAMPLE_SCHEMA,
     SAMPLE_SCHEMA,
@@ -129,6 +130,7 @@ def _valid_sample(
     support: pd.DataFrame,
     *,
     valid_time_utc: pd.Timestamp | None = None,
+    availability_lag_hours: int | None = None,
 ) -> bool:
     if not path.exists():
         return False
@@ -145,10 +147,20 @@ def _valid_sample(
         return False
     if set(frame["SOURCE_DATA_STATE"].astype(str)) != {"COMPLETE"}:
         return False
+    if set(frame["AVAILABILITY_POLICY"].astype(str)) != {AVAILABILITY_POLICY}:
+        return False
+    if set(frame["WIND_VECTOR_BASIS"].astype(str)) != {"earth_relative"}:
+        return False
+    if not set(frame["SOURCE_WIND_BASIS"].astype(str)).issubset({"grid_relative", "earth_relative"}):
+        return False
     if valid_time_utc is not None:
         valid = pd.Timestamp(valid_time_utc)
         valid = valid.tz_localize("UTC") if valid.tzinfo is None else valid.tz_convert("UTC")
         if set(frame["VALID_TIME_UTC"].astype(str)) != {valid.isoformat()}:
+            return False
+        if availability_lag_hours is not None and set(frame["AVAILABLE_AT_UTC"].astype(str)) != {
+            (valid + pd.Timedelta(hours=availability_lag_hours)).isoformat()
+        }:
             return False
         if set(frame["PRECIP_VALID_TIME_UTC"].astype(str)) != {valid.isoformat()}:
             return False
@@ -166,6 +178,7 @@ def _reusable_core_sample(
     support: pd.DataFrame,
     *,
     valid_time_utc: pd.Timestamp,
+    availability_lag_hours: int,
 ) -> pd.DataFrame | None:
     """Return a checksum-independent cached f00 core sample suitable for precip repair."""
 
@@ -186,10 +199,19 @@ def _reusable_core_sample(
         or frame["H3_INDEX"].duplicated().any()
         or set(frame["H3_INDEX"].astype(str)) != set(support["H3_INDEX"].astype(str))
         or set(frame["SOURCE_DATA_STATE"].astype(str)) != {"COMPLETE"}
+        or set(frame["AVAILABILITY_POLICY"].astype(str)) != {AVAILABILITY_POLICY}
+        or set(frame["WIND_VECTOR_BASIS"].astype(str)) != {"earth_relative"}
+        or not set(frame["SOURCE_WIND_BASIS"].astype(str)).issubset({"grid_relative", "earth_relative"})
     ):
         return None
     valid = pd.Timestamp(valid_time_utc).tz_convert("UTC").isoformat()
     if set(frame["VALID_TIME_UTC"].astype(str)) != {valid}:
+        return None
+    expected_available = (
+        pd.Timestamp(valid_time_utc).tz_convert("UTC")
+        + pd.Timedelta(hours=availability_lag_hours)
+    ).isoformat()
+    if set(frame["AVAILABLE_AT_UTC"].astype(str)) != {expected_available}:
         return None
     core_numeric = [
         column
@@ -322,6 +344,7 @@ def _publish_complete_acquisition(
                 "interval_hours": weather.interval_hours,
                 "h3_resolution": weather.h3_resolution,
                 "availability_lag_hours": weather.availability_lag_hours,
+                "availability_policy": AVAILABILITY_POLICY,
                 "source": {
                     "model": HRRR_MODEL,
                     "product": HRRR_PRODUCT,
@@ -374,7 +397,7 @@ def _publish_complete_acquisition(
             source_completeness="complete",
             availability_semantics={
                 "product_type": "retrospective_analysis_with_short_forecast_precipitation",
-                "rule": "AVAILABLE_AT_UTC equals VALID_TIME_UTC plus the configured source lag.",
+                "rule": "AVAILABLE_AT_UTC is an assumed fixed-lag policy timestamp, equal to VALID_TIME_UTC plus the configured lag; provider-observed availability is not measured.",
                 "publication": "The canonical inventory is published only when every expected valid time is complete.",
             },
             limitations=[
@@ -477,7 +500,7 @@ def download_surface_weather(
         expected_checksum = str(existing.get("CHECKSUM") or "")
         expected_crosswalk_checksum = str(existing.get("CROSSWALK_CHECKSUM") or "")
         expected_hash = str(existing.get("SOURCE_GRID_HASH") or "") or None
-        if expected_hash is None and _valid_sample(destination, support, valid_time_utc=valid):
+        if expected_hash is None and _valid_sample(destination, support, valid_time_utc=valid, availability_lag_hours=weather.availability_lag_hours):
             expected_hash = str(
                 pq.read_table(destination, columns=["SOURCE_GRID_HASH"])[0][0].as_py()
             )
@@ -512,7 +535,7 @@ def download_surface_weather(
         if (
             not overwrite
             and checksum_ok
-            and _valid_sample(destination, support, valid_time_utc=valid)
+            and _valid_sample(destination, support, valid_time_utc=valid, availability_lag_hours=weather.availability_lag_hours)
             and crosswalk_ok
             and precip_provenance_ok
         ):
@@ -535,7 +558,7 @@ def download_surface_weather(
             )
         try:
             reusable_core = (
-                _reusable_core_sample(destination, support, valid_time_utc=valid)
+                _reusable_core_sample(destination, support, valid_time_utc=valid, availability_lag_hours=weather.availability_lag_hours)
                 if not overwrite and checksum_ok and crosswalk_ok
                 else None
             )
@@ -570,7 +593,7 @@ def download_surface_weather(
                     forecast_hour=precip_forecast_hour,
                 )
                 _atomic_table_write(repaired, destination, SAMPLE_SCHEMA)
-                if not _valid_sample(destination, support, valid_time_utc=valid):
+                if not _valid_sample(destination, support, valid_time_utc=valid, availability_lag_hours=weather.availability_lag_hours):
                     raise RuntimeError(
                         f"Written HRRR precipitation repair failed validation: {destination}"
                     )
@@ -655,7 +678,7 @@ def download_surface_weather(
                 precip_forecast_hour=precip_forecast_hour,
             )
             _atomic_table_write(sampled, destination, SAMPLE_SCHEMA)
-            if not _valid_sample(destination, support, valid_time_utc=valid):
+            if not _valid_sample(destination, support, valid_time_utc=valid, availability_lag_hours=weather.availability_lag_hours):
                 raise RuntimeError(f"Written HRRR sample failed validation: {destination}")
             return _inventory_row(
                 valid_time=valid,

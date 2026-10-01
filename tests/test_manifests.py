@@ -20,6 +20,8 @@ from meteorology.artifacts import (
 from meteorology.migration import (
     _recover_interrupted_migrations,
 )
+from meteorology.validation import validate_product
+from meteorology.core.data.meteorological_schemas import SUPPORT_SCHEMA
 
 
 def test_manifest_detects_artifact_tampering(tmp_path: Path) -> None:
@@ -96,6 +98,39 @@ def test_manifest_detects_schema_contract_tampering(tmp_path: Path) -> None:
         load_manifest(manifest, verify_artifacts=True)
 
 
+def test_historical_method_remains_checksum_readable_without_current_deep_validation(
+    tmp_path: Path,
+) -> None:
+    artifact = tmp_path / "support.parquet"
+    write_table(
+        artifact,
+        pa.Table.from_pylist([{
+            "H3_INDEX": "cell", "H3_RESOLUTION": 5, "CENTROID_LAT": 48.0,
+            "CENTROID_LON": -123.0, "SUPPORT_STATE": "MODEL_BBOX_CENTROID",
+        }], schema=SUPPORT_SCHEMA),
+        SUPPORT_SCHEMA,
+    )
+    manifest = tmp_path / "MANIFEST.json"
+    write_manifest(
+        manifest,
+        manifest_payload(
+            product="meteorological.spatial_support",
+            run_id="historical",
+            config_path=tmp_path / "config.yaml",
+            resolved_config={"bbox": "historical"},
+            artifacts=[parquet_contract(artifact)],
+            sources=[{
+                "name": "fixture", "license": "fixture", "attribution": "fixture",
+                "observation_period": "not applicable", "redistribution_restrictions": "none",
+            }],
+            method_version="h3_bbox_centroid_support_v1",
+        ),
+    )
+    assert load_manifest(manifest, verify_artifacts=True)["method_version"] == "h3_bbox_centroid_support_v1"
+    with pytest.raises(ValueError, match="archived deep validator"):
+        validate_product(manifest)
+
+
 def test_atomic_product_publisher_restores_existing_family_on_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -125,6 +160,27 @@ def test_atomic_product_publisher_restores_existing_family_on_failure(
             publisher.publish()
     assert first.read_text() == "old-first"
     assert second.read_text() == "old-second"
+
+
+@pytest.mark.parametrize("run_id", ["../outside", "/tmp/outside", "..", "a/b", "a\\b"])
+def test_publisher_rejects_run_id_path_escape(tmp_path: Path, run_id: str) -> None:
+    with pytest.raises(ValueError, match="safe path component"):
+        TransactionalFamilyPublisher(tmp_path / "publication", run_id=run_id)
+
+
+def test_publisher_preserves_other_staging_and_rejects_symlink(tmp_path: Path) -> None:
+    parent = tmp_path / "publication"
+    old = parent / ".staging" / "previous"
+    old.mkdir(parents=True)
+    (old / "evidence.txt").write_text("keep")
+    with TransactionalFamilyPublisher(parent, run_id="previous"):
+        assert (old / "evidence.txt").read_text() == "keep"
+    link_parent = tmp_path / "linked"
+    link_parent.mkdir()
+    (link_parent / ".staging").symlink_to(parent / ".staging", target_is_directory=True)
+    with pytest.raises(ValueError, match="symlink"):
+        with TransactionalFamilyPublisher(link_parent, run_id="new"):
+            pass
 
 
 def test_atomic_product_publisher_recovers_interrupted_transaction(tmp_path: Path) -> None:

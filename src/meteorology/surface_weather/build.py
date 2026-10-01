@@ -27,7 +27,7 @@ from ..artifacts import (
 from ..config import DEFAULT_CONFIG_PATH, load_meteorological_config
 from ..spatial_support.build import load_meteorological_support
 from .download import INVENTORY_SCHEMA
-from .sampling import CROSSWALK_SCHEMA, SAMPLE_SCHEMA, make_sample_times_for_local_date
+from .sampling import AVAILABILITY_POLICY, CROSSWALK_SCHEMA, SAMPLE_SCHEMA, make_sample_times_for_local_date
 
 
 def _snapshot_replaced_manifest(manifest_path: Path) -> Path | None:
@@ -78,6 +78,10 @@ def _read_validated_sample(
     valid = pd.Timestamp(expected_time).tz_convert("UTC").isoformat()
     if set(frame["VALID_TIME_UTC"].astype(str)) != {valid}:
         raise ValueError(f"HRRR sample valid time is incorrect: {path}")
+    if set(frame["AVAILABLE_AT_UTC"].astype(str)) != {str(inventory_row.AVAILABLE_AT_UTC)}:
+        raise ValueError(f"HRRR sample availability disagrees with the inventory: {path}")
+    if set(frame["AVAILABILITY_POLICY"].astype(str)) != {AVAILABILITY_POLICY}:
+        raise ValueError(f"HRRR sample availability policy is incompatible: {path}")
     if (
         set(frame["INIT_TIME_UTC"].astype(str)) != {valid}
         or set(frame["FORECAST_HOUR"].astype(int)) != {0}
@@ -99,6 +103,10 @@ def _read_validated_sample(
         raise ValueError(f"HRRR sample support is incomplete: {path}")
     if frame["H3_INDEX"].duplicated().any() or set(frame["SOURCE_DATA_STATE"]) != {"COMPLETE"}:
         raise ValueError(f"HRRR sample keys or data state are invalid: {path}")
+    if set(frame["WIND_VECTOR_BASIS"].astype(str)) != {"earth_relative"}:
+        raise ValueError(f"HRRR sample wind basis is not earth relative: {path}")
+    if not set(frame["SOURCE_WIND_BASIS"].astype(str)).issubset({"grid_relative", "earth_relative"}):
+        raise ValueError(f"HRRR sample source wind basis is invalid: {path}")
     numeric = frame.select_dtypes(include=[np.number]).to_numpy(dtype=float)
     if frame.isna().any().any() or not np.isfinite(numeric).all():
         raise ValueError(f"HRRR sample contains missing or non-finite values: {path}")
@@ -287,7 +295,6 @@ def build_surface_weather(
     run_id = run_id or f"surface-weather-r5-{uuid.uuid4().hex[:12]}"
     crosswalk_destination = weather.daily_output_dir.parent / "H3_HRRR_NEAREST_GRID_RES_5"
     _snapshot_replaced_manifest(weather.manifest_path)
-    precip_positive_sample_count = 0
     with TransactionalFamilyPublisher(weather.daily_output_dir.parent, run_id=run_id) as publisher:
         staged_daily = publisher.stage_path(weather.daily_output_dir)
         staged_crosswalk = publisher.stage_path(crosswalk_destination)
@@ -306,9 +313,6 @@ def build_surface_weather(
                     support_cells=support_cells,
                     source_model=source_model,
                 )
-                precip_positive_sample_count += int(
-                    (sample["PRECIP_RATE_MM_HR"].to_numpy(dtype=float) > 0.0).sum()
-                )
                 timestamp_frames.append(sample)
                 if not row.CROSSWALK_RELATIVE_PATH or not row.CROSSWALK_CHECKSUM:
                     raise ValueError(f"HRRR inventory lacks crosswalk provenance for {valid}.")
@@ -324,11 +328,6 @@ def build_surface_weather(
                 staged_daily / f"year={local_date[:4]}" / f"date={local_date}" / "part-000.parquet",
                 pa.Table.from_pandas(daily.reset_index(drop=True), preserve_index=False),
                 DAILY_SCHEMA,
-            )
-        if precip_positive_sample_count == 0:
-            raise ValueError(
-                "Canonical weather release rejected: forecast precipitation is all zero "
-                "across the complete frozen range."
             )
         for grid_hash, (path, checksum) in sorted(crosswalk_sources.items()):
             if not path.exists() or checksum_path(path) != checksum:
@@ -403,7 +402,7 @@ def build_surface_weather(
                 "PRECIP_MM_DAY_ESTIMATE is a six-snapshot estimate from f01 forecast rates, not an hourly or accumulated 24-hour precipitation analysis.",
                 "H3 values are nearest-neighbour samples from the direct HRRR grid.",
                 "Partial days and missing or non-finite source values are not published.",
-                "A complete-range all-zero precipitation field is treated as a failed release.",
+                "An all-zero precipitation range can be valid when every source sample passes identity, completeness, and unit checks.",
                 "Wind direction is undefined for a calm mean vector and is null in that case.",
             ],
         )

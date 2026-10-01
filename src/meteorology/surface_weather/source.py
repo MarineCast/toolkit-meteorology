@@ -15,6 +15,7 @@ from .source_validation import (
     BoundingBox,
     dataset_to_flat_variable_grid,
     infer_required_hrrr_variables,
+    validate_decoded_source_times,
 )
 
 HRRR_MODEL = "hrrr"
@@ -45,6 +46,7 @@ RAW_COLUMNS = [
     "SOURCE_PRODUCT",
     "FORECAST_HOUR",
     "SOURCE_GRID_HASH",
+    "SOURCE_WIND_BASIS",
     "TEMPERATURE_2M_K",
     "RELATIVE_HUMIDITY_2M_PCT",
     "U_WIND_10M_MS",
@@ -68,6 +70,7 @@ RAW_SCHEMA = pa.schema(
         pa.field("SOURCE_PRODUCT", pa.string(), nullable=False),
         pa.field("FORECAST_HOUR", pa.int16(), nullable=False),
         pa.field("SOURCE_GRID_HASH", pa.string(), nullable=False),
+        pa.field("SOURCE_WIND_BASIS", pa.string(), nullable=False),
         *[
             pa.field(name, pa.float64(), nullable=False)
             for name in RAW_COLUMNS
@@ -83,6 +86,7 @@ RAW_SCHEMA = pa.schema(
                 "SOURCE_PRODUCT",
                 "FORECAST_HOUR",
                 "SOURCE_GRID_HASH",
+                "SOURCE_WIND_BASIS",
             }
         ],
     ]
@@ -154,6 +158,25 @@ def normalize_hrrr_values(
 def _combined_search(variables: Mapping[str, str] = HRRR_VARIABLES) -> str:
     values = [value.strip(":") for value in variables.values()]
     return ":(?:" + "|".join(values) + ")"
+
+
+def _decoded_wind_basis(mapping: Mapping[str, tuple[Any, str] | None]) -> str | None:
+    names = ("u_wind_10m_ms", "v_wind_10m_ms")
+    if not any(name in mapping for name in names):
+        return None
+    flags = []
+    for name in names:
+        selected = mapping.get(name)
+        if selected is None:
+            raise ValueError("HRRR wind components must be decoded as a pair.")
+        dataset, variable = selected
+        flag = dataset[variable].attrs.get("GRIB_uvRelativeToGrid")
+        if str(flag) not in {"0", "1"}:
+            raise ValueError(f"HRRR {name} has no usable GRIB wind-reference flag.")
+        flags.append(int(flag))
+    if flags[0] != flags[1]:
+        raise ValueError("HRRR U/V wind-reference flags disagree.")
+    return "grid_relative" if flags[0] else "earth_relative"
 
 
 def hrrr_aws_archive_uri(valid_time_utc: pd.Timestamp, forecast_hour: int = FORECAST_HOUR) -> str:
@@ -240,6 +263,9 @@ def normalize_flat_grid(
     init = valid - pd.Timedelta(hours=FORECAST_HOUR)
     available = valid + pd.Timedelta(hours=int(availability_lag_hours))
     grid_hash = _grid_hash(output["SOURCE_LAT"], output["SOURCE_LON"])
+    source_wind_basis = flat.attrs.get("source_wind_basis")
+    if source_wind_basis not in {"grid_relative", "earth_relative"}:
+        raise ValueError("HRRR source wind basis is missing after decoding.")
     output.insert(3, "VALID_TIME_UTC", valid.isoformat())
     output.insert(4, "INIT_TIME_UTC", init.isoformat())
     output.insert(5, "AVAILABLE_AT_UTC", available.isoformat())
@@ -247,6 +273,7 @@ def normalize_flat_grid(
     output.insert(7, "SOURCE_PRODUCT", HRRR_PRODUCT)
     output.insert(8, "FORECAST_HOUR", FORECAST_HOUR)
     output.insert(9, "SOURCE_GRID_HASH", grid_hash)
+    output.insert(10, "SOURCE_WIND_BASIS", source_wind_basis)
     if output[RAW_COLUMNS].isna().any().any():
         null_columns = output.columns[output.isna().any()].tolist()
         raise ValueError(f"HRRR raw source grid contains null values: {null_columns}")
@@ -296,13 +323,19 @@ def fetch_cropped_hrrr_fields(
             allow_missing=False,
             reject_ambiguous=True,
         )
+        validate_decoded_source_times(mapping, valid_time_utc=valid, forecast_hour=hour)
         padded = BoundingBox(
             min_lat=float(bbox["min_lat"]) - float(bbox_padding_degrees),
             max_lat=float(bbox["max_lat"]) + float(bbox_padding_degrees),
             min_lon=float(bbox["min_lon"]) - float(bbox_padding_degrees),
             max_lon=float(bbox["max_lon"]) + float(bbox_padding_degrees),
         )
-        flat = dataset_to_flat_variable_grid(dataset, mapping, padded, pad_deg=0.0)
+        wind_basis = _decoded_wind_basis(mapping)
+        flat = dataset_to_flat_variable_grid(
+            dataset, mapping, padded, pad_deg=0.0, wind_basis=wind_basis
+        )
+        if wind_basis is not None:
+            flat.attrs["source_wind_basis"] = wind_basis
         units_by_variable: dict[str, str] = {}
         for output_name, mapping_value in mapping.items():
             if mapping_value is None:

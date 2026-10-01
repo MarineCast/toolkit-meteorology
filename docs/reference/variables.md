@@ -6,7 +6,7 @@ Predictor candidate means only that a field may be considered after availability
 
 ## Spatial Support
 
-Method: `h3_bbox_centroid_support_v1`. Support: R4, R5, R6; timeless.
+Method: `h3_bbox_centroid_support_v2`. Support: R4, R5, R6; timeless.
 
 | Field | Source field | Unit | Processing | Range | Kind | Predictor? |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -20,7 +20,7 @@ Missingness: not applicable to complete deterministic output. Limitation: Centro
 
 ## Hrrr Sample
 
-Method: `hrrr_f00_f01_nearest_sample_v1`. Support: R5; one UTC valid time.
+Method: `hrrr_f00_f01_earth_wind_sample_v2`. Support: R5; one UTC valid time.
 
 | Field | Source field | Unit | Processing | Range | Kind | Predictor? |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -29,11 +29,14 @@ Method: `hrrr_f00_f01_nearest_sample_v1`. Support: R5; one UTC valid time.
 | VALID_TIME_UTC | HRRR field valid time in UTC | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | INIT_TIME_UTC | HRRR core analysis initialization time in UTC | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | AVAILABLE_AT_UTC | declared source availability time in UTC | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| AVAILABILITY_POLICY | versioned rule used to derive the declared availability time | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | TEMPERATURE_2M_C | TMP:2 m above ground | deg C | Kelvin - 273.15 | -100..70 | continuous | True |
 | RELATIVE_HUMIDITY_2M_PCT | RH:2 m above ground | % | unit-normalized source value | 0..100 | continuous | True |
 | U_WIND_10M_MS | UGRD:10 m above ground | m/s | source value | finite | continuous | True |
 | V_WIND_10M_MS | VGRD:10 m above ground | m/s | source value | finite | continuous | True |
 | WIND_SPEED_10M_MS | UGRD, VGRD:10 m above ground | m/s | hypot(u, v) | 0..inf | continuous | True |
+| WIND_VECTOR_BASIS | published 10 m wind components use true east and north axes | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_WIND_BASIS | decoded GRIB basis before any required wind rotation | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | WIND_GUST_SURFACE_MS | GUST:surface | m/s | unit-normalized source value | 0..inf | continuous | True |
 | VISIBILITY_KM | VIS:surface | km | metres / 1000 | 0..inf | continuous | True |
 | TOTAL_CLOUD_COVER_PCT | TCDC:entire atmosphere | % | unit-normalized source value | 0..100 | continuous | True |
@@ -55,7 +58,7 @@ Missingness: reject incomplete source/support; no zero fill. Limitation: Retrosp
 
 ## Hrrr Inventory
 
-Method: `hrrr_f00_f01_nearest_sample_v1`. Support: R5; one UTC valid time.
+Method: `hrrr_f00_f01_earth_wind_sample_v2`. Support: R5; one UTC valid time.
 
 | Field | Source field | Unit | Processing | Range | Kind | Predictor? |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -85,7 +88,7 @@ Missingness: not applicable to complete deterministic output. Nullable exception
 
 ## Hrrr Crosswalk
 
-Method: `hrrr_f00_f01_nearest_sample_v1`. Support: R5; one source grid.
+Method: `hrrr_f00_f01_earth_wind_sample_v2`. Support: R5; one source grid.
 
 | Field | Source field | Unit | Processing | Range | Kind | Predictor? |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -98,7 +101,7 @@ Missingness: not applicable to complete deterministic output. Limitation: Centro
 
 ## Surface Weather
 
-Method: `hrrr_surface_daily_v2`. Support: R5; local date.
+Method: `hrrr_surface_daily_earth_wind_v3`. Support: R5; local date.
 
 | Field | Source field | Unit | Processing | Range | Kind | Predictor? |
 | --- | --- | --- | --- | --- | --- | --- |

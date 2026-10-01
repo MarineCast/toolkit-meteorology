@@ -12,12 +12,16 @@ from meteorology.surface_weather.sampling import (
     build_nearest_grid_crosswalk,
 )
 from meteorology.surface_weather.source import (
+    _decoded_wind_basis,
     hrrr_aws_archive_uri,
     normalize_forecast_precip_grid,
     normalize_hrrr_values,
 )
 from meteorology.surface_weather.source_validation import (
+    BoundingBox,
+    dataset_to_flat_variable_grid,
     infer_required_hrrr_variables,
+    validate_decoded_source_times,
 )
 
 
@@ -114,6 +118,109 @@ def test_hrrr_variable_matching_fails_on_missing_or_ambiguous_identity() -> None
         )
 
 
+def test_hrrr_grid_rejects_extra_slice_and_misaligned_coordinates() -> None:
+    bounds = BoundingBox(47.0, 50.0, -125.0, -122.0)
+    base = _temperature_dataset(("t2m",))
+    extra = base.expand_dims(member=[0, 1])
+    with pytest.raises(ValueError, match="exactly two spatial dimensions"):
+        dataset_to_flat_variable_grid(
+            extra, {"temperature_2m_k": (extra, "t2m")}, bounds
+        )
+    shifted = _temperature_dataset(("t2m",))
+    shifted = shifted.assign_coords(latitude=shifted.latitude + 0.5)
+    with pytest.raises(ValueError, match="coordinate grid differs"):
+        dataset_to_flat_variable_grid(
+            base,
+            {"temperature_2m_k": (base, "t2m"), "other": (shifted, "t2m")},
+            bounds,
+        )
+    reversed_coords = _temperature_dataset(("t2m",))
+    reversed_coords = reversed_coords.assign_coords(
+        longitude=(("y", "x"), reversed_coords.longitude.isel(x=slice(None, None, -1)).values)
+    )
+    with pytest.raises(ValueError, match="coordinate grid differs"):
+        dataset_to_flat_variable_grid(
+            base,
+            {"temperature_2m_k": (base, "t2m"), "other": (reversed_coords, "t2m")},
+            bounds,
+        )
+    transposed = _temperature_dataset(("t2m",))
+    transposed["t2m"] = transposed["t2m"].transpose("x", "y")
+    with pytest.raises(ValueError, match="dimension order differs"):
+        dataset_to_flat_variable_grid(
+            base,
+            {"temperature_2m_k": (base, "t2m"), "other": (transposed, "t2m")},
+            bounds,
+        )
+
+
+def test_hrrr_decoded_time_must_match_requested_cycle() -> None:
+    base = _temperature_dataset(("t2m",)).assign_coords(
+        time=np.datetime64("2024-01-02T07:00:00"),
+        step=np.timedelta64(1, "h"),
+        valid_time=np.datetime64("2024-01-02T08:00:00"),
+    )
+    base["t2m"].attrs.update({"GRIB_stepType": "instant", "GRIB_stepRange": "1"})
+    selected = {"temperature_2m_k": (base, "t2m")}
+    validate_decoded_source_times(
+        selected, valid_time_utc=pd.Timestamp("2024-01-02T08:00:00Z"), forecast_hour=1
+    )
+    wrong_step = base.assign_coords(step=np.timedelta64(2, "h"))
+    with pytest.raises(ValueError, match="decoded step"):
+        validate_decoded_source_times(
+            {"temperature_2m_k": (wrong_step, "t2m")},
+            valid_time_utc=pd.Timestamp("2024-01-02T08:00:00Z"),
+            forecast_hour=1,
+        )
+    wrong_interval = base.copy(deep=True)
+    wrong_interval["t2m"].attrs["GRIB_stepRange"] = "0-1"
+    with pytest.raises(ValueError, match="step type or interval"):
+        validate_decoded_source_times(
+            {"temperature_2m_k": (wrong_interval, "t2m")},
+            valid_time_utc=pd.Timestamp("2024-01-02T08:00:00Z"),
+            forecast_hour=1,
+        )
+    wrong_init = base.assign_coords(time=np.datetime64("2024-01-02T06:00:00"))
+    with pytest.raises(ValueError, match="decoded time"):
+        validate_decoded_source_times(
+            {"temperature_2m_k": (wrong_init, "t2m")},
+            valid_time_utc=pd.Timestamp("2024-01-02T08:00:00Z"),
+            forecast_hour=1,
+        )
+    wrong_valid = base.assign_coords(valid_time=np.datetime64("2024-01-02T09:00:00"))
+    with pytest.raises(ValueError, match="decoded valid_time"):
+        validate_decoded_source_times(
+            {"temperature_2m_k": (wrong_valid, "t2m")},
+            valid_time_utc=pd.Timestamp("2024-01-02T08:00:00Z"),
+            forecast_hour=1,
+        )
+
+
+def test_grid_relative_wind_rotates_to_true_east_and_north() -> None:
+    grid = xr.Dataset(
+        {
+            "u10": (("y", "x"), np.ones((2, 2))),
+            "v10": (("y", "x"), np.zeros((2, 2))),
+        },
+        coords={
+            "latitude": (("y", "x"), [[0.0, 0.01], [0.01, 0.02]]),
+            "longitude": (("y", "x"), [[0.0, 0.01], [-0.01, 0.0]]),
+        },
+    )
+    grid["u10"].attrs["GRIB_uvRelativeToGrid"] = 1
+    grid["v10"].attrs["GRIB_uvRelativeToGrid"] = 1
+    mapping = {"u_wind_10m_ms": (grid, "u10"), "v_wind_10m_ms": (grid, "v10")}
+    assert _decoded_wind_basis(mapping) == "grid_relative"
+    flat = dataset_to_flat_variable_grid(
+        grid, mapping, BoundingBox(-1.0, 1.0, -1.0, 1.0), wind_basis="grid_relative"
+    )
+    assert np.allclose(flat["u_wind_10m_ms"], np.sqrt(0.5), atol=0.004)
+    assert np.allclose(flat["v_wind_10m_ms"], np.sqrt(0.5), atol=0.004)
+    grid["v10"].attrs["GRIB_uvRelativeToGrid"] = 0
+    with pytest.raises(ValueError, match="flags disagree"):
+        _decoded_wind_basis(mapping)
+
+
 def test_nearest_grid_crosswalk_is_source_row_order_invariant() -> None:
     support = pd.DataFrame(
         {
@@ -177,4 +284,3 @@ def test_core_catalog_declares_meteorological_partition_contracts() -> None:
     }
     for dataset_id, partition_keys in expected.items():
         assert DATASETS.get(dataset_id).partition_keys == partition_keys
-
