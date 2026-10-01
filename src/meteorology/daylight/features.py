@@ -90,13 +90,15 @@ def _apply_normalized_weights(
     cell_min = h3.map(bounds["cell_min"])  # type: ignore[arg-type]
     cell_max = h3.map(bounds["cell_max"])  # type: ignore[arg-type]
     cell_denom = (cell_max - cell_min).where((cell_max - cell_min) != 0)
-    out["daylight_weight_cell_norm"] = ((hours - cell_min) / cell_denom).fillna(1.0).clip(0.0, 1.0)
+    out["daylight_weight_cell_norm"] = ((hours - cell_min) / cell_denom).fillna(
+        out["daylight_fraction"]
+    ).clip(0.0, 1.0)
 
     global_min = float(bounds["global_min"])
     global_max = float(bounds["global_max"])
     global_denom = global_max - global_min
     if global_denom == 0:
-        out["daylight_weight_global_norm"] = 1.0
+        out["daylight_weight_global_norm"] = out["daylight_fraction"]
     else:
         out["daylight_weight_global_norm"] = ((hours - global_min) / global_denom).clip(0.0, 1.0)
 

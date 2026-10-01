@@ -139,9 +139,9 @@ products:
     - hrrr_source_inventory
     - meteorological_spatial_support
     grain: one row per H3 cell and local date
-    feature_count: 21
+    feature_count: 25
     variable_kind_counts:
-      feature_variable: 12
+      feature_variable: 16
       metadata: 9
     features:
       EXPECTED_SAMPLE_COUNT:
@@ -399,6 +399,23 @@ products:
         - 5
         modeling_use: eligible_after_policy_review
         default_ecological_occurrence_model: null
+      U_WIND_10M_MS_MEAN:
+        common_name: U Wind 10M Ms Mean
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: U_WIND_10M_MS_MEAN
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: metres per second
+        arrow_type: double
+        role: physical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: U_WIND_10M_MS_MEAN
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
       VISIBILITY_KM_MEAN:
         common_name: Visibility Km Mean
         metric_family: meteorological
@@ -429,6 +446,40 @@ products:
         variable_kind: feature_variable
         topology: within_cell_or_nonspatial
         scale_group: VISIBILITY_KM_MIN
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      V_WIND_10M_MS_MEAN:
+        common_name: V Wind 10M Ms Mean
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: V_WIND_10M_MS_MEAN
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: metres per second
+        arrow_type: double
+        role: physical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: V_WIND_10M_MS_MEAN
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      WIND_DIRECTION_FROM_10M_DEG:
+        common_name: Wind Direction From 10M Deg
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: WIND_DIRECTION_FROM_10M_DEG
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: degrees
+        arrow_type: double
+        role: physical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: WIND_DIRECTION_FROM_10M_DEG
         available_resolutions:
         - 5
         modeling_use: eligible_after_policy_review
@@ -497,6 +548,23 @@ products:
         variable_kind: feature_variable
         topology: within_cell_or_nonspatial
         scale_group: WIND_SPEED_10M_MS_MEAN
+        available_resolutions:
+        - 5
+        modeling_use: eligible_after_policy_review
+        default_ecological_occurrence_model: null
+      WIND_VECTOR_SPEED_10M_MS:
+        common_name: Wind Vector Speed 10M Ms
+        metric_family: meteorological
+        metric_subfamily: surface_weather
+        column: WIND_VECTOR_SPEED_10M_MS
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_SURFACE_WEATHER_DAILY_RES_5
+        unit: metres per second
+        arrow_type: double
+        role: physical_metric
+        variable_kind: feature_variable
+        topology: within_cell_or_nonspatial
+        scale_group: WIND_VECTOR_SPEED_10M_MS
         available_resolutions:
         - 5
         modeling_use: eligible_after_policy_review
@@ -1708,7 +1776,7 @@ products:
         - 5
         modeling_use: excluded_metadata
         default_ecological_occurrence_model: null
-feature_entry_count: 88
+feature_entry_count: 92
 supporting_products: {}
 superseded_products: {}
 catalog_contract:
@@ -1746,7 +1814,7 @@ catalog_contract:
 schema_version: 4
 catalog_id: environment
 product_count: 7
-unique_column_count: 75
+unique_column_count: 79
 family_counts:
   meteorological: 7
 generated_from_materialized_schemas: false

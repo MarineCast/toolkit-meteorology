@@ -15,8 +15,10 @@ import pyarrow.parquet as pq
 
 from meteorology.core.artifacts import atomic_write_json
 from meteorology.core.config.paths import project_root
+from meteorology._version import __version__
+from meteorology.methods import METHOD_VERSIONS
 
-MANIFEST_SCHEMA_VERSION = 2
+MANIFEST_SCHEMA_VERSION = 3
 
 
 def sha256_file(path: Path) -> str:
@@ -116,10 +118,14 @@ def portable_path(path: str | Path) -> str:
     return str(resolved)
 
 
-def resolve_portable_path(path: str | Path) -> Path:
+def resolve_portable_path(path: str | Path, *, base: str | Path | None = None) -> Path:
     candidate = Path(path)
     if candidate.is_absolute():
         return candidate
+    if base is not None:
+        beside_manifest = Path(base).resolve() / candidate
+        if beside_manifest.exists():
+            return beside_manifest
     candidate_root = os.environ.get("METEOROLOGY_CANDIDATE_ROOT")
     roots = (
         [Path(candidate_root).resolve(), project_root().resolve()]
@@ -185,14 +191,30 @@ def manifest_payload(
     formulas: Mapping[str, str] | None = None,
     units: Mapping[str, str] | None = None,
     limitations: Sequence[str] = (),
+    method_version: str | None = None,
 ) -> dict[str, Any]:
     if not artifacts:
         raise ValueError("A meteorological manifest must contain at least one artifact.")
     live_code = code_state()
+    method = method_version or METHOD_VERSIONS.get(product, "unregistered_fixture")
+    identity = {
+        "product": product,
+        "software_version": __version__,
+        "method_version": method,
+        "resolved_config_hash": stable_hash(resolved_config),
+        "inputs": [value.get("checksum") for value in inputs],
+        "artifacts": [
+            item.get("checksum")
+            for item in artifacts
+        ],
+    }
     return {
         "manifest_schema_version": MANIFEST_SCHEMA_VERSION,
         "product": product,
         "run_id": run_id,
+        "release_id": stable_hash(identity),
+        "software_version": __version__,
+        "method_version": method,
         "build_time_utc": datetime.now(UTC).replace(microsecond=0).isoformat(),
         "code_revision": live_code["revision"],
         "code_dirty": live_code["dirty"],
@@ -228,11 +250,13 @@ def load_manifest(path: str | Path, *, verify_artifacts: bool = True) -> dict[st
     payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError(f"Meteorological manifest root must be a mapping: {manifest_path}")
-    validate_manifest(payload, verify_artifacts=verify_artifacts)
+    validate_manifest(payload, verify_artifacts=verify_artifacts, base=manifest_path.parent)
     return payload
 
 
-def validate_manifest(payload: Mapping[str, Any], *, verify_artifacts: bool = True) -> None:
+def validate_manifest(
+    payload: Mapping[str, Any], *, verify_artifacts: bool = True, base: str | Path | None = None
+) -> None:
     required = {
         "manifest_schema_version",
         "product",
@@ -259,8 +283,29 @@ def validate_manifest(payload: Mapping[str, Any], *, verify_artifacts: bool = Tr
     missing = sorted(required.difference(payload))
     if missing:
         raise ValueError(f"Meteorological manifest is missing fields: {missing}")
-    if int(payload["manifest_schema_version"]) != MANIFEST_SCHEMA_VERSION:
+    version = int(payload["manifest_schema_version"])
+    if version not in {2, MANIFEST_SCHEMA_VERSION}:
         raise ValueError("Unsupported meteorological manifest schema version.")
+    if version == MANIFEST_SCHEMA_VERSION:
+        for field in ("release_id", "software_version", "method_version"):
+            if not isinstance(payload.get(field), str) or not payload[field]:
+                raise ValueError(f"Meteorological manifest {field} is invalid.")
+        product = str(payload["product"])
+        if product in METHOD_VERSIONS and payload["method_version"] != METHOD_VERSIONS[product]:
+            raise ValueError(f"Incompatible scientific method version for {product}.")
+        identity = {
+            "product": product,
+            "software_version": payload["software_version"],
+            "method_version": payload["method_version"],
+            "resolved_config_hash": payload["resolved_config_hash"],
+            "inputs": [value.get("checksum") for value in payload["inputs"]],
+            "artifacts": [
+                item.get("checksum")
+                for item in payload["artifacts"]
+            ],
+        }
+        if payload["release_id"] != stable_hash(identity):
+            raise ValueError("Meteorological manifest release_id does not match its inputs and outputs.")
     if payload["resolved_config_hash"] != stable_hash(payload["resolved_config"]):
         raise ValueError("Meteorological manifest resolved-config hash is invalid.")
     if not isinstance(payload["code_dirty"], bool):
@@ -321,7 +366,7 @@ def validate_manifest(payload: Mapping[str, Any], *, verify_artifacts: bool = Tr
     if not verify_artifacts:
         return
     for source_input in payload["inputs"]:
-        path = resolve_portable_path(str(source_input["path"]))
+        path = resolve_portable_path(str(source_input["path"]), base=base)
         if not path.exists():
             raise FileNotFoundError(f"Manifest input does not exist: {path}")
         observed = checksum_path(path)
@@ -337,7 +382,7 @@ def validate_manifest(payload: Mapping[str, Any], *, verify_artifacts: bool = Tr
             or not artifact.get("checksum")
         ):
             raise ValueError("Each meteorological artifact requires path and checksum.")
-        path = resolve_portable_path(str(artifact["path"]))
+        path = resolve_portable_path(str(artifact["path"]), base=base)
         if not path.exists():
             raise FileNotFoundError(f"Manifest artifact does not exist: {path}")
         observed = checksum_path(path)

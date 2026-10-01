@@ -119,9 +119,9 @@ def build_meteorological_spatial_support(
             availability_semantics="Timeless deterministic support; available after a successful local build.",
             sources=[
                 {
-                    "name": "OrcaCast common model-area bounding box",
-                    "license": "Internal configuration",
-                    "attribution": "OrcaCast",
+                    "name": "User-configured WGS84 bounding box",
+                    "license": "User-provided configuration",
+                    "attribution": "Workspace configuration",
                     "observation_period": "Not applicable",
                     "redistribution_restrictions": "None",
                 }

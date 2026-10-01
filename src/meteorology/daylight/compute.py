@@ -172,7 +172,9 @@ def prepare_h3_centroids(
     cells["h3"] = cells["h3"].astype("string")
     cells["centroid_lat"] = pd.to_numeric(cells["centroid_lat"], errors="coerce")
     cells["centroid_lon"] = pd.to_numeric(cells["centroid_lon"], errors="coerce")
-    cells = cells.drop_duplicates(subset=["h3"], keep="first").reset_index(drop=True)
+    if cells["h3"].duplicated().any():
+        raise ValueError("H3 centroid table has duplicate cell identities.")
+    cells = cells.reset_index(drop=True)
     if cells[["h3", "centroid_lat", "centroid_lon"]].isna().any().any():
         raise ValueError("H3 centroid table contains null h3, latitude, or longitude values.")
     if not cells["centroid_lat"].between(-90.0, 90.0).all():

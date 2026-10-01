@@ -68,7 +68,7 @@ application's old cross-domain candidate orchestration or a new whole-domain rel
 - From `/tmp`, **52 installed submodules imported with OrcaCast imports blocked**. Synthetic H3
   support, one-day daylight and lunar products built through the installed CLI. All three manifests
   passed input/output checksum validation. Installed catalog and policy generation/check passed.
-- Source parses using Python 3.11 syntax. CI is configured for Python 3.11 and 3.14; remote CI and
+- At transfer time, source parsed using Python 3.11 syntax and CI was configured for Python 3.11 and 3.14; remote CI and
   a local Python 3.11 runtime were not executed.
 - OrcaCast: all **7 remaining workflow stages** resolve; its **49-entry application registry**
   and project/data configuration documents load; `data build --help` loads without meteorology.

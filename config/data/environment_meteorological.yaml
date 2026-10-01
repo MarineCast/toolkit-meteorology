@@ -2,7 +2,7 @@ schema_version: 3
 
 spatial_support:
   bbox:
-    area: model_area
+    area: example_area
   resolutions: [4, 5, 6]
   output:
     root_dir: data/processed/domain/environmental_layer/meteorological/spatial_support
@@ -18,8 +18,8 @@ surface_weather:
     h3_resolution: 5
     interval_hours: 4
   time:
-    start_date: "2020-01-01"
-    end_date: latest_complete
+    start_date: "2024-01-02"
+    end_date: "2024-01-02"
     timezone: America/Los_Angeles
     availability_lag_hours: 6
   bbox_padding_degrees: 0.2
@@ -34,8 +34,8 @@ surface_weather:
 
 daylight:
   h3_resolution: 4
-  start_date: "2020-01-01"
-  end_date: "2026-12-31"
+  start_date: "2024-01-02"
+  end_date: "2024-01-02"
   timezone: America/Los_Angeles
   timestep_minutes: 30
   low_sun_max_degrees: 10.0
@@ -47,8 +47,8 @@ daylight:
 
 lunar:
   h3_resolution: 5
-  start_date: "2020-01-01"
-  end_date: "2026-12-31"
+  start_date: "2024-01-02"
+  end_date: "2024-01-02"
   sample_hour_utc: 12
   timezone: America/Los_Angeles
   timestep_minutes: 30

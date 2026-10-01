@@ -1,6 +1,6 @@
 schema_version: 1
 policy_scope: default_ecological_occurrence_model
-feature_catalog_subset_checksum: 15ca8d4d656491ac0f74324af32ff7a6bde9f1bd31f712eb2ddcf8ab56c6eff5
+feature_catalog_subset_checksum: 288288193990f8605f82c564da2eba56bb462df212554f713b3ed3cdb20d8e69
 complete_scientific_products_retained: true
 deterministic_duplicate_contract:
   DAYLIGHT_FRACTION: DAYLIGHT_HOURS / 24
@@ -912,6 +912,17 @@ features:
   included_by_default: true
   exclusion_reason: null
 - product: surface_weather_daily
+  column: U_WIND_10M_MS_MEAN
+  role: physical_metric
+  variable_kind: feature_variable
+  feature_family: meteorological
+  metric_subfamily: surface_weather
+  scale_group: U_WIND_10M_MS_MEAN
+  topology: within_cell_or_nonspatial
+  modeling_use: eligible_after_policy_review
+  included_by_default: true
+  exclusion_reason: null
+- product: surface_weather_daily
   column: VISIBILITY_KM_MEAN
   role: physical_metric
   variable_kind: feature_variable
@@ -933,6 +944,28 @@ features:
   modeling_use: eligible_after_policy_review
   included_by_default: true
   exclusion_reason: null
+- product: surface_weather_daily
+  column: V_WIND_10M_MS_MEAN
+  role: physical_metric
+  variable_kind: feature_variable
+  feature_family: meteorological
+  metric_subfamily: surface_weather
+  scale_group: V_WIND_10M_MS_MEAN
+  topology: within_cell_or_nonspatial
+  modeling_use: eligible_after_policy_review
+  included_by_default: true
+  exclusion_reason: null
+- product: surface_weather_daily
+  column: WIND_DIRECTION_FROM_10M_DEG
+  role: physical_metric
+  variable_kind: feature_variable
+  feature_family: meteorological
+  metric_subfamily: surface_weather
+  scale_group: WIND_DIRECTION_FROM_10M_DEG
+  topology: within_cell_or_nonspatial
+  modeling_use: eligible_after_policy_review
+  included_by_default: false
+  exclusion_reason: requires_circular_encoding_and_calm_missingness_policy
 - product: surface_weather_daily
   column: WIND_GUST_SURFACE_MS_MAX
   role: physical_metric
@@ -973,6 +1006,17 @@ features:
   feature_family: meteorological
   metric_subfamily: surface_weather
   scale_group: WIND_SPEED_10M_MS_MEAN
+  topology: within_cell_or_nonspatial
+  modeling_use: eligible_after_policy_review
+  included_by_default: true
+  exclusion_reason: null
+- product: surface_weather_daily
+  column: WIND_VECTOR_SPEED_10M_MS
+  role: physical_metric
+  variable_kind: feature_variable
+  feature_family: meteorological
+  metric_subfamily: surface_weather
+  scale_group: WIND_VECTOR_SPEED_10M_MS
   topology: within_cell_or_nonspatial
   modeling_use: eligible_after_policy_review
   included_by_default: true

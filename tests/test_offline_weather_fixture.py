@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -211,6 +212,28 @@ def test_direct_r5_download_build_and_inspect_contract(tmp_path: Path, monkeypat
     assert np.allclose(daily["PRECIP_MM_DAY_ESTIMATE"], 86.4)
     assert not daily.isna().any().any()
     load_manifest(outputs[-1], verify_artifacts=True)
+    from meteorology.validation import validate_product
+
+    checked = validate_product(outputs[-1])
+    assert checked["valid"] and checked["row_count"] == 2 * len(support)
+    from meteorology.releases import freeze_release
+
+    frozen = freeze_release(outputs[-1], tmp_path / "frozen-releases")
+    assert frozen.parent.name == checked["release_id"]
+    assert validate_product(frozen)["valid"]
+    with pytest.raises(FileExistsError, match="already exists"):
+        freeze_release(outputs[-1], tmp_path / "frozen-releases")
+    relocated = tmp_path / "relocated-release"
+    shutil.move(frozen.parent, relocated)
+    relocated_manifest = relocated / "MANIFEST.json"
+    assert validate_product(relocated_manifest)["valid"]
+    archived = json.loads(relocated_manifest.read_text())
+    assert all(not Path(item["path"]).is_absolute() for item in archived["artifacts"])
+    assert all(not Path(item["path"]).is_absolute() for item in archived["inputs"])
+    archived_inventory = relocated / "inputs/hrrr_samples/HRRR_R5_SOURCE_INVENTORY.parquet"
+    assert archived_inventory.is_file()
+    archived_rows = pq.read_table(archived_inventory).to_pandas()
+    assert all((archived_inventory.parent / relative).exists() for relative in archived_rows["RELATIVE_PATH"])
 
     legacy = daily[["H3_INDEX", "DATE", *SHARED_LEGACY_FIELDS]].rename(
         columns={

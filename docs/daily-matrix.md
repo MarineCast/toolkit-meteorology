@@ -17,7 +17,10 @@ The exporter rejects duplicate/invalid cells, inconsistent resolution, incomplet
 support, mismatched date ranges/timezones and existing destinations. It streams yearly
 row groups to a temporary file, then atomically renames the complete product. Embedded
 `meteorology_daily_matrix` metadata retains native manifests, dates, timezone, source
-identity, source rights, units, formulas and limitations. The file is local research context;
+identity, source rights, units, formulas, software/method versions, a content-derived release
+ID and limitations. `meteorology validate --daily-matrix NEW.parquet` checks the
+embedded identity, H3/date support and native-resolution nulls, and reports a file checksum.
+The file is local research context;
 its production does not establish forecasting/model integration or authorize redistribution.
 
 HRRR core weather comprises six four-hourly f00 analyses per local date. Precipitation uses

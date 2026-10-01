@@ -4,11 +4,25 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "toolkit-meteorology"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Provenance-aware HRRR weather, daylight, lunar and atmospheric H3 products"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 license = "Apache-2.0"
+authors = [{name = "MarineCast contributors"}]
+keywords = ["meteorology", "HRRR", "H3", "geospatial", "astronomy", "environmental modeling", "reproducible science"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Atmospheric Science",
+  "Topic :: Scientific/Engineering :: GIS",
+]
 dependencies = [
   "branca>=0.7", "folium>=0.20", "geopandas>=1", "h3>=4", "numpy>=1.26", "pandas>=2.1",
   "pyarrow>=14", "pydantic>=2", "pyproj>=3.6", "PyYAML>=6",
@@ -18,6 +32,13 @@ dependencies = [
 [project.optional-dependencies]
 acquisition = ["herbie-data>=2024.3", "cfgrib>=0.9", "eccodes>=2.35"]
 test = ["pytest>=8"]
+docs = ["mkdocs-material>=9.5", "mkdocstrings[python]>=0.25"]
+dev = ["pytest>=8", "ruff>=0.8", "build>=1.2", "twine>=5", "mkdocs-material>=9.5", "mkdocstrings[python]>=0.25"]
+
+[project.urls]
+Documentation = "https://marinecast.github.io/toolkit-meteorology/"
+Repository = "https://github.com/MarineCast/toolkit-meteorology"
+Issues = "https://github.com/MarineCast/toolkit-meteorology/issues"
 
 [project.scripts]
 meteorology = "meteorology.cli:main"
@@ -25,9 +46,20 @@ meteorology = "meteorology.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.dynamic]
+version = {attr = "meteorology._version.__version__"}
+
 [tool.setuptools.package-data]
-meteorology = ["resources/**/*", "**/*.md", "**/*.txt"]
+meteorology = ["resources/**/*", "**/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --import-mode=importlib"
+markers = ["live: opt-in network and GRIB provider compatibility tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

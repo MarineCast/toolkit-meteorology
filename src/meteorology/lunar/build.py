@@ -138,8 +138,8 @@ def build_lunar(
             sources=[
                 {
                     "name": "Dependency-light approximate lunar astronomy",
-                    "license": "OrcaCast implementation",
-                    "attribution": "OrcaCast",
+                    "license": "Apache-2.0 toolkit implementation",
+                    "attribution": "toolkit-meteorology",
                     "observation_period": "Not applicable; deterministic astronomy",
                     "redistribution_restrictions": "None",
                 }

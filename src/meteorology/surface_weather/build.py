@@ -62,6 +62,7 @@ def _read_validated_sample(
     inventory_row: Any,
     expected_time: pd.Timestamp,
     support_cells: set[str],
+    source_model: str = "hrrr",
 ) -> pd.DataFrame:
     if inventory_row is None or str(inventory_row.STATUS) != "COMPLETE":
         raise ValueError(f"HRRR inventory is incomplete for {expected_time.isoformat()}.")
@@ -77,6 +78,14 @@ def _read_validated_sample(
     valid = pd.Timestamp(expected_time).tz_convert("UTC").isoformat()
     if set(frame["VALID_TIME_UTC"].astype(str)) != {valid}:
         raise ValueError(f"HRRR sample valid time is incorrect: {path}")
+    if (
+        set(frame["INIT_TIME_UTC"].astype(str)) != {valid}
+        or set(frame["FORECAST_HOUR"].astype(int)) != {0}
+        or set(frame["SOURCE_MODEL"].astype(str)) != {source_model}
+        or set(frame["SOURCE_PRODUCT"].astype(str)) != {"sfc"}
+        or set(frame["DATE"].astype(str)) != {str(inventory_row.LOCAL_DATE)}
+    ):
+        raise ValueError(f"HRRR sample f00 analysis or local-date identity is incorrect: {path}")
     precip_init = (
         pd.Timestamp(expected_time).tz_convert("UTC") - pd.Timedelta(hours=1)
     ).isoformat()
@@ -93,6 +102,20 @@ def _read_validated_sample(
     numeric = frame.select_dtypes(include=[np.number]).to_numpy(dtype=float)
     if frame.isna().any().any() or not np.isfinite(numeric).all():
         raise ValueError(f"HRRR sample contains missing or non-finite values: {path}")
+    bounds = {
+        "TEMPERATURE_2M_C": (-100.0, 70.0),
+        "RELATIVE_HUMIDITY_2M_PCT": (0.0, 100.0),
+        "WIND_SPEED_10M_MS": (0.0, None),
+        "WIND_GUST_SURFACE_MS": (0.0, None),
+        "VISIBILITY_KM": (0.0, None),
+        "TOTAL_CLOUD_COVER_PCT": (0.0, 100.0),
+        "PRECIP_RATE_MM_HR": (0.0, None),
+        "MEAN_SEA_LEVEL_PRESSURE_HPA": (700.0, 1200.0),
+    }
+    for column, (minimum, maximum) in bounds.items():
+        values = frame[column].to_numpy(dtype=float)
+        if (values < minimum).any() or (maximum is not None and (values > maximum).any()):
+            raise ValueError(f"HRRR sample {column} is outside its physical validation range: {path}")
     if set(frame["SOURCE_GRID_HASH"].astype(str)) != {str(inventory_row.SOURCE_GRID_HASH)}:
         raise ValueError(f"HRRR sample grid hash disagrees with inventory: {path}")
     return frame
@@ -129,6 +152,8 @@ def aggregate_surface_weather_daily(samples: pd.DataFrame, interval_hours: int) 
     temperature = values("TEMPERATURE_2M_C")
     humidity = values("RELATIVE_HUMIDITY_2M_PCT")
     wind = values("WIND_SPEED_10M_MS")
+    u_wind = values("U_WIND_10M_MS")
+    v_wind = values("V_WIND_10M_MS")
     gust = values("WIND_GUST_SURFACE_MS")
     visibility = values("VISIBILITY_KM")
     cloud = values("TOTAL_CLOUD_COVER_PCT")
@@ -140,6 +165,16 @@ def aggregate_surface_weather_daily(samples: pd.DataFrame, interval_hours: int) 
         ordered["AVAILABLE_AT_UTC"].astype(str).to_numpy(dtype=object).reshape(-1, expected)
     )
     group_keys = ordered[keys].drop_duplicates()
+    u_mean = u_wind.mean(axis=1)
+    v_mean = v_wind.mean(axis=1)
+    vector_speed = np.hypot(u_mean, v_mean)
+    # Meteorological convention: clockwise from north, direction FROM.
+    # A calm mean vector has no direction; never encode it as north (zero).
+    direction = np.where(
+        vector_speed > 1e-12,
+        (np.degrees(np.arctan2(-u_mean, -v_mean)) + 360.0) % 360.0,
+        np.nan,
+    )
     return pd.DataFrame(
         {
             "H3_INDEX": group_keys["H3_INDEX"].astype(str).to_numpy(),
@@ -148,6 +183,10 @@ def aggregate_surface_weather_daily(samples: pd.DataFrame, interval_hours: int) 
             "RELATIVE_HUMIDITY_2M_PCT_MEAN": humidity.mean(axis=1),
             "WIND_SPEED_10M_MS_MEAN": wind.mean(axis=1),
             "WIND_SPEED_10M_MS_MAX": wind.max(axis=1),
+            "U_WIND_10M_MS_MEAN": u_mean,
+            "V_WIND_10M_MS_MEAN": v_mean,
+            "WIND_VECTOR_SPEED_10M_MS": vector_speed,
+            "WIND_DIRECTION_FROM_10M_DEG": direction,
             "WIND_GUST_SURFACE_MS_MEAN": gust.mean(axis=1),
             "WIND_GUST_SURFACE_MS_MAX": gust.max(axis=1),
             "VISIBILITY_KM_MEAN": visibility.mean(axis=1),
@@ -184,9 +223,10 @@ def validate_surface_weather_daily(
     for date, group in daily.groupby("DATE"):
         if set(group["H3_INDEX"].astype(str)) != support_cells:
             raise ValueError(f"Daily R5 weather support mismatch for {date}.")
-    if daily.isna().any().any():
+    required = daily.drop(columns=["WIND_DIRECTION_FROM_10M_DEG"])
+    if required.isna().any().any():
         raise ValueError("Daily R5 weather contains null values.")
-    numeric = daily.select_dtypes(include=[np.number]).to_numpy(dtype=float)
+    numeric = required.select_dtypes(include=[np.number]).to_numpy(dtype=float)
     if not np.isfinite(numeric).all():
         raise ValueError("Daily R5 weather contains non-finite values.")
     if set(daily["QC_STATE"].astype(str)) != {"COMPLETE"}:
@@ -219,6 +259,9 @@ def build_surface_weather(
         raise ValueError(
             f"Unexpected HRRR acquisition manifest product: {acquisition_manifest['product']}"
         )
+    source_model = str(acquisition_manifest.get("resolved_config", {}).get("source", {}).get("model", "hrrr"))
+    if source_model not in {"hrrr", "synthetic_hrrr"}:
+        raise ValueError(f"Unsupported acquisition source model: {source_model}")
     frozen = acquisition_manifest.get("temporal_coverage", {})
     frozen_start = str(frozen.get("start_date") or "")
     frozen_end = str(frozen.get("end_date") or "")
@@ -261,6 +304,7 @@ def build_surface_weather(
                     inventory_row=row,
                     expected_time=valid,
                     support_cells=support_cells,
+                    source_model=source_model,
                 )
                 precip_positive_sample_count += int(
                     (sample["PRECIP_RATE_MM_HR"].to_numpy(dtype=float) > 0.0).sum()
@@ -333,33 +377,20 @@ def build_surface_weather(
                     "checksum": checksum_path(config.support_manifest_path),
                 },
             ],
-            sources=[
-                {
-                    "name": "NOAA HRRR surface analysis",
-                    "license": "United States government data; consult NOAA source terms",
-                    "attribution": "NOAA/NCEP HRRR",
-                    "observation_period": f"{start} through {end}",
-                    "redistribution_restrictions": "Consult authoritative NOAA archive terms",
-                },
-                {
-                    "name": "NOAA HRRR one-hour precipitation forecast",
-                    "license": "United States government data; consult NOAA source terms",
-                    "attribution": "NOAA/NCEP HRRR",
-                    "observation_period": f"{start} through {end}",
-                    "redistribution_restrictions": "Consult authoritative NOAA archive terms",
-                },
-            ],
+            sources=acquisition_manifest["sources"],
             h3_resolution=weather.h3_resolution,
             spatial_bounds=config.bbox,
             temporal_coverage={"start_date": start, "end_date": end},
             source_completeness="complete",
             availability_semantics={
-                "product_type": "retrospective_analysis_with_short_forecast_precipitation",
+                "product_type": "synthetic_offline_fixture" if source_model == "synthetic_hrrr" else "retrospective_analysis_with_short_forecast_precipitation",
                 "daily_release": "Each local date requires all six configured f00 core analyses and matched f01 precipitation rates for every R5 cell.",
                 "sample_availability": "AVAILABLE_AT_UTC is inherited from the direct-HRRR acquisition inventory.",
             },
             formulas={
-                "PRECIP_MM_DAY_ESTIMATE": "sum(PRECIP_RATE_MM_HR * 4 hours) across six f01 PRATE forecasts initialized one hour before and valid at the configured sample times"
+                "PRECIP_MM_DAY_ESTIMATE": "sum(PRECIP_RATE_MM_HR * 4 hours) across six f01 PRATE forecasts initialized one hour before and valid at the configured sample times",
+                "WIND_VECTOR_SPEED_10M_MS": "hypot(mean(U_WIND_10M_MS), mean(V_WIND_10M_MS))",
+                "WIND_DIRECTION_FROM_10M_DEG": "mod(degrees(atan2(-mean(U_WIND_10M_MS), -mean(V_WIND_10M_MS))) + 360, 360); null when mean-vector speed <= 1e-12 m/s",
             },
             units={
                 "temperature": "degrees Celsius",
@@ -373,6 +404,7 @@ def build_surface_weather(
                 "H3 values are nearest-neighbour samples from the direct HRRR grid.",
                 "Partial days and missing or non-finite source values are not published.",
                 "A complete-range all-zero precipitation field is treated as a failed release.",
+                "Wind direction is undefined for a calm mean vector and is null in that case.",
             ],
         )
         write_manifest(staged_manifest, payload)

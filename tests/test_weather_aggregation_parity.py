@@ -36,6 +36,8 @@ def _samples(interval: int = 4) -> pd.DataFrame:
                         "AVAILABLE_AT_UTC": (valid + pd.Timedelta(hours=6)).isoformat(),
                         "SOURCE_DATA_STATE": "COMPLETE",
                         **{column: rng.normal() * 10 ** rng.uniform(-8, 8) for column in METRICS},
+                        "U_WIND_10M_MS": rng.normal(),
+                        "V_WIND_10M_MS": rng.normal(),
                         "PRECIP_RATE_MM_HR": rng.uniform(0, 10),
                     }
                 )
@@ -66,7 +68,7 @@ def _per_group_reference(samples: pd.DataFrame, interval: int) -> pd.DataFrame:
             }
         )
         rows.append(row)
-    return pd.DataFrame(rows, columns=DAILY_SCHEMA.names)
+    return pd.DataFrame(rows)
 
 
 @pytest.mark.parametrize("interval", [1, 4, 6])
@@ -77,7 +79,7 @@ def test_aggregation_exactly_matches_per_group_reference(interval: int, dtype: s
         samples[column] = samples[column].astype(dtype)
     expected = _per_group_reference(samples, interval)
     actual = aggregate_surface_weather_daily(samples, interval)
-    pd.testing.assert_frame_equal(actual, expected, check_exact=True)
+    pd.testing.assert_frame_equal(actual[expected.columns], expected, check_exact=True)
 
 
 @pytest.mark.parametrize("value", [np.nan, np.inf, -np.inf])
@@ -120,3 +122,26 @@ def test_aggregation_rejects_missing_keys_or_times(column: str) -> None:
 def test_aggregation_retains_empty_schema() -> None:
     actual = aggregate_surface_weather_daily(_samples().iloc[:0], 4)
     pd.testing.assert_frame_equal(actual, pd.DataFrame(columns=DAILY_SCHEMA.names))
+
+
+def test_wind_direction_wraparound_and_calm_are_not_arithmetic_angles() -> None:
+    samples = _samples().query("H3_INDEX == 'a' and DATE == '2024-03-10'").copy()
+    degrees = np.array([359.0, 1.0] * 3)
+    samples["U_WIND_10M_MS"] = -np.sin(np.deg2rad(degrees))
+    samples["V_WIND_10M_MS"] = -np.cos(np.deg2rad(degrees))
+    result = aggregate_surface_weather_daily(samples, 4).iloc[0]
+    assert result.WIND_DIRECTION_FROM_10M_DEG == pytest.approx(0.0, abs=1e-10)
+    assert result.WIND_VECTOR_SPEED_10M_MS == pytest.approx(np.cos(np.deg2rad(1)))
+
+    samples["U_WIND_10M_MS"] = [1.0, -1.0] * 3
+    samples["V_WIND_10M_MS"] = 0.0
+    calm = aggregate_surface_weather_daily(samples, 4).iloc[0]
+    assert calm.WIND_VECTOR_SPEED_10M_MS == 0.0
+    assert pd.isna(calm.WIND_DIRECTION_FROM_10M_DEG)
+
+
+def test_precipitation_uses_each_snapshot_once() -> None:
+    samples = _samples().query("H3_INDEX == 'a' and DATE == '2024-03-10'").copy()
+    samples["PRECIP_RATE_MM_HR"] = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    result = aggregate_surface_weather_daily(samples, 4).iloc[0]
+    assert result.PRECIP_MM_DAY_ESTIMATE == 4.0

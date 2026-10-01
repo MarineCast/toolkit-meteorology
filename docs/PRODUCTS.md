@@ -1,10 +1,12 @@
 # Products and interpretation
 
-[Documentation index](README.md)
+[Documentation index](index.md)
 
-The checked-in [feature catalog](../config/feature_catalog.yaml) documents field names, units,
-roles and declared product paths. The [Arrow schemas](../src/meteorology/core/data/meteorological_schemas.py)
-are the executable type contract. Catalog materialization status reflects the workspace in which
+The canonical [variable inventory](reference/variables.md) documents every Arrow field's source,
+units, calculation, missingness, method version and modeling kind. The checked-in
+[feature catalog](https://github.com/MarineCast/toolkit-meteorology/blob/main/config/feature_catalog.yaml) tracks field roles and product paths. The
+[Arrow schemas](https://github.com/MarineCast/toolkit-meteorology/blob/main/src/meteorology/core/data/meteorological_schemas.py) are the executable type
+contract. Catalog materialization status reflects the workspace in which
 it was generated; checked-in metadata does not certify a regional release.
 
 | Product | Row identity | Support / partitioning |
@@ -24,8 +26,9 @@ Do not join rows by order or substitute water-only H3 support for atmospheric su
 
 ## Weather
 
-Fields describe temperature, humidity, wind, gusts, visibility, cloud cover, pressure and estimated
-precipitation. QC, coverage, sample counts and source metadata remain separate from physical values.
+Fields describe temperature, humidity, vector wind and direction, gusts, visibility, cloud cover,
+pressure and estimated precipitation. Calm mean-vector direction is null. QC, coverage, sample
+counts and source metadata remain separate from physical values.
 The daily product uses six four-hourly core-weather analyses. Matched precipitation forecasts are
 initialized one hour earlier at forecast hour one, with the same valid times.
 
@@ -39,6 +42,8 @@ Daylight describes daily solar exposure and a compact day-of-year lookup. Lunar 
 approximate phase, illumination and moonlit darkness. Their deterministic aliases remain in
 scientific products even when the optional model policy excludes them from a model matrix.
 Astronomy omits terrain horizons, clouds, artificial light and ephemeris-grade corrections.
+Mean positive solar elevation is null on sampled polar night; lunar fractions of night are null
+when there is no night. Zero is reserved for an actual zero-hour or zero-illumination result.
 
 ## Consuming products
 

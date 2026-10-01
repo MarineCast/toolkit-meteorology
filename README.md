@@ -1,87 +1,90 @@
 # Meteorology Toolkit
 
-Species-neutral HRRR weather, daylight, lunar calculations and full-bbox atmospheric H3 support.
-The distribution is **`toolkit-meteorology`**; the Python package and command are **`meteorology`**.
-It installs independently of OrcaCast and sibling toolkits.
+![Illustrated coastal weather systems over the Salish Sea](docs/assets/banner.png)
 
-## Documentation
+[![Offline package checks](https://github.com/MarineCast/toolkit-meteorology/actions/workflows/tests.yml/badge.svg)](https://github.com/MarineCast/toolkit-meteorology/actions/workflows/tests.yml) · [Documentation](https://marinecast.github.io/toolkit-meteorology/) · [Scientific methodology](docs/methodology.md) · [Variable inventory](docs/reference/variables.md)
 
-Start with the [documentation index](docs/README.md) for setup, configuration, workflows,
-product contracts, architecture and development guidance.
+**Reproducible, provenance-aware spatial and temporal meteorological and astronomical products for environmental and ecological modeling.** `toolkit-meteorology` is an independently installable Python distribution. Import `meteorology` or use the `meteorology` command. It does not require an OrcaCast checkout.
 
-## Installation
+| Product | Meaning | Native support |
+| --- | --- | --- |
+| Atmospheric H3 support | Cell centroids inside a configured WGS84 box, including land and water | R4, R5, R6 |
+| Surface weather | Six four-hourly HRRR `sfc/f00` analysis samples; matched `sfc/f01` precipitation-rate snapshots | R5 × local date |
+| Daylight | Approximate geometric day length, solar profile and daylight weights | R4 × local date; day-of-year lookup |
+| Lunar context | Approximate phase, disk illumination and geometrical moon visibility | R5 × local date |
+| Daily matrix | Optional union of native daily families, with unsupported component values null | R4/R5 × local date |
 
-Python 3.11+ on Linux or macOS. Transactional publication uses POSIX file locks.
+The package is primarily **retrospective**. `PRECIP_MM_DAY_ESTIMATE` sums six forecast-rate snapshots multiplied by nominal four-hour intervals; it is not a measured 24-hour precipitation accumulation. Weather and astronomy do not measure species occurrence, observer effort, reporting or detection probability. Read [limitations](docs/limitations.md) before using the values as model predictors.
 
-```sh
-python -m pip install -e '.[test]'
-python -m pytest -q
-meteorology --help
+## Start in under five minutes, offline
+
+Use Python 3.11–3.13 on macOS or Linux. From a clone:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install '.[test]'
+meteorology --workspace ./weather-demo init
+meteorology --workspace ./weather-demo example-offline
+meteorology --workspace ./weather-demo validate \
+  --daily-matrix ./weather-demo/outputs/synthetic-daily-matrix.parquet
 ```
 
-For a regular install use `python -m pip install .`. Install `.[acquisition]` to acquire HRRR
-GRIB data through Herbie, cfgrib and ecCodes. Offline builds and astronomy do not require Herbie.
-A compatible ecCodes runtime is required for live GRIB decoding.
+`example-offline` creates explicitly synthetic one-day HRRR-like inputs, then runs the normal support, weather, daylight, lunar and matrix builders. It requires a fresh workspace, makes no network requests and refuses to replace existing products. It is a package workflow check, not a live NOAA data certification. The [quickstart](docs/getting-started/quickstart.md) also shows a clean wheel install outside the checkout.
 
-## Workspace and execution
+## Real HRRR workflow
 
-Paths resolve under the current directory, `METEOROLOGY_WORKSPACE`, or the CLI's `--workspace`.
-Package installation never makes site-packages a data/output directory. Initialize an external
-workspace, then edit `config/common.yaml` and `config/data/environment_meteorological.yaml`:
+Live acquisition uses optional Herbie, cfgrib and ecCodes support:
 
-```sh
-meteorology --workspace /path/to/weather init
-meteorology --workspace /path/to/weather build spatial-support
-meteorology --workspace /path/to/weather download surface-weather --start-date 2024-01-02 --end-date 2024-01-02 --workers 4
-meteorology --workspace /path/to/weather build surface-weather
-meteorology --workspace /path/to/weather build daylight --start-date 2024-01-02 --end-date 2024-01-02
-meteorology --workspace /path/to/weather build lunar --start-date 2024-01-02 --end-date 2024-01-02
-meteorology --workspace /path/to/weather inspect surface-weather --date 2024-01-02
-meteorology --workspace /path/to/weather catalog
-meteorology --workspace /path/to/weather feature-policy
+```bash
+python -m pip install '.[acquisition]'
+meteorology --workspace ./weather-real init
+meteorology --workspace ./weather-real build spatial-support
+meteorology --workspace ./weather-real download surface-weather \
+  --start-date 2024-01-02 --end-date 2024-01-02 --dry-run
+meteorology --workspace ./weather-real download surface-weather \
+  --start-date 2024-01-02 --end-date 2024-01-02 --workers 4
+meteorology --workspace ./weather-real build surface-weather
+meteorology --workspace ./weather-real validate \
+  --manifest ./weather-real/data/processed/domain/environmental_layer/meteorological/surface_weather/MANIFEST.json
 ```
 
-Set the configured weather date range to match the acquired range before building. The inherited
-regional defaults cover the Northeast Pacific and multiple years; inspect them before acquisition
-or astronomy builds. `init` preserves existing files. Each family supports `--help`; `stages`
-lists build order. Acquisition is explicit; builds read local inputs. Repeated builds use the
-inherited family staging, manifest validation and transactional replacement semantics. There is
-no whole-domain candidate release or promotion command in this extraction. Use a separate workspace
-for experiments. Never point it at validated OrcaCast data for an exploratory build.
+Inspect the initialized bounding box, timezone, date and output paths first. A request spanning more than seven local days requires explicit `--allow-large-download`; `--dry-run` reports the intended time span and cycle count without contacting the provider. Acquisition resumes verified samples. The package never writes runtime products into `site-packages`.
 
-Python APIs use the same workspace contract:
+## Python API
 
 ```python
-from meteorology.config import load_meteorological_config
-from meteorology.spatial_support.build import build_meteorological_spatial_support
+import meteorology
 
-config = load_meteorological_config()  # after workspace initialization
-build_meteorological_spatial_support(config.path)
+print(meteorology.__version__)
+config = meteorology.load_config()  # METEOROLOGY_WORKSPACE or current directory
+meteorology.build_spatial_support()
+preview = meteorology.download_surface_weather(
+    start_date="2024-01-02", end_date="2024-01-02", dry_run=True
+)
+print(preview["expected_times"])
 ```
 
-## Scientific scope
+The root API also provides `build_surface_weather`, `build_daylight`, `build_lunar`, `export_daily_matrix`, `validate_product` and `freeze_release`. See the [API reference](docs/reference/api.md).
 
-- H3 support includes land and water, at R4/R5/R6; it is not a wet-cell universe.
-- Weather is R5, one row per H3 cell and local date, using six four-hourly HRRR f00 analyses.
-- Precipitation uses matched f01 forecasts and is a six-snapshot daily estimate, not a measured
-  24-hour accumulation. Source issue time, lead time and valid time remain distinct.
-- Daylight is R4 daily plus a day-of-year lookup; lunar phase/moonlight is R5 daily. Approximate
-  astronomy does not model clouds, terrain horizons, refraction or artificial light.
-- Missing, unsupported and non-finite inputs stay distinct from observed zero and block weather
-  publication when the required support is incomplete. Units, Arrow schemas, keys, checksums,
-  provenance, and acquisition-resumption behavior are retained.
-- This implementation is retrospective weather plus deterministic astronomy. General future-weather
-  forecasting remains outside its implemented scope. Weather is not sighting probability.
+## Scientific and release contracts
 
-See [contracts and workflow](docs/CONTRACTS.md), [source rights and limitations](src/meteorology/DATA_SOURCES.md),
-[development](docs/DEVELOPMENT.md), and [migration and validation](docs/MIGRATION.md).
-The inherited `modeling.feature_policy` is an optional downstream ecological-model selection policy;
-it never changes scientific products and is not a universal recommendation for every application.
+- [Methodology](docs/methodology.md) explains source identity, local dates and DST, nearest-grid sampling, daily reductions, vector wind, precipitation and astronomical approximations.
+- [Product contracts](docs/CONTRACTS.md) and [Arrow-backed variable inventory](docs/reference/variables.md) define keys, units, missingness, schemas and scientific method versions.
+- Every family manifest records software version, method version, run ID, content-derived release ID, configuration, input/output checksums, source attribution and limitations. `meteorology validate` checks a release; `meteorology freeze-release` copies it to a checksum-backed release-ID directory and refuses to replace an existing one.
+- The package's [modeling guidance](docs/guides/downstream-modeling.md) calls out temporal/spatial leakage and availability at prediction time. Its optional feature policy is a downstream selection aid, not a universal ecological recommendation.
 
-## Validation boundary
+## Development and release status
 
-Offline fixtures exercise strict acquisition identity, aggregation, missingness, failure recovery,
-manifest checksums, astronomy and HTML generation. Live acquisition, regional rebuilds, visual map
-QA, remote CI and OrcaCast model integration are separate checks. No source datasets are bundled.
+```bash
+python -m pip install '.[dev]'
+python -m pytest -q
+ruff check src tests
+mkdocs build --strict
+python -m build
+python -m twine check dist/*
+```
 
-See [combined daily H3 export](docs/daily-matrix.md) for a single native-resolution product.
+See [production readiness](PRODUCTION_READINESS.md), the [release checklist](docs/development/release-process.md), and [CHANGELOG.md](CHANGELOG.md) for verified status and remaining owner actions. Creating a tag, publishing to PyPI and running a regional NOAA rebuild are separate reviewed actions.
+
+Apache-2.0 software license. NOAA/source data rights and attribution are described in [sources and rights](docs/DATA_SOURCES.md).
