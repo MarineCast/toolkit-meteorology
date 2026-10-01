@@ -20,7 +20,7 @@ Missingness: not applicable to complete deterministic output. Limitation: Centro
 
 ## Hrrr Sample
 
-Method: `hrrr_f00_f01_earth_wind_sample_v3`. Support: R5; one UTC valid time.
+Method: `hrrr_f00_f01_earth_wind_sample_v4`. Support: R5; one UTC valid time.
 
 | Field | Source field | Unit | Processing | Range | Kind | Predictor? |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -58,7 +58,7 @@ Missingness: reject incomplete source/support; no zero fill. Limitation: Retrosp
 
 ## Hrrr Inventory
 
-Method: `hrrr_f00_f01_earth_wind_sample_v3`. Support: R5; one UTC valid time.
+Method: `hrrr_f00_f01_earth_wind_sample_v4`. Support: R5; one UTC valid time.
 
 | Field | Source field | Unit | Processing | Range | Kind | Predictor? |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -87,16 +87,22 @@ Method: `hrrr_f00_f01_earth_wind_sample_v3`. Support: R5; one UTC valid time.
 | SOURCE_RETRIEVED_AT_UTC | UTC time the core GRIB retrieval completed | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | PRECIP_OBJECT_URI | logical NOAA HRRR f01 object identity independent of mirror | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | PRECIP_RETRIEVED_AT_UTC | UTC time the f01 GRIB retrieval completed | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SPATIAL_POLICY_ID | versioned geographic acceptance rule for the sampled support | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| NATIVE_GRID_CHECKSUM | SHA-256 of full decoded native coordinate arrays, not raw GRIB bytes | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SUPPORT_HASH | stable hash of sorted H3 cell and centroid coordinates | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 
-Missingness: not applicable to complete deterministic output. Nullable exceptions: `SOURCE_URI`: null before or after unsuccessful acquisition; `RELATIVE_PATH`: null until a validated sample is published; `CHECKSUM`: null until a validated sample is published; `CROSSWALK_RELATIVE_PATH`: null until a validated crosswalk is published; `CROSSWALK_CHECKSUM`: null until a validated crosswalk is published; `SOURCE_GRID_HASH`: null when the source grid could not be validated; `FAILURE_REASON`: null when acquisition succeeded; `PRECIP_INIT_TIME_UTC`: null when precipitation source acquisition failed; `PRECIP_FORECAST_HOUR`: null when precipitation source acquisition failed; `PRECIP_SOURCE_URI`: null when precipitation source acquisition failed; `SOURCE_OBJECT_URI`: null before or after unsuccessful acquisition; `SOURCE_RETRIEVED_AT_UTC`: null before or after unsuccessful acquisition; `PRECIP_OBJECT_URI`: null when precipitation source acquisition failed; `PRECIP_RETRIEVED_AT_UTC`: null when precipitation source acquisition failed. Limitation: Centroid support is not an area average.
+Missingness: not applicable to complete deterministic output. Nullable exceptions: `SOURCE_URI`: null before or after unsuccessful acquisition; `RELATIVE_PATH`: null until a validated sample is published; `CHECKSUM`: null until a validated sample is published; `CROSSWALK_RELATIVE_PATH`: null until a validated crosswalk is published; `CROSSWALK_CHECKSUM`: null until a validated crosswalk is published; `SOURCE_GRID_HASH`: null when the source grid could not be validated; `FAILURE_REASON`: null when acquisition succeeded; `PRECIP_INIT_TIME_UTC`: null when precipitation source acquisition failed; `PRECIP_FORECAST_HOUR`: null when precipitation source acquisition failed; `PRECIP_SOURCE_URI`: null when precipitation source acquisition failed; `SOURCE_OBJECT_URI`: null before or after unsuccessful acquisition; `SOURCE_RETRIEVED_AT_UTC`: null before or after unsuccessful acquisition; `PRECIP_OBJECT_URI`: null when precipitation source acquisition failed; `PRECIP_RETRIEVED_AT_UTC`: null when precipitation source acquisition failed; `SPATIAL_POLICY_ID`: null until exact-support geographic acceptance succeeds; `NATIVE_GRID_CHECKSUM`: null until full decoded native grid identity is verified; `SUPPORT_HASH`: null until accepted H3 support identity is established. Limitation: Centroid support is not an area average.
 
 ## Hrrr Crosswalk
 
-Method: `hrrr_f00_f01_earth_wind_sample_v3`. Support: R5; one source grid.
+Method: `hrrr_f00_f01_earth_wind_sample_v4`. Support: R5; one source grid.
 
 | Field | Source field | Unit | Processing | Range | Kind | Predictor? |
 | --- | --- | --- | --- | --- | --- | --- |
 | H3_INDEX | H3 cell index at the declared native resolution | H3 cell identifier | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SPATIAL_POLICY_ID | versioned geographic acceptance rule for the sampled support | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| NATIVE_GRID_CHECKSUM | SHA-256 of full decoded native coordinate arrays, not raw GRIB bytes | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SUPPORT_HASH | stable hash of sorted H3 cell and centroid coordinates | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | SOURCE_GRID_HASH | checksum of ordered source-grid coordinates | SHA-256 hex digest | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | SOURCE_GRID_INDEX | flattened index of nearest source-grid point | count or identifier | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
 | SOURCE_GRID_DISTANCE_M | great-circle distance from H3 centroid to selected source point | m | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |

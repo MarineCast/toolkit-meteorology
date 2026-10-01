@@ -67,6 +67,7 @@ class SurfaceWeatherConfig:
     daily_output_dir: Path
     manifest_path: Path
     bbox_padding_degrees: float
+    spatial_acceptance_policy: str = "hrrr_conus_native_nearest_v1"
 
     @property
     def expected_samples_per_standard_day(self) -> int:
@@ -157,6 +158,7 @@ def _load_surface(section: Mapping[str, Any]) -> SurfaceWeatherConfig:
         "raw",
         "output",
         "bbox_padding_degrees",
+        "spatial_acceptance_policy",
     }
     _keys(section, allowed, "surface_weather")
     source = _mapping(_required(section, "source", "surface_weather"), "surface_weather.source")
@@ -228,6 +230,9 @@ def _load_surface(section: Mapping[str, Any]) -> SurfaceWeatherConfig:
     padding = float(section.get("bbox_padding_degrees", 0.2))
     if padding < 0:
         raise ValueError("surface_weather.bbox_padding_degrees must be >= 0.")
+    policy = str(section.get("spatial_acceptance_policy", "hrrr_conus_native_nearest_v1"))
+    if policy not in {"hrrr_conus_native_nearest_v1", "synthetic_native_nearest_v1"}:
+        raise ValueError("surface_weather.spatial_acceptance_policy is unsupported.")
     return SurfaceWeatherConfig(
         h3_resolution=resolution,
         interval_hours=interval,
@@ -245,6 +250,7 @@ def _load_surface(section: Mapping[str, Any]) -> SurfaceWeatherConfig:
         daily_output_dir=_path(_required(output, "daily_dir", "surface_weather.output")),
         manifest_path=_path(_required(output, "manifest_path", "surface_weather.output")),
         bbox_padding_degrees=padding,
+        spatial_acceptance_policy=policy,
     )
 
 

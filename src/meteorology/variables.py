@@ -111,6 +111,9 @@ INVENTORY_NULLS = {
     "PRECIP_SOURCE_URI": "null when precipitation source acquisition failed",
     "PRECIP_OBJECT_URI": "null when precipitation source acquisition failed",
     "PRECIP_RETRIEVED_AT_UTC": "null when precipitation source acquisition failed",
+    "SPATIAL_POLICY_ID": "null until exact-support geographic acceptance succeeds",
+    "NATIVE_GRID_CHECKSUM": "null until full decoded native grid identity is verified",
+    "SUPPORT_HASH": "null until accepted H3 support identity is established",
 }
 
 # Identity, acquisition, calendar and quality fields are documented as
@@ -129,6 +132,9 @@ METADATA_SOURCE = {
     "AVAILABLE_AT_UTC": "declared source availability time in UTC",
     "AVAILABILITY_POLICY": "versioned rule used to derive the declared availability time",
     "SOURCE_GRID_HASH": "checksum of ordered source-grid coordinates",
+    "SPATIAL_POLICY_ID": "versioned geographic acceptance rule for the sampled support",
+    "NATIVE_GRID_CHECKSUM": "SHA-256 of full decoded native coordinate arrays, not raw GRIB bytes",
+    "SUPPORT_HASH": "stable hash of sorted H3 cell and centroid coordinates",
     "SOURCE_GRID_INDEX": "flattened index of nearest source-grid point",
     "SOURCE_GRID_DISTANCE_M": "great-circle distance from H3 centroid to selected source point",
     "SOURCE_GRID_DISTANCE_M_MEAN": "mean of six nearest-source distances",

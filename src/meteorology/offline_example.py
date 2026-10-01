@@ -18,7 +18,8 @@ from .lunar.build import build_lunar
 from .spatial_support.build import build_meteorological_spatial_support, load_meteorological_support
 from .surface_weather.build import build_surface_weather
 from .surface_weather.download import _inventory_row, sample_path
-from .surface_weather.sampling import build_nearest_grid_crosswalk, make_sample_times_for_local_date, sample_source_grid
+from .surface_weather.sampling import make_sample_times_for_local_date, sample_source_grid
+from .surface_weather.spatial_acceptance import support_identity
 from .validation import validate_daily_matrix, validate_product
 
 
@@ -47,7 +48,19 @@ def build_offline_example(config_path: str | Path = "config/data/environment_met
         "SOURCE_LON": support["CENTROID_LON"].to_numpy(dtype=float),
         "SOURCE_GRID_HASH": grid_hash,
     })
-    crosswalk = build_nearest_grid_crosswalk(support, source_grid)
+    # Synthetic input points are the H3 centroids themselves, so their identity
+    # mapping is explicit and never presented as a validated NOAA native grid.
+    spatial_policy = "synthetic_identity_v1"
+    support_hash = support_identity(support)
+    crosswalk = pd.DataFrame({
+        "H3_INDEX": support["H3_INDEX"].astype(str),
+        "SPATIAL_POLICY_ID": spatial_policy,
+        "NATIVE_GRID_CHECKSUM": grid_hash,
+        "SUPPORT_HASH": support_hash,
+        "SOURCE_GRID_HASH": grid_hash,
+        "SOURCE_GRID_INDEX": source_grid["SOURCE_GRID_INDEX"].astype("int32"),
+        "SOURCE_GRID_DISTANCE_M": 0.0,
+    })[HRRR_CROSSWALK_SCHEMA.names]
     crosswalk_path = weather.raw_dir / "crosswalks" / f"{grid_hash}.parquet"
     write_table(crosswalk_path, pa.Table.from_pandas(crosswalk, preserve_index=False), HRRR_CROSSWALK_SCHEMA)
     rows = []
@@ -78,6 +91,8 @@ def build_offline_example(config_path: str | Path = "config/data/environment_met
             source_uri=f"synthetic://fixture/f00/{valid.isoformat()}",
             precip_source_uri=f"synthetic://fixture/f01/{valid.isoformat()}",
             source_grid_hash=grid_hash,
+            spatial_policy_id=spatial_policy, native_grid_checksum=grid_hash,
+            support_hash=support_hash,
         )
         row.update(SOURCE_BACKEND="synthetic_fixture", SOURCE_FORMAT="SYNTHETIC_PARQUET",
                    PRECISION_QC_STATE="DETERMINISTIC_SYNTHETIC",
@@ -90,6 +105,13 @@ def build_offline_example(config_path: str | Path = "config/data/environment_met
         resolved_config={"start_date": date, "end_date": date, "timezone": weather.timezone,
                          "interval_hours": 4, "h3_resolution": 5,
                          "availability_lag_hours": 6,
+                         "spatial_acceptance": {
+                             "policy_id": spatial_policy,
+                             "support_hash": support_hash,
+                             "native_grid_checksums": [grid_hash],
+                             "source": "synthetic H3 centroids",
+                             "distance_criterion": "identity mapping; zero offset",
+                         },
                          "source": {"model": "synthetic_hrrr", "product": "sfc", "forecast_hour": 0,
                                     "precipitation_forecast_hour": 1}},
         artifacts=[parquet_contract(weather.inventory_path)],

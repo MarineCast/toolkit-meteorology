@@ -1389,11 +1389,28 @@ products:
     dependencies:
     - meteorological_spatial_support
     grain: one row per H3 cell and HRRR source-grid hash
-    feature_count: 3
+    feature_count: 6
     variable_kind_counts:
       feature_variable: 0
-      metadata: 3
+      metadata: 6
     features:
+      NATIVE_GRID_CHECKSUM:
+        common_name: Native Grid Checksum
+        metric_family: meteorological
+        metric_subfamily: spatial_support
+        column: NATIVE_GRID_CHECKSUM
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_HRRR_NEAREST_GRID_RES_5
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: NATIVE_GRID_CHECKSUM
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
       SOURCE_GRID_DISTANCE_M:
         common_name: Source Grid Distance M
         metric_family: meteorological
@@ -1445,6 +1462,40 @@ products:
         - 5
         modeling_use: excluded_metadata
         default_ecological_occurrence_model: null
+      SPATIAL_POLICY_ID:
+        common_name: Spatial Policy Id
+        metric_family: meteorological
+        metric_subfamily: spatial_support
+        column: SPATIAL_POLICY_ID
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_HRRR_NEAREST_GRID_RES_5
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SPATIAL_POLICY_ID
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      SUPPORT_HASH:
+        common_name: Support Hash
+        metric_family: meteorological
+        metric_subfamily: spatial_support
+        column: SUPPORT_HASH
+        collection_paths:
+          5: data/processed/domain/environmental_layer/meteorological/surface_weather/H3_HRRR_NEAREST_GRID_RES_5
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SUPPORT_HASH
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
   hrrr_source_inventory:
     common_name: HRRR acquisition inventory
     metric_family: meteorological
@@ -1465,10 +1516,10 @@ products:
     producer: meteorology.surface_weather.download
     dependencies: []
     grain: one row per expected HRRR valid time
-    feature_count: 25
+    feature_count: 28
     variable_kind_counts:
       feature_variable: 0
-      metadata: 25
+      metadata: 28
     features:
       AVAILABLE_AT_UTC:
         common_name: Available At Utc
@@ -1619,6 +1670,23 @@ products:
         variable_kind: metadata
         topology: within_cell_or_nonspatial
         scale_group: LOCAL_DATE
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      NATIVE_GRID_CHECKSUM:
+        common_name: Native Grid Checksum
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: NATIVE_GRID_CHECKSUM
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: NATIVE_GRID_CHECKSUM
         available_resolutions:
         - 5
         modeling_use: excluded_metadata
@@ -1844,6 +1912,23 @@ products:
         - 5
         modeling_use: excluded_metadata
         default_ecological_occurrence_model: null
+      SPATIAL_POLICY_ID:
+        common_name: Spatial Policy Id
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: SPATIAL_POLICY_ID
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SPATIAL_POLICY_ID
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
       STATUS:
         common_name: Status
         metric_family: meteorological
@@ -1857,6 +1942,23 @@ products:
         variable_kind: metadata
         topology: within_cell_or_nonspatial
         scale_group: STATUS
+        available_resolutions:
+        - 5
+        modeling_use: excluded_metadata
+        default_ecological_occurrence_model: null
+      SUPPORT_HASH:
+        common_name: Support Hash
+        metric_family: meteorological
+        metric_subfamily: source_inventory
+        column: SUPPORT_HASH
+        collection_paths:
+          5: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_SOURCE_INVENTORY.parquet
+        unit: unitless
+        arrow_type: string
+        role: provenance_or_qc
+        variable_kind: metadata
+        topology: within_cell_or_nonspatial
+        scale_group: SUPPORT_HASH
         available_resolutions:
         - 5
         modeling_use: excluded_metadata
@@ -1895,7 +1997,7 @@ products:
         - 5
         modeling_use: excluded_metadata
         default_ecological_occurrence_model: null
-feature_entry_count: 99
+feature_entry_count: 105
 supporting_products: {}
 superseded_products: {}
 catalog_contract:
@@ -1933,7 +2035,7 @@ catalog_contract:
 schema_version: 4
 catalog_id: environment
 product_count: 7
-unique_column_count: 83
+unique_column_count: 86
 family_counts:
   meteorological: 7
 generated_from_materialized_schemas: false

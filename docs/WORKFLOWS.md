@@ -29,8 +29,17 @@ meteorology download surface-weather --start-date 2024-01-02 --end-date 2024-01-
 meteorology build surface-weather --start-date 2024-01-02 --end-date 2024-01-02
 ```
 
-The download command performs network access; the build consumes validated local samples and
-inventory. Worker count must be between 1 and 16. Successful samples and the working inventory
+The download command performs network access and checks the versioned native-grid geographic
+acceptance policy before publishing every exact-
+support crosswalk. If a target is outside the NOAA CONUS footprint, its native nearest point
+is absent from the crop, or its sampling distance exceeds the local cell-geometry limit,
+publication stops. Inspect the working inventory's `FAILURE_REASON` and the full per-cell
+`raw/runs/<token>/spatial_rejections/<valid-time>.json` report, then adjust the support or
+re-extract the source crop and rerun. Old acquisition rows without the policy identity require
+reacquisition before they can be included in a v4 manifest.
+
+The build consumes validated local samples and inventory. Worker count must be between 1 and 16.
+Successful samples and the working inventory
 survive acquisition failures. Rerun the same command to resume. `--overwrite` refetches
 already validated times into new immutable objects; it does not change published references
 until the complete acquisition commits. It is not needed for normal resumption.

@@ -286,6 +286,7 @@ def test_grid_wind_agrees_with_independent_lambert_convergence(longitude: float)
 
 
 def test_nearest_grid_crosswalk_is_source_row_order_invariant() -> None:
+    from meteorology.surface_weather.spatial_acceptance import NativeGrid
     support = pd.DataFrame(
         {
             "H3_INDEX": ["a", "b"],
@@ -301,11 +302,19 @@ def test_nearest_grid_crosswalk_is_source_row_order_invariant() -> None:
             "SOURCE_GRID_HASH": ["fixture", "fixture"],
         }
     )
+    raw.attrs["native_grid"] = NativeGrid.from_coordinates(
+        np.array([[48.0, 48.0], [49.0, 49.0]]),
+        np.array([[-124.0, -123.0], [-124.0, -123.0]]),
+    )
+    raw.attrs["native_indices"] = np.array([0, 3])
+    reversed_raw = raw.iloc[::-1].reset_index(drop=True)
+    reversed_raw.attrs["native_indices"] = np.array([3, 0])
     first = (
-        build_nearest_grid_crosswalk(support, raw).sort_values("H3_INDEX").reset_index(drop=True)
+        build_nearest_grid_crosswalk(support, raw, policy_id="synthetic_native_nearest_v1")
+        .sort_values("H3_INDEX").reset_index(drop=True)
     )
     second = (
-        build_nearest_grid_crosswalk(support, raw.iloc[::-1].reset_index(drop=True))
+        build_nearest_grid_crosswalk(support, reversed_raw, policy_id="synthetic_native_nearest_v1")
         .sort_values("H3_INDEX")
         .reset_index(drop=True)
     )

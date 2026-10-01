@@ -2,6 +2,41 @@
 
 This is a local implementation review for proposed software version `0.1.0` on 2026-09-30. It does not certify a live NOAA data release, a deployed documentation site, or a published Python package.
 
+## October 1 geographic acceptance patch (build ID `pr2-spatial-20261001`)
+
+This PR 2 candidate is stacked on PR 1 commit
+`bb2b725fd6aeede35264613ab812d0b5e2afe0e9`; its own PR head identifies the
+exact reviewed source. It adds the versioned `hrrr_conus_native_nearest_v1` gate for the
+NOAA/NCEP 3-km CONUS HRRR grid. Full decoded native coordinates, not a requested crop,
+define the footprint and native-nearest point. The crop must contain that point and the
+geodesic sampling distance must fit the local half-cell diagonal plus 10 m. Per-cell
+rejection reports are retained in the disposable/acquisition run state. The crosswalk,
+inventory and manifest bind policy, native-coordinate checksum and support identity.
+The acquisition method advances from v3 to v4, and the crosswalk/inventory Arrow schemas
+gain spatial identity fields. Unchanged daily scientific methods retain their IDs.
+PR 1 rows are readable as acquisition seeds but cannot be published under v4 without
+reacquisition. The synthetic offline example uses a separately named identity policy.
+
+| Gate | Local result on macOS arm64 / Python 3.12 |
+| --- | --- |
+| Full offline suite | PASS: 160 passed, one opt-in live NOAA test skipped |
+| Spatial regression | PASS: interior/land/water, boundary, outside footprint, distance, truncated crop, missing native node, missing metadata, rejected overwrite preserving canonical references; existing date-only support and frozen relocation cases passed in full suite |
+| Ruff, catalog/policy freshness, generated-variable documentation, `git diff --check`, strict MkDocs | PASS |
+| Isolated `python -m build` | FAIL/NOT VERIFIED: package-index DNS access unavailable when resolving `setuptools>=80` |
+| Existing-environment `python -m build --no-isolation` and `twine check dist/*` | PASS: sdist and wheel built and checked; build dependencies were reused |
+| Wheel installed outside checkout | PASS: force-reinstalled with `--no-deps` in existing dependency environment; `pip check`, CLI init/help, one-day synthetic example, deep acquisition/weather/daylight/lunar/matrix validation and policy freshness (569 matrix rows) |
+| Live full-grid NOAA/Herbie, independent grid fingerprint, regional accuracy, real-data workspace, release publication | NOT RUN |
+
+The [NOAA/NCEP grid specification](https://www.emc.ncep.noaa.gov/mmb/namgrids/hrrrspecs.html)
+provides the native shape, corners and projected 3-km spacing used for source identity.
+The SHA-256 stored by this patch covers decoded full-grid latitude/longitude arrays,
+not raw GRIB bytes or the NOAA specification page. Synthetic tests validate rejection
+semantics and failure safety; they do not prove that a live Herbie decode matches the
+published geometry on every historical cycle. F19's geographic acceptance machinery is
+implemented for the declared CONUS policy, while its live-provider evidence gate remains
+open until a bounded real-GRIB run is separately authorized and recorded. PR 3's
+independent scientific comparison is outside this patch.
+
 ## October 1 acquisition publication patch (build ID `pr1-acquisition-20261001`)
 
 This PR 1 candidate is based on `origin/main` at

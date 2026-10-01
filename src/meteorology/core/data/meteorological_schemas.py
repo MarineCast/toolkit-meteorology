@@ -83,6 +83,9 @@ LUNAR_SCHEMA = pa.schema(
 HRRR_CROSSWALK_SCHEMA = pa.schema(
     [
         pa.field("H3_INDEX", pa.string(), nullable=False),
+        pa.field("SPATIAL_POLICY_ID", pa.string(), nullable=False),
+        pa.field("NATIVE_GRID_CHECKSUM", pa.string(), nullable=False),
+        pa.field("SUPPORT_HASH", pa.string(), nullable=False),
         pa.field("SOURCE_GRID_HASH", pa.string(), nullable=False),
         pa.field("SOURCE_GRID_INDEX", pa.int32(), nullable=False),
         pa.field("SOURCE_GRID_DISTANCE_M", pa.float64(), nullable=False),
@@ -161,13 +164,22 @@ LEGACY_HRRR_INVENTORY_SCHEMA = pa.schema(
     ]
 )
 
-HRRR_INVENTORY_SCHEMA = pa.schema(
+PRE_SPATIAL_INVENTORY_SCHEMA = pa.schema(
     [
         *LEGACY_HRRR_INVENTORY_SCHEMA,
         pa.field("SOURCE_OBJECT_URI", pa.string(), nullable=True),
         pa.field("SOURCE_RETRIEVED_AT_UTC", pa.string(), nullable=True),
         pa.field("PRECIP_OBJECT_URI", pa.string(), nullable=True),
         pa.field("PRECIP_RETRIEVED_AT_UTC", pa.string(), nullable=True),
+    ]
+)
+
+HRRR_INVENTORY_SCHEMA = pa.schema(
+    [
+        *PRE_SPATIAL_INVENTORY_SCHEMA,
+        pa.field("SPATIAL_POLICY_ID", pa.string(), nullable=True),
+        pa.field("NATIVE_GRID_CHECKSUM", pa.string(), nullable=True),
+        pa.field("SUPPORT_HASH", pa.string(), nullable=True),
     ]
 )
 

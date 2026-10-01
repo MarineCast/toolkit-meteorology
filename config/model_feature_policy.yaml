@@ -1,6 +1,6 @@
 schema_version: 2
 policy_scope: default_ecological_occurrence_model
-feature_catalog_subset_checksum: 7aa99ddec6d49bc4518fa199b2e771f3373bcf47fad3be1e1ce99cca71a6275d
+feature_catalog_subset_checksum: 073ae5418426c7e43dc3b6696b0475d08cd870a36eb9eb72aaf10455ddf6d3ac
 complete_scientific_products_retained: true
 deterministic_duplicate_contract:
   DAYLIGHT_FRACTION: DAYLIGHT_HOURS / 24
@@ -252,6 +252,17 @@ features:
   included_by_default: false
   exclusion_reason: alternate_lookup_duplicate_of_daily_product
 - product: hrrr_nearest_grid_crosswalk
+  column: NATIVE_GRID_CHECKSUM
+  role: provenance_or_qc
+  variable_kind: metadata
+  feature_family: meteorological
+  metric_subfamily: spatial_support
+  scale_group: NATIVE_GRID_CHECKSUM
+  topology: within_cell_or_nonspatial
+  modeling_use: excluded_metadata
+  included_by_default: false
+  exclusion_reason: catalog_variable_kind:metadata
+- product: hrrr_nearest_grid_crosswalk
   column: SOURCE_GRID_DISTANCE_M
   role: provenance_or_qc
   variable_kind: metadata
@@ -280,6 +291,28 @@ features:
   feature_family: meteorological
   metric_subfamily: spatial_support
   scale_group: SOURCE_GRID_INDEX
+  topology: within_cell_or_nonspatial
+  modeling_use: excluded_metadata
+  included_by_default: false
+  exclusion_reason: catalog_variable_kind:metadata
+- product: hrrr_nearest_grid_crosswalk
+  column: SPATIAL_POLICY_ID
+  role: provenance_or_qc
+  variable_kind: metadata
+  feature_family: meteorological
+  metric_subfamily: spatial_support
+  scale_group: SPATIAL_POLICY_ID
+  topology: within_cell_or_nonspatial
+  modeling_use: excluded_metadata
+  included_by_default: false
+  exclusion_reason: catalog_variable_kind:metadata
+- product: hrrr_nearest_grid_crosswalk
+  column: SUPPORT_HASH
+  role: provenance_or_qc
+  variable_kind: metadata
+  feature_family: meteorological
+  metric_subfamily: spatial_support
+  scale_group: SUPPORT_HASH
   topology: within_cell_or_nonspatial
   modeling_use: excluded_metadata
   included_by_default: false
@@ -379,6 +412,17 @@ features:
   feature_family: meteorological
   metric_subfamily: source_inventory
   scale_group: LOCAL_DATE
+  topology: within_cell_or_nonspatial
+  modeling_use: excluded_metadata
+  included_by_default: false
+  exclusion_reason: catalog_variable_kind:metadata
+- product: hrrr_source_inventory
+  column: NATIVE_GRID_CHECKSUM
+  role: provenance_or_qc
+  variable_kind: metadata
+  feature_family: meteorological
+  metric_subfamily: source_inventory
+  scale_group: NATIVE_GRID_CHECKSUM
   topology: within_cell_or_nonspatial
   modeling_use: excluded_metadata
   included_by_default: false
@@ -527,12 +571,34 @@ features:
   included_by_default: false
   exclusion_reason: catalog_variable_kind:metadata
 - product: hrrr_source_inventory
+  column: SPATIAL_POLICY_ID
+  role: provenance_or_qc
+  variable_kind: metadata
+  feature_family: meteorological
+  metric_subfamily: source_inventory
+  scale_group: SPATIAL_POLICY_ID
+  topology: within_cell_or_nonspatial
+  modeling_use: excluded_metadata
+  included_by_default: false
+  exclusion_reason: catalog_variable_kind:metadata
+- product: hrrr_source_inventory
   column: STATUS
   role: provenance_or_qc
   variable_kind: metadata
   feature_family: meteorological
   metric_subfamily: source_inventory
   scale_group: STATUS
+  topology: within_cell_or_nonspatial
+  modeling_use: excluded_metadata
+  included_by_default: false
+  exclusion_reason: catalog_variable_kind:metadata
+- product: hrrr_source_inventory
+  column: SUPPORT_HASH
+  role: provenance_or_qc
+  variable_kind: metadata
+  feature_family: meteorological
+  metric_subfamily: source_inventory
+  scale_group: SUPPORT_HASH
   topology: within_cell_or_nonspatial
   modeling_use: excluded_metadata
   included_by_default: false

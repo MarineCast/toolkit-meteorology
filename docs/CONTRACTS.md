@@ -30,6 +30,26 @@ meteorology download surface-weather \
   --workers 4
 ```
 
+### Geographic acceptance (`hrrr_conus_native_nearest_v1`)
+
+The exact-support R5 product accepts H3 centroids only when all of these checks pass:
+
+1. The full decoded `sfc/f00` native grid matches the [NOAA/NCEP 3-km CONUS grid specification](https://www.emc.ncep.noaa.gov/mmb/namgrids/hrrrspecs.html): 1059 rows by 1799 columns, published corner coordinates within 250 m (the source rounds them to 0.001 degree), and sampled adjacent spacings from 2.5 to 3.5 km. The native coordinate arrays, in row-major order, have their own SHA-256 checksum. This checksum covers decoded coordinates, **not** GRIB bytes. Logical and actual retrieval URIs remain separately recorded.
+2. A centroid lies on or within the polygon traced by the full native grid perimeter. The requested bounding box and the crop's coordinate extrema do not define this footprint. The current policy is for the NOAA CONUS grid in ordinary western-hemisphere coordinates; it does not claim global, Alaska or antimeridian support. Land and water have identical eligibility.
+3. The nearest full-native node selected by the same haversine point search used for the crosswalk is present in the cropped extraction. A missing or truncated crop fails as `native_nearest_missing_from_crop`; it cannot silently substitute a distant crop-edge node. Nonfinite source pixels also fail acquisition.
+4. The WGS84 geodesic distance from centroid to the nearest native node is no greater than half the maximum diagonal of the cells adjacent to that node, plus 10 m for coordinate/rounding tolerance. This geometric criterion reflects point sampling of a nominal 3-km native grid; it is not a universal kilometer threshold or an area-average claim. `SOURCE_GRID_DISTANCE_M` retains the sampler's haversine distance. A boundary point is eligible when the polygon covers it and all other checks pass.
+
+The crosswalk and inventory bind the policy ID, full-native coordinate checksum, crop grid hash,
+and sorted H3-centroid support hash. The acquisition manifest lists accepted native checksums
+and the policy. Any rejected target blocks the full exact-support publication; the working
+inventory gives a failure summary and `raw/runs/<token>/spatial_rejections/<valid-time>.json`
+records every rejected cell with reason and distances. Re-extract a truncated crop or correct
+the configured support before retrying. A date-only configuration change does not alter the
+support hash. Old v3 acquisition inventories/crosswalks cannot be reused as v4 geographic
+evidence; explicit reacquisition is required, and historical releases retain their archived
+method and validator. The synthetic offline example records a separate identity policy and
+makes no NOAA coverage claim.
+
 The acquisition retains one region-sized sample per timestamp plus the source-grid
 crosswalk. New files use immutable serialized-SHA-256 paths under `raw/objects/samples/`
 and `raw/objects/crosswalks/`; the inventory stores the relative path and checksum of each.
@@ -101,7 +121,7 @@ rebuilding support before acquisition or product builds.
 `AVAILABLE_AT_UTC` is a versioned assumed fixed-lag policy, not a measured provider
 publication timestamp. A changed lag invalidates cached samples; acquisition and build
 check every retained sample timestamp against the current policy and inventory. The current
-acquisition, weather and daylight method IDs are v3, v4 and v3 respectively; old releases retain
+acquisition, weather and daylight method IDs are v4, v4 and v3 respectively; old releases retain
 their original method IDs and require new generation to gain these contracts.
 
 Before recoverably archiving legacy weather artifacts, run the complete-range and shared-core

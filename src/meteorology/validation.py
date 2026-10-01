@@ -218,6 +218,9 @@ def _validate_product_unlocked(manifest_path: str | Path) -> dict[str, Any]:
             raise ValueError("Acquisition inventory does not cover its exact continuous schedule.")
         if set(inventory["STATUS"].astype(str)) != {"COMPLETE"}:
             raise ValueError("Acquisition inventory contains incomplete cycles.")
+        spatial = resolved.get("spatial_acceptance")
+        if not isinstance(spatial, dict) or not spatial.get("policy_id") or not spatial.get("support_hash"):
+            raise ValueError("Acquisition manifest lacks the spatial acceptance policy.")
         synthetic = resolved["source"].get("model") == "synthetic_hrrr"
         if acquisition_inventory_source is None:
             raise ValueError("Acquisition inventory artifact is missing.")
@@ -250,6 +253,12 @@ def _validate_product_unlocked(manifest_path: str | Path) -> dict[str, Any]:
                 )
             if invalid:
                 raise ValueError(f"Acquisition inventory row violates release provenance: {valid}.")
+            if (
+                row.SPATIAL_POLICY_ID != spatial["policy_id"]
+                or row.SUPPORT_HASH != spatial["support_hash"]
+                or row.NATIVE_GRID_CHECKSUM not in spatial["native_grid_checksums"]
+            ):
+                raise ValueError(f"Acquisition inventory row violates spatial acceptance identity: {valid}.")
             sample = resolve_raw_relative(raw_root, str(row.RELATIVE_PATH))
             crosswalk = resolve_raw_relative(raw_root, str(row.CROSSWALK_RELATIVE_PATH))
             if not sample.is_file() or checksum_path(sample) != str(row.CHECKSUM):
@@ -278,6 +287,9 @@ def _validate_product_unlocked(manifest_path: str | Path) -> dict[str, Any]:
                     len(crosswalk_frame) != int(row.H3_CELL_COUNT)
                     or crosswalk_frame["H3_INDEX"].duplicated().any()
                     or set(crosswalk_frame["SOURCE_GRID_HASH"].astype(str)) != {str(row.SOURCE_GRID_HASH)}
+                    or set(crosswalk_frame["SPATIAL_POLICY_ID"].astype(str)) != {str(row.SPATIAL_POLICY_ID)}
+                    or set(crosswalk_frame["NATIVE_GRID_CHECKSUM"].astype(str)) != {str(row.NATIVE_GRID_CHECKSUM)}
+                    or set(crosswalk_frame["SUPPORT_HASH"].astype(str)) != {str(row.SUPPORT_HASH)}
                 ):
                     raise ValueError(f"Acquisition crosswalk identity is invalid: {crosswalk}")
                 checked_crosswalks[crosswalk_key] = set(crosswalk_frame["H3_INDEX"].astype(str))

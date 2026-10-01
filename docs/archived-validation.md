@@ -9,6 +9,14 @@ with a newer method ID.
 | --- | --- | --- | --- | --- |
 | `39ecf4c7cb1a38fc02878889d0fec8523e1742f7` | `hrrr_f00_f01_nearest_sample_v1` | `hrrr_surface_daily_v2` | `daylight_astronomy_v2` | `native_resolution_daily_matrix_v1` |
 | `5dde17996021498e45750e7811f5b3aff24ef0d2` | `hrrr_f00_f01_earth_wind_sample_v2` | `hrrr_surface_daily_earth_wind_v3` | `daylight_astronomy_v2` | `native_resolution_daily_matrix_v2` |
+| `bb2b725fd6aeede35264613ab812d0b5e2afe0e9` (PR 1) | `hrrr_f00_f01_earth_wind_sample_v3` | `hrrr_surface_daily_earth_wind_v4` | `daylight_astronomy_v3` | `native_resolution_daily_matrix_v2` |
+
+PR 2 changes the acquisition method to `hrrr_f00_f01_earth_wind_sample_v4` and adds
+crosswalk/inventory spatial-identity columns. The PR 1 revision is the pinned reader
+for retained v3 acquisition artifacts. A v3 inventory is not proof that every target
+passed native-footprint, crop-completeness and point-distance checks; regenerate it
+with the new acquisition method before making that claim. Unchanged daily weather,
+daylight, lunar and matrix methods retain their existing identities.
 
 For a retained release, identify its `method_version` in the manifest. Use a
 separate checkout and Python environment pinned to the matching revision, then

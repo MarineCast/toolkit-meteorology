@@ -13,10 +13,13 @@ import pyarrow as pa
 
 from .source_validation import (
     BoundingBox,
+    _as_2d_values,
+    _lat_lon_for_values,
     dataset_to_flat_variable_grid,
     infer_required_hrrr_variables,
     validate_decoded_source_times,
 )
+from .spatial_acceptance import NativeGrid, POLICY_ID
 
 HRRR_MODEL = "hrrr"
 HRRR_PRODUCT = "sfc"
@@ -289,7 +292,11 @@ def normalize_flat_grid(
     if output[RAW_COLUMNS].isna().any().any():
         null_columns = output.columns[output.isna().any()].tolist()
         raise ValueError(f"HRRR raw source grid contains null values: {null_columns}")
-    return output[RAW_COLUMNS]
+    result = output[RAW_COLUMNS]
+    if "native_grid" in flat.attrs and "hrrr_native_index" in flat:
+        result.attrs["native_grid"] = flat.attrs["native_grid"]
+        result.attrs["native_indices"] = flat["hrrr_native_index"].to_numpy(dtype="int64")
+    return result
 
 
 def fetch_cropped_hrrr_fields(
@@ -336,6 +343,11 @@ def fetch_cropped_hrrr_fields(
             reject_ambiguous=True,
         )
         validate_decoded_source_times(mapping, valid_time_utc=valid, forecast_hour=hour)
+        native_ds, native_name = next(value for value in mapping.values() if value is not None)
+        native_values = _as_2d_values(native_ds[native_name])
+        native_lat, native_lon = _lat_lon_for_values(native_ds, native_values.shape)
+        native_grid = NativeGrid.from_coordinates(native_lat, native_lon)
+        native_grid.validate_identity(POLICY_ID)
         padded = BoundingBox(
             min_lat=float(bbox["min_lat"]) - float(bbox_padding_degrees),
             max_lat=float(bbox["max_lat"]) + float(bbox_padding_degrees),
@@ -346,6 +358,7 @@ def fetch_cropped_hrrr_fields(
         flat = dataset_to_flat_variable_grid(
             dataset, mapping, padded, pad_deg=0.0, wind_basis=wind_basis
         )
+        flat.attrs["native_grid"] = native_grid
         if wind_basis is not None:
             flat.attrs["source_wind_basis"] = wind_basis
         units_by_variable: dict[str, str] = {}
@@ -400,6 +413,8 @@ def normalize_forecast_precip_grid(
     numeric = output.select_dtypes(include=[np.number]).to_numpy(dtype=float)
     if output.isna().any().any() or not np.isfinite(numeric).all():
         raise ValueError("HRRR forecast precipitation grid contains missing values.")
+    if "native_grid" in flat.attrs:
+        output.attrs["native_grid"] = flat.attrs["native_grid"]
     return output
 
 
@@ -443,6 +458,13 @@ def replace_source_grid_precipitation(
         raise ValueError("The f00 core and f01 precipitation grids do not match.")
     if len(source_grid) != len(precip_grid):
         raise ValueError("The f00 core and f01 precipitation grids have different row counts.")
+    native = source_grid.attrs.get("native_grid")
+    precip_native = precip_grid.attrs.get("native_grid")
+    if (
+        native is not None and precip_native is not None
+        and native.checksum != precip_native.checksum
+    ):
+        raise ValueError("The f00 and f01 full native HRRR grids do not match.")
     left = source_grid.sort_values("SOURCE_GRID_INDEX").reset_index(drop=True).copy()
     right = precip_grid.sort_values("SOURCE_GRID_INDEX").reset_index(drop=True)
     if not np.array_equal(
@@ -455,7 +477,9 @@ def replace_source_grid_precipitation(
     ):
         raise ValueError("The f00 core and f01 precipitation grid coordinates do not match.")
     left["PRECIP_RATE_KG_M2_S"] = right["PRECIP_RATE_KG_M2_S"].to_numpy(dtype=float)
-    return left[RAW_COLUMNS]
+    result = left[RAW_COLUMNS]
+    result.attrs.update(source_grid.attrs)
+    return result
 
 
 def fetch_cropped_hrrr_grid(

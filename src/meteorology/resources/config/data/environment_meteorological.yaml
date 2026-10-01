@@ -23,6 +23,7 @@ surface_weather:
     timezone: America/Los_Angeles
     availability_lag_hours: 6
   bbox_padding_degrees: 0.2
+  spatial_acceptance_policy: hrrr_conus_native_nearest_v1
   raw:
     root_dir: data/raw/environment/meteorological/surface_weather/hrrr
     working_inventory_path: data/raw/environment/meteorological/surface_weather/hrrr/HRRR_R5_WORKING_INVENTORY.parquet

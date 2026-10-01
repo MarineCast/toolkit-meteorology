@@ -469,6 +469,7 @@ def dataset_to_flat_variable_grid(
         {
             "hrrr_lat": lat[mask].astype(float),
             "hrrr_lon": lon[mask].astype(float),
+            "hrrr_native_index": np.flatnonzero(mask).astype("int32"),
         }
     )
     for output_name, mapping_value in variable_mapping.items():

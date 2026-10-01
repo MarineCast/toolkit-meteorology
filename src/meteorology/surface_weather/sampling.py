@@ -11,6 +11,7 @@ from meteorology.core.data.meteorological_schemas import HRRR_SAMPLE_SCHEMA as S
 from meteorology.core.data.meteorological_schemas import (
     PRE_F01_SAMPLE_SCHEMA,
 )
+from .spatial_acceptance import POLICY_ID, validate_spatial_acceptance
 
 EARTH_RADIUS_M = 6_371_008.8
 AVAILABILITY_POLICY = "assumed_fixed_lag_v1"
@@ -43,8 +44,10 @@ def make_sample_times_for_local_date(
 def build_nearest_grid_crosswalk(
     support: pd.DataFrame,
     source_grid: pd.DataFrame,
+    *,
+    policy_id: str = POLICY_ID,
 ) -> pd.DataFrame:
-    """Map every support cell to the closest row in one identified HRRR grid."""
+    """Map exact support only after full-native geographic acceptance."""
 
     required_support = {"H3_INDEX", "CENTROID_LAT", "CENTROID_LON"}
     required_grid = {"SOURCE_GRID_INDEX", "SOURCE_LAT", "SOURCE_LON", "SOURCE_GRID_HASH"}
@@ -55,6 +58,7 @@ def build_nearest_grid_crosswalk(
     hashes = set(source_grid["SOURCE_GRID_HASH"].astype(str))
     if len(hashes) != 1:
         raise ValueError("HRRR source grid must contain exactly one grid hash.")
+    acceptance = validate_spatial_acceptance(support, source_grid, policy_id=policy_id)
     coordinates = source_grid[["SOURCE_LAT", "SOURCE_LON"]].to_numpy(dtype=float)
     if not np.isfinite(coordinates).all():
         raise ValueError("HRRR source-grid coordinates contain non-finite values.")
@@ -66,6 +70,9 @@ def build_nearest_grid_crosswalk(
     frame = pd.DataFrame(
         {
             "H3_INDEX": support["H3_INDEX"].astype(str).to_numpy(),
+            "SPATIAL_POLICY_ID": policy_id,
+            "NATIVE_GRID_CHECKSUM": acceptance["native_grid_checksum"],
+            "SUPPORT_HASH": acceptance["support_hash"],
             "SOURCE_GRID_HASH": next(iter(hashes)),
             "SOURCE_GRID_INDEX": source_rows,
             "SOURCE_GRID_DISTANCE_M": distance[:, 0] * EARTH_RADIUS_M,

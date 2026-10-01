@@ -60,6 +60,7 @@ from meteorology.surface_weather.source import (
     hrrr_aws_archive_uri,
     hrrr_logical_object_uri,
 )
+from meteorology.surface_weather.spatial_acceptance import NativeGrid
 from meteorology.surface_weather.verify import (
     SHARED_LEGACY_FIELDS,
     _legacy_field_partial_evidence,
@@ -70,6 +71,7 @@ from meteorology.validation import validate_daily_matrix, validate_product
 
 def _fixture_config(tmp_path: Path, *, end_date: str = "2024-01-02") -> Path:
     raw = yaml.safe_load(Path("config/data/environment_meteorological.yaml").read_text())
+    raw["surface_weather"]["spatial_acceptance_policy"] = "synthetic_native_nearest_v1"
     raw_root = tmp_path / "raw"
     processed = tmp_path / "processed"
     raw["surface_weather"]["time"]["start_date"] = "2024-01-02"
@@ -106,7 +108,7 @@ def _raw_grid(valid: pd.Timestamp, availability_lag_hours: int = 6) -> pd.DataFr
     available = valid + pd.Timedelta(hours=availability_lag_hours)
     rows = []
     for index, (lat, lon) in enumerate(
-        [(46.5, -125.0), (46.5, -121.0), (50.5, -125.0), (50.5, -121.0)]
+        [(46.5, -126.5), (46.5, -121.0), (50.5, -126.5), (50.5, -121.0)]
     ):
         rows.append(
             {
@@ -132,7 +134,13 @@ def _raw_grid(valid: pd.Timestamp, availability_lag_hours: int = 6) -> pd.DataFr
                 "MEAN_SEA_LEVEL_PRESSURE_PA": 98_000.0,
             }
         )
-    return pd.DataFrame(rows, columns=RAW_COLUMNS)
+    frame = pd.DataFrame(rows, columns=RAW_COLUMNS)
+    frame.attrs["native_grid"] = NativeGrid.from_coordinates(
+        np.array([[46.5, 46.5], [50.5, 50.5]]),
+        np.array([[-126.5, -121.0], [-126.5, -121.0]]),
+    )
+    frame.attrs["native_indices"] = np.arange(4, dtype="int64")
+    return frame
 
 
 def _patch_fetch(
@@ -196,6 +204,76 @@ def test_complete_range_all_zero_forecast_precipitation_is_valid(
     outputs = build_surface_weather(config_path, run_id="fixture-all-zero-weather")
     daily = ds.dataset(outputs[0], format="parquet", partitioning="hive").to_table().to_pandas()
     assert (daily["PRECIP_MM_DAY_ESTIMATE"] == 0.0).all()
+
+
+def test_truncated_native_crop_blocks_refresh_and_retains_rejection_report(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from meteorology.surface_weather import download as module
+
+    config_path = _fixture_config(tmp_path)
+    build_meteorological_spatial_support(config_path, run_id="fixture-support")
+    _patch_fetch(monkeypatch, [])
+    download_surface_weather(config_path, run_id="baseline")
+    original = _published_acquisition_bytes(config_path)
+
+    def truncated(**kwargs):
+        valid = pd.Timestamp(kwargs["valid_time_utc"]).tz_convert("UTC")
+        frame = _raw_grid(valid).iloc[1:].reset_index(drop=True)
+        frame["SOURCE_GRID_HASH"] = "fixture-grid-truncated-v1"
+        frame.attrs["native_grid"] = _raw_grid(valid).attrs["native_grid"]
+        frame.attrs["native_indices"] = np.array([1, 2, 3], dtype="int64")
+        return frame, hrrr_aws_archive_uri(valid)
+
+    def truncated_precip(**kwargs):
+        valid = pd.Timestamp(kwargs["valid_time_utc"]).tz_convert("UTC")
+        frame = _raw_grid(valid).iloc[1:].reset_index(drop=True)
+        frame["SOURCE_GRID_HASH"] = "fixture-grid-truncated-v1"
+        output = frame[["SOURCE_GRID_INDEX", "SOURCE_LAT", "SOURCE_LON", "SOURCE_GRID_HASH"]].copy()
+        output["PRECIP_RATE_KG_M2_S"] = 0.001
+        output["PRECIP_INIT_TIME_UTC"] = (valid - pd.Timedelta(hours=1)).isoformat()
+        output["PRECIP_VALID_TIME_UTC"] = valid.isoformat()
+        output["PRECIP_FORECAST_HOUR"] = 1
+        return output, hrrr_aws_archive_uri(valid, 1)
+
+    monkeypatch.setattr(module, "fetch_cropped_hrrr_grid", truncated)
+    monkeypatch.setattr(module, "fetch_cropped_hrrr_precip_grid", truncated_precip)
+    with pytest.raises(RuntimeError, match="acquisition was incomplete"):
+        download_surface_weather(config_path, overwrite=True, run_id="truncated")
+    _assert_published_bytes(original)
+    config = load_meteorological_config(config_path)
+    reports = list((config.surface_weather.raw_dir / "runs").glob(
+        "*/spatial_rejections/*.json"
+    ))
+    assert len(reports) == 6
+    report = json.loads(reports[0].read_text())
+    assert report["rejected"]
+    assert {row["reason"] for row in report["rejected"]} == {
+        "native_nearest_missing_from_crop"
+    }
+
+
+def test_pr1_inventory_is_readable_but_cannot_publish_as_spatially_accepted(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from meteorology.core.data.meteorological_schemas import PRE_SPATIAL_INVENTORY_SCHEMA
+    from meteorology.surface_weather.download import _load_inventory
+
+    config_path = _fixture_config(tmp_path)
+    build_meteorological_spatial_support(config_path, run_id="fixture-support")
+    _patch_fetch(monkeypatch, [])
+    download_surface_weather(config_path, run_id="baseline")
+    config = load_meteorological_config(config_path)
+    current = pq.read_table(config.surface_weather.inventory_path).to_pylist()
+    old_path = tmp_path / "pr1-inventory.parquet"
+    write_table(
+        old_path,
+        pa.Table.from_pylist(current, schema=PRE_SPATIAL_INVENTORY_SCHEMA),
+        PRE_SPATIAL_INVENTORY_SCHEMA,
+    )
+    old_rows = _load_inventory(old_path)
+    assert len(old_rows) == 6
+    assert all(row["SPATIAL_POLICY_ID"] is None for row in old_rows)
 
 
 def test_support_rejects_changed_bounding_box(tmp_path: Path) -> None:

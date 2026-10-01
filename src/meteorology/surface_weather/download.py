@@ -26,6 +26,7 @@ from meteorology.core.data.meteorological_schemas import HRRR_INVENTORY_SCHEMA a
 from meteorology.core.data.meteorological_schemas import (
     LEGACY_HRRR_INVENTORY_SCHEMA,
     PRE_F01_INVENTORY_SCHEMA,
+    PRE_SPATIAL_INVENTORY_SCHEMA,
 )
 
 from ..artifacts import (
@@ -58,6 +59,7 @@ from .source import (
     hrrr_logical_object_uri,
     replace_source_grid_precipitation,
 )
+from .spatial_acceptance import SpatialAcceptanceError, support_identity
 from .storage import (
     acquisition_lock,
     copy_referenced_object,
@@ -125,7 +127,8 @@ def _load_inventory(path: Path) -> list[dict[str, Any]]:
     parquet = pq.ParquetFile(path)
     schema = parquet.schema_arrow
     if not any(schema.equals(candidate, check_metadata=False) for candidate in (
-        INVENTORY_SCHEMA, LEGACY_HRRR_INVENTORY_SCHEMA, PRE_F01_INVENTORY_SCHEMA
+        INVENTORY_SCHEMA, PRE_SPATIAL_INVENTORY_SCHEMA,
+        LEGACY_HRRR_INVENTORY_SCHEMA, PRE_F01_INVENTORY_SCHEMA
     )):
         raise ValueError(f"R5 HRRR inventory has an incompatible schema: {path}")
     rows = parquet.read().to_pylist()
@@ -136,6 +139,7 @@ def _load_inventory(path: Path) -> list[dict[str, Any]]:
         for name in (
             "SOURCE_OBJECT_URI", "SOURCE_RETRIEVED_AT_UTC",
             "PRECIP_OBJECT_URI", "PRECIP_RETRIEVED_AT_UTC",
+            "SPATIAL_POLICY_ID", "NATIVE_GRID_CHECKSUM", "SUPPORT_HASH",
         ):
             row.setdefault(name, None)
     valid_times = [str(row["VALID_TIME_UTC"]) for row in rows]
@@ -144,7 +148,10 @@ def _load_inventory(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def _valid_crosswalk(path: Path, support: pd.DataFrame, expected_hash: str | None = None) -> bool:
+def _valid_crosswalk(
+    path: Path, support: pd.DataFrame, expected_hash: str | None = None,
+    *, policy_id: str | None = None, native_checksum: str | None = None,
+) -> bool:
     if not path.exists():
         return False
     try:
@@ -159,6 +166,9 @@ def _valid_crosswalk(path: Path, support: pd.DataFrame, expected_hash: str | Non
         and not frame["H3_INDEX"].duplicated().any()
         and set(frame["H3_INDEX"].astype(str)) == set(support["H3_INDEX"].astype(str))
         and (expected_hash is None or set(frame["SOURCE_GRID_HASH"].astype(str)) == {expected_hash})
+        and set(frame["SUPPORT_HASH"].astype(str)) == {support_identity(support)}
+        and (policy_id is None or set(frame["SPATIAL_POLICY_ID"].astype(str)) == {policy_id})
+        and (native_checksum is None or set(frame["NATIVE_GRID_CHECKSUM"].astype(str)) == {native_checksum})
         and np.isfinite(frame["SOURCE_GRID_DISTANCE_M"].to_numpy(dtype=float)).all()
     )
 
@@ -290,6 +300,9 @@ def _inventory_row(
     sample_checksum: str | None = None,
     crosswalk_checksum: str | None = None,
     source_grid_hash: str | None = None,
+    spatial_policy_id: str | None = None,
+    native_grid_checksum: str | None = None,
+    support_hash: str | None = None,
 ) -> dict[str, object]:
     valid = pd.Timestamp(valid_time)
     valid = valid.tz_localize("UTC") if valid.tzinfo is None else valid.tz_convert("UTC")
@@ -337,6 +350,9 @@ def _inventory_row(
         "SOURCE_RETRIEVED_AT_UTC": source_retrieved_at_utc if status == "COMPLETE" else None,
         "PRECIP_OBJECT_URI": hrrr_logical_object_uri(valid, precip_forecast_hour) if status == "COMPLETE" else None,
         "PRECIP_RETRIEVED_AT_UTC": precip_retrieved_at_utc if status == "COMPLETE" else None,
+        "SPATIAL_POLICY_ID": spatial_policy_id if status == "COMPLETE" else None,
+        "NATIVE_GRID_CHECKSUM": native_grid_checksum if status == "COMPLETE" else None,
+        "SUPPORT_HASH": support_hash if status == "COMPLETE" else None,
     }
 
 
@@ -388,6 +404,9 @@ def _publish_complete_acquisition(
             or row.get("AVAILABLE_AT_UTC") != expected_available
             or int(row.get("H3_CELL_COUNT") or -1) != len(support)
             or int(row.get("H3_RESOLUTION") or -1) != weather.h3_resolution
+            or row.get("SPATIAL_POLICY_ID") != weather.spatial_acceptance_policy
+            or row.get("SUPPORT_HASH") != support_identity(support)
+            or not row.get("NATIVE_GRID_CHECKSUM")
         ):
             raise ValueError(f"Retained HRRR row has incompatible release policy: {valid_time}.")
         sample_relative = Path(str(row.get("RELATIVE_PATH") or ""))
@@ -403,7 +422,11 @@ def _publish_complete_acquisition(
         )
         if crosswalk_key not in validated_crosswalks:
             if (
-                not _valid_crosswalk(crosswalk, support, str(row.get("SOURCE_GRID_HASH")))
+                not _valid_crosswalk(
+                    crosswalk, support, str(row.get("SOURCE_GRID_HASH")),
+                    policy_id=weather.spatial_acceptance_policy,
+                    native_checksum=str(row.get("NATIVE_GRID_CHECKSUM")),
+                )
                 or sha256_file(crosswalk) != row.get("CROSSWALK_CHECKSUM")
             ):
                 raise ValueError(f"Retained HRRR sample or crosswalk is invalid: {valid_time}.")
@@ -462,6 +485,14 @@ def _publish_complete_acquisition(
                     "variable_selectors": HRRR_VARIABLES,
                 },
                 "sample_storage": "immutable-sha256-objects-v1; one strict H3 R5 Parquet file per valid time",
+                "spatial_acceptance": {
+                    "policy_id": weather.spatial_acceptance_policy,
+                    "support_hash": support_identity(support),
+                    "native_grid_checksums": sorted({str(row["NATIVE_GRID_CHECKSUM"]) for row in rows}),
+                    "source": "full decoded f00 native latitude/longitude grid",
+                    "source_spec_url": "https://www.emc.ncep.noaa.gov/mmb/namgrids/hrrrspecs.html",
+                    "distance_criterion": "nearest native point within half maximum adjacent WGS84 cell diagonal plus 10 m",
+                },
             },
             artifacts=[inventory_contract],
             inputs=[
@@ -594,7 +625,7 @@ def _download_surface_weather_locked(
     seed_path = working_destination if working_destination.exists() else inventory_destination
     existing_rows = _load_inventory(seed_path)
     existing_by_time = {str(row["VALID_TIME_UTC"]): row for row in existing_rows}
-    crosswalk_cache: dict[str, tuple[pd.DataFrame, Path, str]] = {}
+    crosswalk_cache: dict[tuple[str, str], tuple[pd.DataFrame, Path, str]] = {}
     crosswalk_validation_cache: dict[tuple[str, str], bool] = {}
     crosswalk_checksum_cache: dict[Path, str] = {}
     crosswalk_lock = Lock()
@@ -615,6 +646,7 @@ def _download_surface_weather_locked(
         expected_checksum = str(existing.get("CHECKSUM") or "")
         expected_crosswalk_checksum = str(existing.get("CROSSWALK_CHECKSUM") or "")
         expected_hash = str(existing.get("SOURCE_GRID_HASH") or "") or None
+        expected_native = str(existing.get("NATIVE_GRID_CHECKSUM") or "") or None
         if expected_hash is None and _valid_sample(destination, support, valid_time_utc=valid, availability_lag_hours=weather.availability_lag_hours):
             expected_hash = str(
                 pq.read_table(destination, columns=["SOURCE_GRID_HASH"])[0][0].as_py()
@@ -640,7 +672,11 @@ def _download_surface_weather_locked(
             if validation_key not in crosswalk_validation_cache:
                 crosswalk_validation_cache[validation_key] = (
                     existing_crosswalk is not None
-                    and _valid_crosswalk(existing_crosswalk, support, expected_hash)
+                    and _valid_crosswalk(
+                        existing_crosswalk, support, expected_hash,
+                        policy_id=weather.spatial_acceptance_policy,
+                        native_checksum=expected_native,
+                    )
                 )
             crosswalk_ok = crosswalk_validation_cache[validation_key] and crosswalk_checksum_ok
         source_provenance_ok = (
@@ -661,6 +697,9 @@ def _download_surface_weather_locked(
             and crosswalk_ok
             and source_provenance_ok
             and precip_provenance_ok
+            and existing.get("SPATIAL_POLICY_ID") == weather.spatial_acceptance_policy
+            and existing.get("SUPPORT_HASH") == support_identity(support)
+            and expected_native is not None
         ):
             return _inventory_row(
                 valid_time=valid,
@@ -679,11 +718,17 @@ def _download_surface_weather_locked(
                 sample_checksum=actual_checksum,
                 crosswalk_checksum=actual_crosswalk_checksum,
                 source_grid_hash=expected_hash,
+                spatial_policy_id=weather.spatial_acceptance_policy,
+                native_grid_checksum=expected_native,
+                support_hash=support_identity(support),
             )
         try:
             reusable_core = (
                 _reusable_core_sample(destination, support, valid_time_utc=valid, availability_lag_hours=weather.availability_lag_hours)
                 if not overwrite and checksum_ok and crosswalk_ok and source_provenance_ok
+                and existing.get("SPATIAL_POLICY_ID") == weather.spatial_acceptance_policy
+                and existing.get("SUPPORT_HASH") == support_identity(support)
+                and expected_native is not None
                 else None
             )
             if reusable_core is not None and existing_crosswalk is not None:
@@ -741,6 +786,9 @@ def _download_surface_weather_locked(
                     source_grid_hash=expected_hash,
                     sample_checksum=repaired_checksum,
                     crosswalk_checksum=actual_crosswalk_checksum,
+                    spatial_policy_id=weather.spatial_acceptance_policy,
+                    native_grid_checksum=expected_native,
+                    support_hash=support_identity(support),
                 )
             for attempt in range(1, HERBIE_ATTEMPTS_PER_TIMESTAMP + 1):
                 try:
@@ -785,22 +833,37 @@ def _download_surface_weather_locked(
                     )
                     time.sleep(2 ** (attempt - 1))
             grid_hash = str(source_grid["SOURCE_GRID_HASH"].iloc[0])
+            native_grid = source_grid.attrs.get("native_grid")
+            native_checksum = getattr(native_grid, "checksum", None)
+            if native_checksum is None:
+                raise ValueError("Decoded full native HRRR grid metadata is missing.")
             with crosswalk_lock:
-                cached = crosswalk_cache.get(grid_hash)
+                cached = crosswalk_cache.get((grid_hash, native_checksum))
                 if cached is not None:
                     crosswalk, crosswalk_destination, crosswalk_checksum = cached
-                elif expected_hash == grid_hash and crosswalk_ok and existing_crosswalk is not None:
+                elif (
+                    expected_hash == grid_hash and expected_native == native_checksum
+                    and crosswalk_ok and existing_crosswalk is not None
+                ):
                     crosswalk_destination = existing_crosswalk
                     crosswalk_checksum = actual_crosswalk_checksum
                     crosswalk = pq.read_table(existing_crosswalk, schema=CROSSWALK_SCHEMA).to_pandas()
                 else:
-                    crosswalk = build_nearest_grid_crosswalk(support, source_grid)
+                    crosswalk = build_nearest_grid_crosswalk(
+                        support, source_grid, policy_id=weather.spatial_acceptance_policy
+                    )
                     crosswalk_destination, crosswalk_checksum = write_immutable_table(
                         crosswalk, raw_dir=weather.raw_dir, family="crosswalks",
                         schema=CROSSWALK_SCHEMA,
-                        validate=lambda path: _valid_crosswalk(path, support, grid_hash),
+                        validate=lambda path: _valid_crosswalk(
+                            path, support, grid_hash,
+                            policy_id=weather.spatial_acceptance_policy,
+                            native_checksum=native_checksum,
+                        ),
                     )
-                crosswalk_cache[grid_hash] = (crosswalk, crosswalk_destination, crosswalk_checksum)
+                crosswalk_cache[(grid_hash, native_checksum)] = (
+                    crosswalk, crosswalk_destination, crosswalk_checksum
+                )
             sampled = sample_source_grid(
                 source_grid,
                 crosswalk,
@@ -833,8 +896,17 @@ def _download_surface_weather_locked(
                 source_grid_hash=grid_hash,
                 sample_checksum=published_checksum,
                 crosswalk_checksum=crosswalk_checksum,
+                spatial_policy_id=weather.spatial_acceptance_policy,
+                native_grid_checksum=native_checksum,
+                support_hash=support_identity(support),
             )
         except Exception as exc:
+            if isinstance(exc, SpatialAcceptanceError) and _run_state_path is not None:
+                report_path = (
+                    _run_state_path.parent / "spatial_rejections" /
+                    f"{valid:%Y%m%dT%H%M%SZ}.json"
+                )
+                atomic_write_json(report_path, exc.report)
             LOGGER.exception("Direct HRRR acquisition failed for %s", valid)
             return _inventory_row(
                 valid_time=valid,
