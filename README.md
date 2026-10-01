@@ -1,6 +1,6 @@
 # Meteorology Toolkit
 
-![Illustrated coastal weather systems over the Salish Sea](docs/assets/banner.png)
+<img src="docs/assets/banner.png" alt="Engraved weather station amid clouds, rain, mountains, and pressure systems" width="100%">
 
 [![Offline package checks](https://github.com/MarineCast/toolkit-meteorology/actions/workflows/tests.yml/badge.svg)](https://github.com/MarineCast/toolkit-meteorology/actions/workflows/tests.yml) · [Documentation](https://marinecast.github.io/toolkit-meteorology/) · [Scientific methodology](docs/methodology.md) · [Variable inventory](docs/reference/variables.md)
 
