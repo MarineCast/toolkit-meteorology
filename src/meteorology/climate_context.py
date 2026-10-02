@@ -49,7 +49,7 @@ def validate_roni_rows(rows: list[dict]) -> list[dict]:
         if key in seen:
             raise ValueError("Duplicate RONI season and publication vintage.")
         seen.add(key)
-        validated.append({**row, "availability_status": (
+        validated.append({**row, "published_at_utc": row.get("published_at_utc"), "availability_status": (
             "publication_vintage_recorded" if published is not None else "retrospective_only"
         )})
     return validated
@@ -62,7 +62,7 @@ def select_roni_asof(rows: list[dict], *, year: int, season: str,
     candidates = [row for row in validated if row["year"] == year and row["season"] == season]
     if as_of_utc is not None:
         cutoff = _utc(as_of_utc)
-        candidates = [row for row in candidates if row["published_at_utc"] is not None
+        candidates = [row for row in candidates if row.get("published_at_utc") is not None
                       and _utc(row["published_at_utc"]) <= cutoff]
     if not candidates:
         return None

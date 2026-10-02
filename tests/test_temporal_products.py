@@ -18,7 +18,8 @@ def _hourly(date: str) -> list[dict]:
         row = {field: 0.0 for field in HOURLY_CORE}
         row.update(valid_time_utc=valid.isoformat(), init_time_utc=valid.isoformat(),
                    available_at_utc=(valid + timedelta(hours=6)).isoformat(),
-                   forecast_hour=0, source_model="HRRR", source_product="sfc")
+                   forecast_hour=0, source_model="HRRR", source_product="sfc",
+                   availability_policy="assumed_fixed_lag_v1")
         result.append(row)
     return result
 

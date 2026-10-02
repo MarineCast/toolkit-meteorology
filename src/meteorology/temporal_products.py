@@ -10,6 +10,8 @@ from datetime import date, datetime, time, timedelta, timezone
 from math import isfinite
 from zoneinfo import ZoneInfo
 
+from .surface_weather.sampling import AVAILABILITY_POLICY
+
 
 def _utc(value: str) -> datetime:
     stamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -49,6 +51,7 @@ def validate_hourly_records(
     required_fields: tuple[str, ...] = HOURLY_CORE,
     expected_h3_cells: set[str] | None = None,
     optional_fields: tuple[str, ...] = (),
+    availability_lag_hours: int | None = None,
     as_of_utc: str | None = None,
 ) -> dict:
     """Gate a complete candidate day of distinct source-native hourly analyses.
@@ -57,6 +60,8 @@ def validate_hourly_records(
     Optional fields report coverage without changing core completeness.
     """
     expected = hourly_utc_instants(local_date, timezone_name)
+    if availability_lag_hours is not None and availability_lag_hours < 0:
+        raise ValueError("Availability lag must be nonnegative.")
     as_of = _utc(as_of_utc) if as_of_utc is not None else None
     if expected_h3_cells is not None and not expected_h3_cells:
         raise ValueError("Hourly H3 support cannot be empty.")
@@ -66,6 +71,11 @@ def validate_hourly_records(
         valid = _utc(record["valid_time_utc"])
         initialized = _utc(record["init_time_utc"])
         available = _utc(record["available_at_utc"])
+        if record.get("availability_policy") != AVAILABILITY_POLICY:
+            raise ValueError("Unknown or missing hourly availability policy.")
+        if available < valid or (availability_lag_hours is not None
+                                 and available != valid + timedelta(hours=availability_lag_hours)):
+            raise ValueError("Hourly assumed availability disagrees with valid time and lag policy.")
         if as_of is not None and available > as_of:
             raise ValueError("Hourly source value was unavailable at the requested as-of time.")
         cell = record.get("H3_INDEX") if expected_h3_cells is not None else None
@@ -108,7 +118,9 @@ def summarize_hourly_window(
     """Summarize start-of-hour samples without filling unknown one-hour slots."""
     start, end = _utc(start_utc), _utc(end_utc)
     duration = (end - start).total_seconds() / 3600
-    if duration <= 0 or duration != int(duration) or start.minute or end.minute:
+    if (duration <= 0 or duration != int(duration)
+            or any((stamp.minute, stamp.second, stamp.microsecond) != (0, 0, 0)
+                   for stamp in (start, end))):
         raise ValueError("Hourly windows require positive whole-hour UTC boundaries.")
     as_of = _utc(as_of_utc) if as_of_utc is not None else None
     by_time: dict[datetime, float | None] = {}

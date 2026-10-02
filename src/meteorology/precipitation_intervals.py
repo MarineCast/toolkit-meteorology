@@ -7,6 +7,22 @@ from math import isfinite
 from .temporal_products import _utc
 
 
+def _spatial_target(row: dict) -> tuple:
+    """Return an explicit native point or mapped H3 target, never a grid alone."""
+    basis = row.get("spatial_basis")
+    if basis == "native_grid_point":
+        index = row.get("source_grid_index")
+        if not isinstance(index, int) or index < 0:
+            raise ValueError("Native precipitation requires a source-grid point identity.")
+        return (basis, row.get("source_grid_hash"), index)
+    if basis == "h3_cell":
+        cell, mapping = row.get("H3_INDEX"), row.get("mapping_identity")
+        if not isinstance(cell, str) or not cell or not isinstance(mapping, str) or not mapping:
+            raise ValueError("H3 precipitation requires cell and mapping identity.")
+        return (basis, row.get("source_grid_hash"), cell, mapping)
+    raise ValueError("Precipitation interval requires an explicit spatial target basis.")
+
+
 def difference_same_run_accumulations(earlier: dict, later: dict) -> dict:
     """Difference verified 0-to-lead cumulative amounts from one forecast run.
 
@@ -14,10 +30,13 @@ def difference_same_run_accumulations(earlier: dict, later: dict) -> dict:
     record labels alone are not source evidence. Cross-run subtraction is invalid.
     """
     identity_fields = ("source_model", "source_product", "parameter", "source_grid_hash",
-                       "init_time_utc", "source_grid_index")
+                       "init_time_utc")
     if any(earlier.get(name) is None or earlier.get(name) != later.get(name)
            for name in identity_fields):
         raise ValueError("Cumulative precipitation values must share a source run and grid point.")
+    target = _spatial_target(earlier)
+    if target != _spatial_target(later):
+        raise ValueError("Cumulative precipitation values must share a spatial target.")
     if any(row.get("step_type") != "accum" or row.get("units") != "mm"
            or row.get("step_start_hour") != 0 for row in (earlier, later)):
         raise ValueError("Cumulative precipitation requires verified 0-to-lead mm accumulation.")
@@ -33,13 +52,20 @@ def difference_same_run_accumulations(earlier: dict, later: dict) -> dict:
     if any(not isinstance(value, (int, float)) or not isfinite(value) or value < 0
            for value in (first, second)) or second < first:
         raise ValueError("Cumulative precipitation is missing, negative, or reset within a run.")
-    return {
+    availability = max(_utc(row["available_at_utc"]) for row in (earlier, later))
+    result = {
         "interval_start_utc": first_end.isoformat(), "interval_end_utc": second_end.isoformat(),
         "init_time_utc": init.isoformat(), "step_start_hour": first_step,
-        "step_end_hour": second_step, "source_identity": {
-            name: earlier[name] for name in identity_fields},
-        "modeled_precipitation_amount_mm": second - first,
+        "step_end_hour": second_step, "available_at_utc": availability.isoformat(),
+        "source_model": earlier["source_model"], "source_product": earlier["source_product"],
+        "parameter": earlier["parameter"], "source_grid_hash": earlier["source_grid_hash"],
+        "spatial_basis": earlier["spatial_basis"], "step_type": "accum", "units": "mm",
+        "amount_mm": second - first, "modeled_precipitation_amount_mm": second - first,
     }
+    for name in ("source_grid_index", "H3_INDEX", "mapping_identity"):
+        if name in earlier:
+            result[name] = earlier[name]
+    return result
 
 def sum_exact_precipitation_intervals(
     records: list[dict], *, start_utc: str, end_utc: str,
@@ -54,6 +80,7 @@ def sum_exact_precipitation_intervals(
     cursor = start
     amount = 0.0
     source_identity = None
+    target_identity = None
     for row in ordered:
         left, right = _utc(row["interval_start_utc"]), _utc(row["interval_end_utc"])
         if left != cursor or right <= left or right > end:
@@ -63,8 +90,15 @@ def sum_exact_precipitation_intervals(
         if None in identity or (source_identity is not None and identity != source_identity):
             raise ValueError("Precipitation source identity changes inside the requested interval.")
         source_identity = identity
-        _utc(row["init_time_utc"])
+        target = _spatial_target(row)
+        if target_identity is not None and target != target_identity:
+            raise ValueError("Precipitation spatial target changes inside the requested interval.")
+        target_identity = target
+        if _utc(row["init_time_utc"]) > left:
+            raise ValueError("Precipitation initialization follows interval start.")
         available = _utc(row["available_at_utc"])
+        if available < right:
+            raise ValueError("Precipitation availability precedes interval end.")
         if as_of is not None and available > as_of:
             raise ValueError("Precipitation amount was unavailable at the requested as-of time.")
         if row.get("step_type") != "accum" or row.get("units") != "mm":
@@ -79,4 +113,4 @@ def sum_exact_precipitation_intervals(
     return {"start_utc": start.isoformat(), "end_utc": end.isoformat(),
             "covered_hours": (end - start).total_seconds() / 3600,
             "interval_count": len(ordered), "modeled_precipitation_amount_mm": amount,
-            "source_identity": source_identity}
+            "source_identity": source_identity, "spatial_target": target_identity}

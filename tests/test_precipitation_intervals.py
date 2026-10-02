@@ -18,7 +18,8 @@ def _intervals(date: str) -> list[dict]:
         rows.append(dict(interval_start_utc=cursor.isoformat(), interval_end_utc=following.isoformat(),
                          init_time_utc=cursor.isoformat(), available_at_utc=following.isoformat(),
                          source_model="HRRR", source_product="sfc", parameter="APCP",
-                         source_grid_hash="fixture-grid", step_type="accum", units="mm",
+                         source_grid_hash="fixture-grid", source_grid_index=8,
+                         spatial_basis="native_grid_point", step_type="accum", units="mm",
                          amount_mm=0.0))
         cursor = following
     return rows
@@ -54,15 +55,21 @@ def test_precipitation_gap_overlap_source_switch_and_negative_block_strict_total
 def test_cumulative_difference_requires_one_run_and_verified_step_bounds() -> None:
     base = dict(source_model="HRRR", source_product="sfc", parameter="APCP",
                 source_grid_hash="fixture-grid", source_grid_index=8,
+                spatial_basis="native_grid_point",
                 init_time_utc="2024-01-02T00:00:00+00:00", step_type="accum",
                 units="mm", step_start_hour=0)
     earlier = dict(base, valid_time_utc="2024-01-02T01:00:00+00:00",
-                   step_end_hour=1, amount_mm=2.0)
+                   available_at_utc="2024-01-02T02:00:00+00:00", step_end_hour=1, amount_mm=2.0)
     later = dict(base, valid_time_utc="2024-01-02T03:00:00+00:00",
-                 step_end_hour=3, amount_mm=5.5)
+                 available_at_utc="2024-01-02T04:00:00+00:00", step_end_hour=3, amount_mm=5.5)
     result = difference_same_run_accumulations(earlier, later)
     assert result["modeled_precipitation_amount_mm"] == 3.5
     assert result["step_start_hour"] == 1
+    assert result["available_at_utc"] == "2024-01-02T04:00:00+00:00"
+    assert sum_exact_precipitation_intervals([result],
+                                             start_utc=result["interval_start_utc"],
+                                             end_utc=result["interval_end_utc"])[
+                                                 "modeled_precipitation_amount_mm"] == 3.5
     for changed in (dict(later, init_time_utc="2024-01-02T01:00:00+00:00"),
                     dict(later, amount_mm=1.0),
                     dict(later, step_start_hour=1),

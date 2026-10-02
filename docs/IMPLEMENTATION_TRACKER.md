@@ -1,5 +1,19 @@
 # Remaining meteorology implementation tracker
 
+## 2026-10-02 focused continuation
+
+Candidate-contract regressions were reconstructed from `NEXT_CODEX_TASK.md`; its referenced
+`evidence/test_review_candidate_contracts.py` was not supplied. Four reconstructed tests failed
+against the installed editable package before repair: an interval with no spatial point/cell was
+accepted; an f00 availability preceding its valid time was accepted; an omitted RONI publication
+raised `KeyError` on an as-of query; and a whole-hour-duration window offset by one second was
+accepted. The repaired tests now pass. Native precipitation intervals require a grid-point index;
+mapped H3 intervals require a cell and mapping identity. Totals permit independently verified
+adjacent intervals from different cycles at the same target; cumulative differencing still
+requires one run and retains the later of both input availability timestamps. An f00 hourly row
+requires the declared assumed-lag availability policy and cannot be available before valid time.
+This is contract validation, not real-source compatibility or scientific acceptance.
+
 Date: 2026-10-02. Starting checkout: `f6228703e06b4768dd274404883157d746781a18` on clean `main`. Work is on local `codex/meteorology-complete-remaining` in a disposable clone. This tracker records tested code separately from actual source support and independent scientific acceptance. It does not turn a passing synthetic contract test into a real-source claim.
 
 | Milestone | Implementation | Source compatibility | Empirical scientific acceptance | Affected output and exact remaining gate |
