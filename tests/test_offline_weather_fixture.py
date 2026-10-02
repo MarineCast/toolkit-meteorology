@@ -1227,6 +1227,11 @@ def test_network_free_snapshot_refuses_legacy_or_unbound_policy_evidence(
     source_inventory = config.surface_weather.inventory_path
     original_manifest = source_manifest.read_bytes()
     original_inventory = source_inventory.read_bytes()
+    original_objects = {
+        str(path): sha256_file(path)
+        for path in config.surface_weather.raw_dir.rglob("*.parquet")
+        if "objects" in path.parts
+    }
     candidate = tmp_path / "candidate-raw"
     destination = dict(
         working_inventory_path=candidate / "WORKING.parquet",
@@ -1238,8 +1243,16 @@ def test_network_free_snapshot_refuses_legacy_or_unbound_policy_evidence(
     source_manifest.write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(ValueError, match="manifest|policy|evidence"):
         snapshot_existing_surface_weather_acquisition(config_path, **destination)
+    with pytest.raises(ValueError, match="manifest|policy|evidence"):
+        snapshot_existing_surface_weather_acquisition(config_path)
     assert not destination["manifest_path"].exists()
     assert source_inventory.read_bytes() == original_inventory
+    source_manifest.write_bytes(original_manifest)
+    altered = json.loads(original_manifest)
+    altered["method_version"] = "unknown-method"
+    source_manifest.write_text(json.dumps(altered), encoding="utf-8")
+    with pytest.raises(ValueError, match="method|manifest|evidence"):
+        snapshot_existing_surface_weather_acquisition(config_path, **destination)
     source_manifest.write_bytes(original_manifest)
     source_manifest.unlink()
     with pytest.raises(ValueError, match="manifest|evidence"):
@@ -1252,6 +1265,7 @@ def test_network_free_snapshot_refuses_legacy_or_unbound_policy_evidence(
         snapshot_existing_surface_weather_acquisition(config_path, **destination)
     assert source_manifest.read_bytes() == original_manifest
     assert not destination["manifest_path"].exists()
+    assert all(sha256_file(Path(path)) == digest for path, digest in original_objects.items())
 
 
 @pytest.mark.parametrize("pressure_hpa", [750.0, 1150.0])

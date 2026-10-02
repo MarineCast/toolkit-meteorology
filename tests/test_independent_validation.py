@@ -125,3 +125,15 @@ def test_ndbc_realtime_text_and_malformed_tokens_have_explicit_disposition() -> 
     with pytest.raises(ValueError, match="Duplicate NDBC"):
         _observations(text.replace("2024 01 03 00 00", "2024 01 02 01 00"),
                       "2024-01-02", source_format="realtime_stdmet")
+
+
+def test_ndbc_valid_high_wind_below_fill_is_not_globally_screened() -> None:
+    text = """#YY MM DD hh mm WDIR WSPD GST PRES ATMP
+#yr mo dy hr mn degT m/s m/s hPa degC
+2024 01 02 00 00 360 98.9 98.9 999.0 9.0
+"""
+    rejected = []
+    row = next(iter(_observations(text, "2024-01-02", rejected=rejected).values()))
+    assert row["WSPD"] == row["GST"] == 98.9
+    assert row["PRES"] == 999.0
+    assert rejected == []
