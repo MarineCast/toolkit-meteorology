@@ -8,7 +8,7 @@ import pytest
 
 from meteorology.maintenance.validate_astronomy import compare_usno_reference
 from meteorology.maintenance.validate_horizons import compare_horizons_reference
-from meteorology.maintenance.validate_ndbc import compare_ndbc_day
+from meteorology.maintenance.validate_ndbc import _observations, compare_ndbc_day
 
 
 REFERENCE_ROOT = Path(__file__).resolve().parents[1] / "validation" / "references"
@@ -75,3 +75,41 @@ def test_ndbc_comparison_records_missingness_and_height_limitations() -> None:
     assert report["metrics"]["mean_sea_level_pressure_hpa"]["mae"] == 0.0
     assert report["threshold_decision"] == "not_set_for_one_station_day"
     assert any("3.8 m" in limitation for limitation in report["limitations"])
+
+
+def test_ndbc_historical_field_specific_missing_tokens_do_not_enter_metrics() -> None:
+    text = """#YY MM DD hh mm WDIR WSPD GST PRES ATMP
+#yr mo dy hr mn degT m/s m/s hPa degC
+2024 01 02 00 00 999 99.0 99.0 9999.0 999.0
+2024 01 02 01 00 0 0.0 0.0 999.0 9.0
+"""
+    rejected = []
+    rows = _observations(text, "2024-01-02", rejected=rejected)
+    assert rows["2024-01-02T00:00:00+00:00"] == dict.fromkeys(
+        ("ATMP", "PRES", "WSPD", "GST", "WDIR")
+    )
+    assert rows["2024-01-02T01:00:00+00:00"]["WSPD"] == 0.0
+    assert rows["2024-01-02T01:00:00+00:00"]["PRES"] == 999.0
+    assert {item["field"] for item in rejected} == {"ATMP", "PRES", "WSPD", "GST", "WDIR"}
+    assert all(item["reason"] == "source_missing_token" for item in rejected)
+
+
+def test_ndbc_realtime_text_and_malformed_tokens_have_explicit_disposition() -> None:
+    text = """#YY MM DD hh mm WDIR WSPD GST PRES ATMP
+#yr mo dy hr mn degT m/s m/s hPa degC
+2024 01 02 00 00 MM MM MM MM MM
+2024 01 02 01 00 180 nan broken 1013.0 9.0
+2024 01 03 00 00 180 2.0 3.0 1013.0 9.0
+"""
+    rejected = []
+    rows = _observations(text, "2024-01-02", source_format="realtime_stdmet",
+                         rejected=rejected)
+    assert len(rows) == 2
+    assert {item["reason"] for item in rejected} == {
+        "source_missing_token", "non_finite", "malformed_token",
+        "out_of_period_or_not_exact_hour",
+    }
+    assert rows["2024-01-02T01:00:00+00:00"]["GST"] is None
+    with pytest.raises(ValueError, match="Duplicate NDBC"):
+        _observations(text.replace("2024 01 03 00 00", "2024 01 02 01 00"),
+                      "2024-01-02", source_format="realtime_stdmet")

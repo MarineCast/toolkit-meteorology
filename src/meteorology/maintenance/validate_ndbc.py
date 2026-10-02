@@ -10,6 +10,20 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+NDBC_FIELDS = {
+    "ATMP": (-80.0, 60.0), "PRES": (700.0, 1200.0),
+    "WSPD": (0.0, 100.0), "GST": (0.0, 100.0), "WDIR": (0.0, 360.0),
+}
+# NDBC standard meteorological text format, not a universal numeric replacement rule.
+# https://www.ndbc.noaa.gov/faq/measdes.shtml
+NDBC_MISSING = {
+    "historical_stdmet": {
+        "ATMP": {"999.0"}, "PRES": {"9999.0"},
+        "WSPD": {"99.0"}, "GST": {"99.0"}, "WDIR": {"999"},
+    },
+    "realtime_stdmet": {field: {"MM"} for field in NDBC_FIELDS},
+}
+
 
 def _metric(pairs: list[tuple[float, float]]) -> dict:
     if not pairs:
@@ -22,7 +36,12 @@ def _metric(pairs: list[tuple[float, float]]) -> dict:
     }
 
 
-def _observations(text: str, date: str) -> dict[str, dict[str, float | None]]:
+def _observations(
+    text: str, date: str, *, source_format: str = "historical_stdmet",
+    rejected: list[dict] | None = None,
+) -> dict[str, dict[str, float | None]]:
+    if source_format not in NDBC_MISSING:
+        raise ValueError(f"Unsupported NDBC source format: {source_format}")
     lines = text.splitlines()
     if len(lines) < 3 or not lines[0].startswith("#YY"):
         raise ValueError("NDBC standard meteorological header is missing.")
@@ -37,28 +56,47 @@ def _observations(text: str, date: str) -> dict[str, dict[str, float | None]]:
             f"{values['YY']}-{values['MM']}-{values['DD']}T{values['hh']}:{values['mm']}:00Z"
         )
         if stamp.strftime("%Y-%m-%d") != date or stamp.minute != 0:
+            if rejected is not None:
+                rejected.append({"valid_time_utc": stamp.isoformat(), "field": None,
+                                 "raw_token": None, "disposition": "excluded",
+                                 "reason": "out_of_period_or_not_exact_hour"})
             continue
         key = stamp.isoformat()
         if key in result:
             raise ValueError(f"Duplicate NDBC hourly observation: {key}")
         parsed: dict[str, float | None] = {}
-        limits = {
-            "ATMP": (-80.0, 60.0), "PRES": (700.0, 1200.0),
-            "WSPD": (0.0, 100.0), "GST": (0.0, 100.0), "WDIR": (0.0, 360.0),
-        }
-        for field, (lower, upper) in limits.items():
-            value = float(values[field])
-            parsed[field] = value if np.isfinite(value) and lower <= value <= upper else None
+        for field, (lower, upper) in NDBC_FIELDS.items():
+            token = values[field]
+            reason = None
+            if token in NDBC_MISSING[source_format][field]:
+                reason = "source_missing_token"
+            else:
+                try:
+                    value = float(token)
+                except ValueError:
+                    reason = "malformed_token"
+                else:
+                    if not np.isfinite(value):
+                        reason = "non_finite"
+                    elif not lower <= value <= upper:
+                        reason = "outside_physical_screen"
+            parsed[field] = None if reason else value
+            if reason and rejected is not None:
+                rejected.append({"valid_time_utc": key, "field": field,
+                                 "raw_token": token, "disposition": "rejected", "reason": reason})
         result[key] = parsed
     return result
 
 
 def compare_ndbc_day(
-    observation_text: str, model_rows: list[dict], *, date: str, station_metadata: dict
+    observation_text: str, model_rows: list[dict], *, date: str, station_metadata: dict,
+    source_format: str = "historical_stdmet",
 ) -> dict:
     """Align exact UTC hours and report descriptive point-level errors only."""
 
-    observations = _observations(observation_text, date)
+    rejected: list[dict] = []
+    observations = _observations(observation_text, date, source_format=source_format,
+                                 rejected=rejected)
     models: dict[str, dict] = {}
     for row in model_rows:
         stamp = pd.Timestamp(row["valid_time_utc"])
@@ -116,8 +154,12 @@ def compare_ndbc_day(
         "max": float(np.max(direction_errors)) if direction_errors else None,
         "calm_cutoff_ms": 1.0,
     }
+    for item in rejected:
+        item["station"] = station_metadata["station"]
+        item["source_url"] = station_metadata.get("source_url")
     return {
         "date_utc": date, "station": station_metadata["station"],
+        "source_format": source_format, "rejected_records": rejected,
         "station_metadata": station_metadata,
         "expected_hours": 24, "observation_hours": len(observations),
         "model_hours": len(models), "matched_hours": len(aligned),
@@ -140,12 +182,15 @@ def main() -> int:
     parser.add_argument("--model", type=Path, required=True)
     parser.add_argument("--station-metadata", type=Path, required=True)
     parser.add_argument("--date", required=True)
+    parser.add_argument("--source-format", choices=tuple(NDBC_MISSING),
+                        default="historical_stdmet")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     observed_bytes, model_bytes = args.observations.read_bytes(), args.model.read_bytes()
     report = compare_ndbc_day(
         observed_bytes.decode(), json.loads(model_bytes), date=args.date,
         station_metadata=json.loads(args.station_metadata.read_text()),
+        source_format=args.source_format,
     )
     report["observation_slice_sha256"] = hashlib.sha256(observed_bytes).hexdigest()
     report["model_sample_sha256"] = hashlib.sha256(model_bytes).hexdigest()

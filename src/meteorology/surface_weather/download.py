@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import os
@@ -30,6 +31,7 @@ from meteorology.core.data.meteorological_schemas import (
 
 from ..artifacts import (
     checksum_path,
+    load_manifest,
     manifest_payload,
     parquet_contract,
     sha256_file,
@@ -38,6 +40,7 @@ from ..artifacts import (
 )
 from ..config import DEFAULT_CONFIG_PATH, load_meteorological_config
 from ..field_contracts import FIELD_CONTRACT_VERSION, validate_fields
+from ..methods import METHOD_VERSIONS
 from ..spatial_support.build import load_meteorological_support
 from .sampling import (
     AVAILABILITY_POLICY,
@@ -72,6 +75,119 @@ LOGGER = logging.getLogger(__name__)
 DEFAULT_HERBIE_WORKERS = 4
 MAX_HERBIE_WORKERS = 16
 HERBIE_ATTEMPTS_PER_TIMESTAMP = 3
+ACQUISITION_EVIDENCE_POLICY = "row-bound-current-source-v1"
+
+
+def _row_evidence_key(row: dict[str, Any]) -> tuple:
+    """Fields whose identity must survive an acquisition snapshot or cache reuse."""
+    return tuple(row.get(field) for field in (
+        "VALID_TIME_UTC", "RELATIVE_PATH", "CHECKSUM", "CROSSWALK_RELATIVE_PATH",
+        "CROSSWALK_CHECKSUM", "SOURCE_GRID_HASH", "SOURCE_URI", "SOURCE_OBJECT_URI",
+        "SOURCE_RETRIEVED_AT_UTC", "PRECIP_SOURCE_URI", "PRECIP_OBJECT_URI",
+        "PRECIP_RETRIEVED_AT_UTC", "AVAILABLE_AT_UTC",
+    ))
+
+
+def _row_evidence_path(raw_dir: Path, key: tuple) -> Path:
+    digest = hashlib.sha256(json.dumps(key, separators=(",", ":")).encode()).hexdigest()
+    return raw_dir / "evidence" / f"{digest}.json"
+
+
+def _core_evidence_key(row: dict[str, Any]) -> tuple:
+    key = _row_evidence_key(row)
+    return (*key[:9], key[12])
+
+
+def _record_live_row_evidence(config: Any, row: dict[str, Any]) -> None:
+    """Retain a row-bound result of the native-grid acceptance path for resumption."""
+    weather = config.surface_weather
+    key = _row_evidence_key(row)
+    path = _row_evidence_path(weather.raw_dir, key)
+    payload = {
+        "row_identity": list(key),
+        "method_version": METHOD_VERSIONS["meteorological.surface_weather.download"],
+        "field_contract_version": FIELD_CONTRACT_VERSION,
+        "spatial_acceptance_policy": SPATIAL_ACCEPTANCE_POLICY,
+        "support_checksum": checksum_path(config.support_path(weather.h3_resolution)),
+    }
+    if path.exists():
+        if json.loads(path.read_text()) != payload:
+            raise ValueError(f"Conflicting acquisition row evidence: {path}")
+    else:
+        atomic_write_json(path, payload)
+    core_key = _core_evidence_key(row)
+    core_path = _row_evidence_path(weather.raw_dir, core_key)
+    core_payload = {**payload, "row_identity": list(core_key), "scope": "core_only"}
+    if not core_path.exists():
+        atomic_write_json(core_path, core_payload)
+
+
+def _has_live_row_evidence(config: Any, row: dict[str, Any]) -> bool:
+    weather = config.surface_weather
+    key = _row_evidence_key(row)
+    path = _row_evidence_path(weather.raw_dir, key)
+    if not path.exists():
+        return False
+    try:
+        payload = json.loads(path.read_text())
+        return (
+            payload.get("row_identity") == list(key)
+            and payload.get("method_version") == METHOD_VERSIONS["meteorological.surface_weather.download"]
+            and payload.get("field_contract_version") == FIELD_CONTRACT_VERSION
+            and payload.get("spatial_acceptance_policy") == SPATIAL_ACCEPTANCE_POLICY
+            and payload.get("support_checksum") == checksum_path(config.support_path(weather.h3_resolution))
+        )
+    except (OSError, ValueError):
+        return False
+
+
+def _has_live_core_evidence(config: Any, row: dict[str, Any]) -> bool:
+    weather = config.surface_weather
+    key = _core_evidence_key(row)
+    path = _row_evidence_path(weather.raw_dir, key)
+    if not path.exists():
+        return False
+    try:
+        payload = json.loads(path.read_text())
+        return (
+            payload.get("scope") == "core_only"
+            and payload.get("row_identity") == list(key)
+            and payload.get("method_version") == METHOD_VERSIONS["meteorological.surface_weather.download"]
+            and payload.get("field_contract_version") == FIELD_CONTRACT_VERSION
+            and payload.get("spatial_acceptance_policy") == SPATIAL_ACCEPTANCE_POLICY
+            and payload.get("support_checksum") == checksum_path(config.support_path(weather.h3_resolution))
+        )
+    except (OSError, ValueError):
+        return False
+
+
+def _verified_source_evidence(config: Any) -> tuple[set[tuple], dict[str, str]]:
+    """Read the canonical manifest and its exact inventory, never a workspace marker."""
+    weather = config.surface_weather
+    manifest_path = weather.acquisition_manifest_path
+    inventory_path = weather.inventory_path
+    if not manifest_path.exists() or not inventory_path.exists():
+        raise ValueError("Current source acquisition manifest and inventory are required; reacquire unevidenced rows.")
+    manifest = load_manifest(manifest_path, verify_artifacts=True)
+    resolved = manifest.get("resolved_config", {})
+    if (
+        manifest.get("product") != "meteorological.surface_weather.download"
+        or manifest.get("method_version") != METHOD_VERSIONS["meteorological.surface_weather.download"]
+        or resolved.get("spatial_acceptance_policy") != SPATIAL_ACCEPTANCE_POLICY
+        or resolved.get("field_contract_version") != FIELD_CONTRACT_VERSION
+        or resolved.get("h3_resolution") != weather.h3_resolution
+        or resolved.get("availability_lag_hours") != weather.availability_lag_hours
+        or resolved.get("interval_hours") != weather.interval_hours
+        or not any(item.get("checksum") == checksum_path(inventory_path)
+                   for item in manifest["artifacts"])
+    ):
+        raise ValueError("Source acquisition method, field, spatial policy or inventory evidence does not match; reacquire or use the matching historical validator.")
+    return {_row_evidence_key(row) for row in _load_inventory(inventory_path)}, {
+        "manifest_path": str(manifest_path),
+        "manifest_checksum": sha256_file(manifest_path),
+        "inventory_checksum": checksum_path(inventory_path),
+        "source_release_id": manifest["release_id"],
+    }
 
 
 def sample_path(raw_dir: Path, valid_time_utc: pd.Timestamp, timezone: str) -> Path:
@@ -353,8 +469,17 @@ def _publish_complete_acquisition(
     start: str,
     end: str,
     run_id: str,
+    verified_new_rows: set[tuple] | None = None,
+    source_evidence: tuple[set[tuple], dict[str, str]] | None = None,
 ) -> None:
     weather = config.surface_weather
+    if source_evidence is None:
+        source_evidence = _verified_source_evidence(config)
+    source_keys, source_identity = source_evidence
+    new_keys = verified_new_rows or set()
+    if any(_row_evidence_key(row) not in source_keys | new_keys
+           and not _has_live_row_evidence(config, row) for row in rows):
+        raise ValueError("Acquisition rows lack exact current spatial-policy source evidence; reacquire unevidenced rows.")
     expected_times = _expected_times(start, end, weather.timezone, weather.interval_hours)
     expected_keys = {value.tz_convert("UTC").isoformat() for value in expected_times}
     observed_keys = [str(row["VALID_TIME_UTC"]) for row in rows]
@@ -458,6 +583,8 @@ def _publish_complete_acquisition(
                 "availability_lag_hours": weather.availability_lag_hours,
                 "availability_policy": AVAILABILITY_POLICY,
                 "spatial_acceptance_policy": SPATIAL_ACCEPTANCE_POLICY,
+                "acquisition_evidence_policy": ACQUISITION_EVIDENCE_POLICY,
+                "source_evidence": source_identity,
                 "source": {
                     "model": HRRR_MODEL,
                     "product": HRRR_PRODUCT,
@@ -630,6 +757,21 @@ def _download_surface_weather_locked(
         atomic_write_json(
             policy_marker, {"policy": SPATIAL_ACCEPTANCE_POLICY}, overwrite=policy_marker.exists()
         )
+    if previous_manifest is not None and not legacy_rows:
+        try:
+            source_evidence = _verified_source_evidence(config)
+        except ValueError:
+            # Changed availability/support contracts force fresh acquisition;
+            # they never license reuse under the former manifest's claims.
+            source_evidence = (set(), {"mode": "current_run_native_grid_validation"})
+    else:
+        source_evidence = (set(), {"mode": "current_run_native_grid_validation"})
+    evidenced_existing = source_evidence[0]
+    evidenced_existing_core = (
+        {_core_evidence_key(row) for row in _load_inventory(weather.inventory_path)}
+        if evidenced_existing else set()
+    )
+    verified_new_rows: set[tuple] = set()
     existing_by_time = {str(row["VALID_TIME_UTC"]): row for row in existing_rows}
     crosswalk_cache: dict[str, tuple[pd.DataFrame, Path, str]] = {}
     crosswalk_validation_cache: dict[tuple[str, str], bool] = {}
@@ -693,6 +835,8 @@ def _download_surface_weather_locked(
         )
         if (
             not overwrite
+            and (_row_evidence_key(existing) in evidenced_existing
+                 or _has_live_row_evidence(config, existing))
             and checksum_ok
             and _valid_sample(destination, support, valid_time_utc=valid, availability_lag_hours=weather.availability_lag_hours)
             and crosswalk_ok
@@ -721,6 +865,8 @@ def _download_surface_weather_locked(
             reusable_core = (
                 _reusable_core_sample(destination, support, valid_time_utc=valid, availability_lag_hours=weather.availability_lag_hours)
                 if not overwrite and checksum_ok and crosswalk_ok and source_provenance_ok
+                and (_core_evidence_key(existing) in evidenced_existing_core
+                     or _has_live_core_evidence(config, existing))
                 else None
             )
             if reusable_core is not None and existing_crosswalk is not None:
@@ -761,7 +907,7 @@ def _download_surface_weather_locked(
                         availability_lag_hours=weather.availability_lag_hours,
                     ),
                 )
-                return _inventory_row(
+                repaired_row = _inventory_row(
                     valid_time=valid,
                     timezone=weather.timezone,
                     availability_lag_hours=weather.availability_lag_hours,
@@ -779,6 +925,10 @@ def _download_surface_weather_locked(
                     sample_checksum=repaired_checksum,
                     crosswalk_checksum=actual_crosswalk_checksum,
                 )
+                with crosswalk_lock:
+                    verified_new_rows.add(_row_evidence_key(repaired_row))
+                _record_live_row_evidence(config, repaired_row)
+                return repaired_row
             for attempt in range(1, HERBIE_ATTEMPTS_PER_TIMESTAMP + 1):
                 try:
                     source_grid, source_uri = fetch_cropped_hrrr_grid(
@@ -854,7 +1004,7 @@ def _download_surface_weather_locked(
                     availability_lag_hours=weather.availability_lag_hours,
                 ),
             )
-            return _inventory_row(
+            acquired_row = _inventory_row(
                 valid_time=valid,
                 timezone=weather.timezone,
                 availability_lag_hours=weather.availability_lag_hours,
@@ -872,6 +1022,10 @@ def _download_surface_weather_locked(
                 sample_checksum=published_checksum,
                 crosswalk_checksum=crosswalk_checksum,
             )
+            with crosswalk_lock:
+                verified_new_rows.add(_row_evidence_key(acquired_row))
+            _record_live_row_evidence(config, acquired_row)
+            return acquired_row
         except Exception as exc:
             LOGGER.exception("Direct HRRR acquisition failed for %s", valid)
             return _inventory_row(
@@ -956,6 +1110,8 @@ def _download_surface_weather_locked(
         start=min(str(row["LOCAL_DATE"]) for row in merged_rows),
         end=max(str(row["LOCAL_DATE"]) for row in merged_rows),
         run_id=run_id or f"hrrr-r5-download-{uuid.uuid4().hex[:12]}",
+        verified_new_rows=verified_new_rows,
+        source_evidence=source_evidence,
     )
     summary["inventory_path"] = str(inventory_destination)
     summary["manifest_path"] = str(manifest_destination)
@@ -1057,6 +1213,9 @@ def _snapshot_existing_surface_weather_acquisition_locked(
     candidate_working = Path(working_inventory_path or weather.working_inventory_path)
     candidate_inventory = Path(inventory_path or weather.inventory_path)
     candidate_manifest = Path(manifest_path or weather.acquisition_manifest_path)
+    source_evidence = _verified_source_evidence(config)
+    if any(_row_evidence_key(row) not in source_evidence[0] for row in rows):
+        raise ValueError("Snapshot inventory differs from the verified source acquisition; reacquire unevidenced rows.")
     _atomic_table_write(
         pa.Table.from_pylist(rows, schema=INVENTORY_SCHEMA).to_pandas(),
         candidate_working, INVENTORY_SCHEMA,
@@ -1066,6 +1225,7 @@ def _snapshot_existing_surface_weather_acquisition_locked(
         inventory_destination=candidate_inventory, manifest_destination=candidate_manifest,
         start=dates[0], end=dates[-1],
         run_id=run_id or f"hrrr-r5-snapshot-{uuid.uuid4().hex[:12]}",
+        source_evidence=source_evidence,
     )
     return {
         "snapshot_mode": "existing_validated_r5_samples",

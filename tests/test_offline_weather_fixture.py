@@ -1215,6 +1215,41 @@ def test_existing_sample_snapshot_copies_candidate_references(
         )
 
 
+def test_network_free_snapshot_refuses_legacy_or_unbound_policy_evidence(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config_path = _fixture_config(tmp_path)
+    build_meteorological_spatial_support(config_path, run_id="support")
+    _patch_fetch(monkeypatch, [])
+    download_surface_weather(config_path, max_workers=1, run_id="source")
+    config = load_meteorological_config(config_path)
+    source_manifest = config.surface_weather.acquisition_manifest_path
+    source_inventory = config.surface_weather.inventory_path
+    original_manifest = source_manifest.read_bytes()
+    original_inventory = source_inventory.read_bytes()
+    candidate = tmp_path / "candidate-raw"
+    destination = dict(
+        working_inventory_path=candidate / "WORKING.parquet",
+        inventory_path=candidate / "INVENTORY.parquet",
+        manifest_path=candidate / "MANIFEST.json",
+    )
+    manifest = json.loads(original_manifest)
+    manifest["resolved_config"]["spatial_acceptance_policy"] = "legacy-unverified-policy"
+    source_manifest.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="manifest|policy|evidence"):
+        snapshot_existing_surface_weather_acquisition(config_path, **destination)
+    assert not destination["manifest_path"].exists()
+    assert source_inventory.read_bytes() == original_inventory
+    source_manifest.write_bytes(original_manifest)
+    changed = pq.read_table(source_inventory).to_pandas()
+    changed.loc[0, "SOURCE_URI"] = "https://example.invalid/tampered"
+    pq.write_table(pa.Table.from_pandas(changed, schema=INVENTORY_SCHEMA), source_inventory)
+    with pytest.raises(ValueError, match="checksum|evidence"):
+        snapshot_existing_surface_weather_acquisition(config_path, **destination)
+    assert source_manifest.read_bytes() == original_manifest
+    assert not destination["manifest_path"].exists()
+
+
 def test_custom_acquisition_destination_copies_references(tmp_path: Path, monkeypatch) -> None:
     config_path = _fixture_config(tmp_path)
     build_meteorological_spatial_support(config_path, run_id="support")

@@ -11,12 +11,14 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
 import pyarrow.parquet as pq
 
 from meteorology.core.artifacts import atomic_write_json
 
 from ..artifacts import load_manifest, sha256_file
 from ..config import DEFAULT_CONFIG_PATH, load_meteorological_config
+from ..field_contracts import HARD_LIMITS, REGIONAL_WARNINGS, regional_warning_counts, validate_fields
 from ..spatial_support.build import load_meteorological_support
 from .build import DAILY_SCHEMA
 from .download import INVENTORY_SCHEMA, _expected_times, retrieval_matches_object, valid_retrieval_time
@@ -51,6 +53,23 @@ ABSOLUTE_TOLERANCES = {
     "VISIBILITY_KM_MIN": 1e-3,
     "TOTAL_CLOUD_COVER_PCT_MEAN": 1e-3,
 }
+
+
+def pressure_contract_decision(frame: pd.DataFrame, date: str) -> tuple[list[str], dict[str, int]]:
+    """Apply shared hard limits and regional diagnostics to a daily partition."""
+    problems = []
+    if (frame["MEAN_SEA_LEVEL_PRESSURE_HPA_MIN"] >
+            frame["MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN"]).any():
+        problems.append(f"Daily pressure minimum exceeds mean for {date}.")
+    try:
+        pressure_schema = pa.schema([
+            DAILY_SCHEMA.field("MEAN_SEA_LEVEL_PRESSURE_HPA_MIN"),
+            DAILY_SCHEMA.field("MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN"),
+        ])
+        validate_fields(frame, pressure_schema, context=f"Daily weather {date}")
+    except ValueError as exc:
+        problems.append(f"Daily hard field contract failed for {date}: {exc}")
+    return problems, regional_warning_counts(frame)
 
 LEGACY_SAMPLE_GROUPS = {
     "temperature": {
@@ -543,6 +562,8 @@ def verify_hrrr_r5_rebuild(
     daily_rows = 0
     pressure_minimum = np.inf
     pressure_maximum = -np.inf
+    pressure_warnings: dict[str, int] = defaultdict(int)
+    pressure_structure_failures = 0
     precipitation_maximum = -np.inf
     precipitation_nonzero_rows = 0
     for path in sorted(weather.daily_output_dir.rglob("*.parquet")):
@@ -586,12 +607,11 @@ def verify_hrrr_r5_rebuild(
         pressure_mean = frame["MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN"].to_numpy(dtype=float)
         pressure_minimum = min(pressure_minimum, float(pressure_min.min()))
         pressure_maximum = max(pressure_maximum, float(pressure_mean.max()))
-        if (
-            (pressure_min > pressure_mean).any()
-            or (pressure_min < 800.0).any()
-            or (pressure_mean > 1100.0).any()
-        ):
-            errors.append(f"Daily pressure validation failed for {date}.")
+        pressure_errors, warnings = pressure_contract_decision(frame, date)
+        errors.extend(pressure_errors)
+        pressure_structure_failures += sum("minimum exceeds mean" in issue for issue in pressure_errors)
+        for field, count in warnings.items():
+            pressure_warnings[field] += count
         precipitation = frame["PRECIP_MM_DAY_ESTIMATE"].to_numpy(dtype=float)
         precipitation_maximum = max(precipitation_maximum, float(precipitation.max()))
         precipitation_nonzero_rows += int((precipitation > 0.0).sum())
@@ -629,8 +649,13 @@ def verify_hrrr_r5_rebuild(
         "pressure_validation": {
             "minimum_hpa": pressure_minimum,
             "maximum_hpa": pressure_maximum,
-            "allowed_range_hpa": [800.0, 1100.0],
-            "minimum_not_above_mean": True,
+            "hard_range_hpa": [HARD_LIMITS["MEAN_SEA_LEVEL_PRESSURE_HPA_MIN"].minimum,
+                               HARD_LIMITS["MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN"].maximum],
+            "regional_diagnostic_range_hpa": [REGIONAL_WARNINGS["MEAN_SEA_LEVEL_PRESSURE_HPA_MIN"].minimum,
+                                               REGIONAL_WARNINGS["MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN"].maximum],
+            "regional_warning_counts": dict(pressure_warnings),
+            "minimum_not_above_mean": pressure_structure_failures == 0,
+            "structural_failure_partitions": pressure_structure_failures,
         },
         "precipitation_validation": {
             "source_forecast_hour": weather.precipitation_forecast_hour,
