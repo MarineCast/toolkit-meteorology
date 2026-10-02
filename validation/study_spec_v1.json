@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "status": "prespecified_for_future_regional_study_not_executed",
+  "created_date": "2026-10-02",
+  "requested_domain": {
+    "identity": "OrcaCast config/common.yaml model_area at f622870 handoff",
+    "bbox_wgs84": {"min_lon": -125.8, "min_lat": 46.85, "max_lon": -121.6, "max_lat": 50.0}
+  },
+  "currently_demonstrated_hrrr_example": {
+    "bbox_wgs84": {"min_lon": -125.8, "min_lat": 46.85, "max_lon": -121.6, "max_lat": 49.7},
+    "unsupported_request": "Northwest corner of requested model_area at 50.00 N, 125.80 W failed the decoded CONUS HRRR footprint test; full requested coverage is unverified."
+  },
+  "source_eras": ["2020-2022", "2023-2026"],
+  "seasons": ["winter", "spring", "summer", "autumn"],
+  "coastal_settings": ["US exposed coast", "US inland waters", "Canadian exposed coast", "Canadian inland waters"],
+  "candidate_references": ["NDBC historical standard meteorological", "NCEI hourly station observations", "ECCC historical observations"],
+  "selection_rule": "Select site-periods and freeze exact archive inputs and sensor metadata before examining errors; reserve disjoint site-time holdouts.",
+  "matching": {
+    "time": "Match exact UTC valid time only after verifying observation averaging period and modeled instantaneous or interval support.",
+    "space": "Report source-native nearest point and sampled H3 comparisons separately with distance and coastal setting.",
+    "height": "Report raw height-mismatched measurements separately; adjust only with recorded sensor height and justified physical assumptions.",
+    "missingness": "Apply source-specific fill/QC rules before numerical screening; retain exclusions and valid zeros."
+  },
+  "metrics": ["matched_count", "coverage", "bias", "MAE", "RMSE", "circular_wind_error_above_declared_calm_cutoff", "event_precision_recall_where_reference_supports_it"],
+  "uncertainty": "Blocked site-time intervals, not independent adjacent hours or H3 cells.",
+  "acceptance": {
+    "coarse_context": "thresholds_not_yet_justified_or_frozen",
+    "precision_horizon": "thresholds_not_yet_justified_or_frozen",
+    "atmospheric_variables": "thresholds_not_yet_justified_or_frozen",
+    "decision": "NOT_RUN"
+  },
+  "existing_pilot_inputs_sha256": {
+    "ndbc_reference": "e4cdab9abc502f0b2c3ee2fa5289cb8c1343573fd6ebd4da0f3f4ca70eb97bf5",
+    "hrrr_point_samples": "8301892d7be82cce42d7ebda2cd4bdeedc878fba641d0660c1a933029d1eb104",
+    "usno_reference": "107d554ee47ad583222ba94fdd97efa929dc48be282ed8724e12e22c3aff7143",
+    "jpl_horizons_reference": "51b416064922c8fd36f8600d68dd6149334ed6399fb8962e25bc1bbd5438a555"
+  },
+  "existing_pilot_scope": "One NDBC buoy/UTC day, ten USNO cases, six JPL site-days; retained as pilot only."
+}

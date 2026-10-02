@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "study_spec": "validation/study_spec_v1.json",
+  "requested_model_area_bbox_wgs84": {
+    "min_lon": -125.8, "min_lat": 46.85, "max_lon": -121.6, "max_lat": 50.0
+  },
+  "shipped_example_bbox_wgs84": {
+    "min_lon": -125.8, "min_lat": 46.85, "max_lon": -121.6, "max_lat": 49.7
+  },
+  "source_compatibility_status": "PARTIAL",
+  "evidence": "The prior bounded 2024-01-02 08 UTC HRRR decode accepted the shipped example and rejected the earlier northwest corner at 50.00 N, 125.80 W. This is one cycle, not a full-domain source-coverage calculation.",
+  "unsupported_or_unverified": [
+    "Requested model area north of the shipped example through 50.00 N has no demonstrated complete HRRR footprint acceptance.",
+    "Canadian coastal settings and season/era coverage are not qualified by the single-cycle example."
+  ],
+  "regional_scientific_acceptance": "NOT_RUN",
+  "next_gate": "Prespecify source/site/time fixtures, run bounded decoded footprint checks over requested geography, and retain complete matched observational comparisons."
+}
