@@ -5,7 +5,9 @@ from datetime import timedelta
 import pytest
 
 from meteorology.temporal_products import local_day_bounds
-from meteorology.precipitation_intervals import sum_exact_precipitation_intervals
+from meteorology.precipitation_intervals import (
+    difference_same_run_accumulations, sum_exact_precipitation_intervals,
+)
 
 def _intervals(date: str) -> list[dict]:
     start, end = local_day_bounds(date, "America/Los_Angeles")
@@ -47,3 +49,24 @@ def test_precipitation_gap_overlap_source_switch_and_negative_block_strict_total
         with pytest.raises(ValueError):
             sum_exact_precipitation_intervals(changed, start_utc=start.isoformat(),
                                                end_utc=end.isoformat())
+
+
+def test_cumulative_difference_requires_one_run_and_verified_step_bounds() -> None:
+    base = dict(source_model="HRRR", source_product="sfc", parameter="APCP",
+                source_grid_hash="fixture-grid", source_grid_index=8,
+                init_time_utc="2024-01-02T00:00:00+00:00", step_type="accum",
+                units="mm", step_start_hour=0)
+    earlier = dict(base, valid_time_utc="2024-01-02T01:00:00+00:00",
+                   step_end_hour=1, amount_mm=2.0)
+    later = dict(base, valid_time_utc="2024-01-02T03:00:00+00:00",
+                 step_end_hour=3, amount_mm=5.5)
+    result = difference_same_run_accumulations(earlier, later)
+    assert result["modeled_precipitation_amount_mm"] == 3.5
+    assert result["step_start_hour"] == 1
+    for changed in (dict(later, init_time_utc="2024-01-02T01:00:00+00:00"),
+                    dict(later, amount_mm=1.0),
+                    dict(later, step_start_hour=1),
+                    dict(later, step_end_hour=2),
+                    dict(later, source_grid_index=9)):
+        with pytest.raises(ValueError):
+            difference_same_run_accumulations(earlier, changed)

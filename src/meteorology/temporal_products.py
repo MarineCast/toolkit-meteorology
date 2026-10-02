@@ -47,21 +47,34 @@ HOURLY_CORE = (
 def validate_hourly_records(
     records: list[dict], *, local_date: str, timezone_name: str,
     required_fields: tuple[str, ...] = HOURLY_CORE,
+    expected_h3_cells: set[str] | None = None,
+    optional_fields: tuple[str, ...] = (),
     as_of_utc: str | None = None,
 ) -> dict:
-    """Gate a complete candidate day of distinct source-native hourly analyses."""
+    """Gate a complete candidate day of distinct source-native hourly analyses.
+
+    When H3 cells are supplied, every expected (UTC hour, cell) must occur once.
+    Optional fields report coverage without changing core completeness.
+    """
     expected = hourly_utc_instants(local_date, timezone_name)
     as_of = _utc(as_of_utc) if as_of_utc is not None else None
-    seen: set[datetime] = set()
+    if expected_h3_cells is not None and not expected_h3_cells:
+        raise ValueError("Hourly H3 support cannot be empty.")
+    seen: set[tuple[datetime, str | None]] = set()
+    optional_counts = {field: 0 for field in optional_fields}
     for record in records:
         valid = _utc(record["valid_time_utc"])
         initialized = _utc(record["init_time_utc"])
         available = _utc(record["available_at_utc"])
         if as_of is not None and available > as_of:
             raise ValueError("Hourly source value was unavailable at the requested as-of time.")
-        if valid in seen:
-            raise ValueError(f"Duplicate hourly valid time: {valid.isoformat()}")
-        seen.add(valid)
+        cell = record.get("H3_INDEX") if expected_h3_cells is not None else None
+        if expected_h3_cells is not None and cell not in expected_h3_cells:
+            raise ValueError(f"Unexpected or missing H3 cell at {valid.isoformat()}: {cell!r}")
+        key = (valid, cell)
+        if key in seen:
+            raise ValueError(f"Duplicate hourly time/cell: {valid.isoformat()}, {cell!r}")
+        seen.add(key)
         if initialized != valid or record.get("forecast_hour") != 0:
             raise ValueError("Hourly analysis requires its own f00 cycle; forecast vintages need a separate product.")
         if record.get("source_model") != "HRRR" or record.get("source_product") != "sfc":
@@ -70,15 +83,26 @@ def validate_hourly_records(
             value = record.get(field)
             if value is None or not isinstance(value, (int, float)) or not isfinite(value):
                 raise ValueError(f"Required hourly core field {field} is missing or non-finite at {valid}.")
-    if seen != set(expected):
-        raise ValueError(f"Hourly local day is incomplete: expected {len(expected)}, observed {len(seen)}; missing={len(set(expected) - seen)}, extra={len(seen - set(expected))}.")
+        for field in optional_fields:
+            value = record.get(field)
+            if isinstance(value, (int, float)) and isfinite(value):
+                optional_counts[field] += 1
+    expected_keys = {(instant, cell) for instant in expected
+                     for cell in (expected_h3_cells if expected_h3_cells is not None else {None})}
+    if seen != expected_keys:
+        raise ValueError(f"Hourly local day is incomplete: expected {len(expected_keys)}, observed {len(seen)}; missing={len(expected_keys - seen)}, extra={len(seen - expected_keys)}.")
     return {"local_date": local_date, "timezone": timezone_name,
-            "expected_hours": len(expected), "observed_hours": len(seen),
-            "coverage_fraction": 1.0, "status": "COMPLETE"}
+            "expected_hours": len(expected), "observed_hours": len({key[0] for key in seen}),
+            "expected_cells": len(expected_h3_cells) if expected_h3_cells is not None else None,
+            "expected_rows": len(expected_keys), "observed_rows": len(seen),
+            "coverage_fraction": 1.0, "status": "COMPLETE",
+            "optional_field_coverage": {field: count / len(expected_keys)
+                                        for field, count in optional_counts.items()}}
 
 
 def summarize_hourly_window(
     records: list[dict], *, start_utc: str, end_utc: str, field: str,
+    h3_index: str | None = None,
     as_of_utc: str | None = None,
 ) -> dict:
     """Summarize start-of-hour samples without filling unknown one-hour slots."""
@@ -89,6 +113,10 @@ def summarize_hourly_window(
     as_of = _utc(as_of_utc) if as_of_utc is not None else None
     by_time: dict[datetime, float | None] = {}
     for row in records:
+        if h3_index is not None and row.get("H3_INDEX") != h3_index:
+            continue
+        if h3_index is None and "H3_INDEX" in row:
+            raise ValueError("Select an H3 cell before summarizing a multi-cell hourly window.")
         valid = _utc(row["valid_time_utc"])
         if not start <= valid < end:
             continue
@@ -112,4 +140,3 @@ def summarize_hourly_window(
         "sampled_max": max(values) if values else None,
         "sampled_mean": sum(values) / count if count else None,
     }
-

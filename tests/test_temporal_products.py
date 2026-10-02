@@ -69,3 +69,34 @@ def test_environmental_window_reports_coverage_without_bridging_missing_or_futur
                                     field="TEMPERATURE_2M_C", as_of_utc=start)
     assert as_of["valid_hours"] == 0
 
+
+def test_hourly_h3_inventory_and_optional_coverage() -> None:
+    hours = _hourly("2024-03-10")
+    rows = [dict(row, H3_INDEX=cell, LOW_CLOUD_COVER_PCT=(0.0 if cell == "a" else None))
+            for row in hours for cell in ("a", "b")]
+    result = validate_hourly_records(
+        rows, local_date="2024-03-10", timezone_name="America/Los_Angeles",
+        expected_h3_cells={"a", "b"}, optional_fields=("LOW_CLOUD_COVER_PCT",),
+    )
+    assert result["expected_rows"] == 46
+    assert result["observed_hours"] == 23
+    assert result["optional_field_coverage"] == {"LOW_CLOUD_COVER_PCT": 0.5}
+    with pytest.raises(ValueError, match="incomplete"):
+        validate_hourly_records(rows[:-1], local_date="2024-03-10",
+                                timezone_name="America/Los_Angeles",
+                                expected_h3_cells={"a", "b"})
+    with pytest.raises(ValueError, match="Duplicate"):
+        validate_hourly_records(rows + [rows[0]], local_date="2024-03-10",
+                                timezone_name="America/Los_Angeles",
+                                expected_h3_cells={"a", "b"})
+    with pytest.raises(ValueError, match="Unexpected"):
+        validate_hourly_records([dict(rows[0], H3_INDEX="c"), *rows[1:]],
+                                local_date="2024-03-10", timezone_name="America/Los_Angeles",
+                                expected_h3_cells={"a", "b"})
+    with pytest.raises(ValueError, match="Select an H3 cell"):
+        summarize_hourly_window(rows, start_utc=hours[0]["valid_time_utc"],
+                                end_utc=hours[1]["valid_time_utc"], field="TEMPERATURE_2M_C")
+    selected = summarize_hourly_window(rows, start_utc=hours[0]["valid_time_utc"],
+                                       end_utc=hours[1]["valid_time_utc"],
+                                       field="TEMPERATURE_2M_C", h3_index="b")
+    assert selected["valid_hours"] == 1
