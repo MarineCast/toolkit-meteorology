@@ -6,6 +6,8 @@
 
 The current weather producer is **retrospective**: six local-day HRRR `sfc/f00` analyses, paired with one-hour-lead `sfc/f01` precipitation-rate forecasts. The precipitation result is an estimate from six snapshots. It is not a measured 24-hour accumulation or a future-weather forecast.
 
+The October 2026 [implementation tracker](IMPLEMENTATION_TRACKER.md) records the corrective patch, candidate temporal contracts, frozen-reference results, and remaining provider/accuracy gates. The candidate modules are not new published weather families.
+
 <div class="grid cards" markdown>
 
 - :material-weather-partly-cloudy: **Surface weather**<br>

@@ -24,6 +24,14 @@ Dates use the configured product timezone; source timestamps retain UTC identity
 is part of each product's support contract even where it is not included in the row key.
 Do not join rows by order or substitute water-only H3 support for atmospheric support.
 
+Candidate modules `meteorology.temporal_products`,
+`meteorology.precipitation_intervals`, `meteorology.atmospheric_summaries`
+and `meteorology.climate_context` provide tested time and arithmetic contracts
+for future producers. They do not yet create published family manifests,
+catalog entries or H3 rows. Their fixtures establish software behavior only;
+provider compatibility and scientific accuracy gates remain in the
+[implementation tracker](IMPLEMENTATION_TRACKER.md).
+
 ## Weather
 
 Fields describe temperature, humidity, vector wind and direction, gusts, visibility, cloud cover,

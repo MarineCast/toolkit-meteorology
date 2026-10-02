@@ -92,6 +92,18 @@ def test_ndbc_historical_field_specific_missing_tokens_do_not_enter_metrics() ->
     assert rows["2024-01-02T01:00:00+00:00"]["PRES"] == 999.0
     assert {item["field"] for item in rejected} == {"ATMP", "PRES", "WSPD", "GST", "WDIR"}
     assert all(item["reason"] == "source_missing_token" for item in rejected)
+    models = [dict(valid_time_utc=f"2024-01-02T{hour:02d}:00:00Z",
+                   temperature_2m_k=282.15, mean_sea_level_pressure_pa=99900.0,
+                   u_wind_10m_ms=0.0, v_wind_10m_ms=0.0,
+                   wind_gust_surface_ms=0.0, source_grid_distance_m=100.0)
+              for hour in (0, 1)]
+    report = compare_ndbc_day(text, models, date="2024-01-02",
+                              station_metadata={"station": "fixture", "source_url": "fixture://ndbc"})
+    assert report["matched_hours"] == 2
+    assert report["metrics"]["wind_speed_ms"]["count"] == 1
+    assert report["metrics"]["wind_gust_ms"]["count"] == 1
+    assert report["metrics"]["wind_direction_absolute_error_deg"]["count"] == 0
+    assert all(item["station"] == "fixture" for item in report["rejected_records"])
 
 
 def test_ndbc_realtime_text_and_malformed_tokens_have_explicit_disposition() -> None:

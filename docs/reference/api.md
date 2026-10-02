@@ -31,3 +31,28 @@ For a Python process outside the workspace, set `METEOROLOGY_WORKSPACE` before l
       show_source: false
 
 The [method registry](https://github.com/MarineCast/toolkit-meteorology/blob/main/src/meteorology/methods.py), [variable inventory](variables.md), [schemas](https://github.com/MarineCast/toolkit-meteorology/blob/main/src/meteorology/core/data/meteorological_schemas.py) and [product contracts](../CONTRACTS.md) define the scientific interpretation beyond the function signatures.
+
+## Candidate processing contracts
+
+The following deeper modules are inspectable building blocks for uncompleted
+products. They do not acquire sources or publish family manifests:
+
+```python
+from meteorology.temporal_products import hourly_utc_instants, validate_hourly_records, summarize_hourly_window
+from meteorology.precipitation_intervals import sum_exact_precipitation_intervals
+from meteorology.atmospheric_summaries import dewpoint_depression_c, gust_factor
+from meteorology.climate_context import validate_roni_rows, select_roni_asof
+
+assert len(hourly_utc_instants("2024-03-10", "America/Los_Angeles")) == 23
+assert dewpoint_depression_c(5.0, 2.0) == 3.0
+assert gust_factor(0.0, 0.0, 0.0) is None
+```
+
+`validate_hourly_records` requires complete f00 core fields at distinct real UTC
+hours. `summarize_hourly_window` reports sampled extrema and coverage without
+bridging missing hours. `sum_exact_precipitation_intervals` requires already
+verified source accumulation intervals in millimetres; a PRATE snapshot cannot
+be passed off as an amount. `select_roni_asof` returns no historical value
+without an actual retained publication timestamp. See the
+[implementation tracker](../IMPLEMENTATION_TRACKER.md) for unverified provider,
+schema and scientific gates.

@@ -1,5 +1,15 @@
 # Production readiness evidence
 
+## Current status, 2026-10-02
+
+The six-snapshot retrospective daily family remains the published producer
+contract. The [implementation tracker](docs/IMPLEMENTATION_TRACKER.md) records
+O01–O03 corrections, frozen-reference recomputation, candidate hourly/interval/RONI
+helpers, and separate implementation, source-compatibility and empirical gates.
+Passing offline package tests does not establish full-domain or precision-viewing
+scientific acceptance. No new hourly, accumulation, climate or binational
+release has been published.
+
 This is a local implementation review for proposed software version `0.1.0` on 2026-09-30. It does not certify a live NOAA data release, a deployed documentation site, or a published Python package.
 
 ## October 1 geographic acceptance and independent pilot candidate

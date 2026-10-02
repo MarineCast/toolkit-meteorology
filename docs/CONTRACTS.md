@@ -55,6 +55,16 @@ rows must be reacquired with `--overwrite` for the complete frozen range before
 they can be published under this policy. An in-progress acquisition retains a
 policy marker so it can resume without redownloading its validated rows.
 
+Publication additionally records `row-bound-current-source-v1` acquisition evidence.
+A network-free snapshot requires the exact current source manifest and its
+checksummed canonical inventory; the workspace policy marker is insufficient.
+Newly acquired rows retain evidence bound to their sample/crosswalk and support
+checksums, source identity, and method/field/spatial policy. These records permit
+interrupted live acquisition to resume without promoting unevidenced older rows.
+A verified current canonical manifest from before this extra evidence record
+remains eligible under its documented spatial contract. Historical releases
+retain their original claims.
+
 One writer owns the raw workspace from seed read through publication. A second writer or a
 reader seeking a canonical metadata snapshot receives an explicit busy error. Readers also
 refuse an unfinished metadata journal until recovery. The existing family publisher promotes

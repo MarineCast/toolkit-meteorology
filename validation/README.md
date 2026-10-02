@@ -42,6 +42,12 @@ The adjacent metadata file records the full compressed source SHA-256, station
 coordinates and sensor heights from the [station page](https://www.ndbc.noaa.gov/station_page.php?station=46088).
 The [measurement description](https://www.ndbc.noaa.gov/faq/measdes.shtml)
 defines UTC timestamps, units and missing-value sentinels.
+The historical standard-meteorological parser now rejects field-specific fills
+before physical ranges: WSPD/GST `99.0`, WDIR `999`, ATMP `999.0` and PRES
+`9999.0`. Realtime standard-meteorological `MM` is a separate parser mode.
+The recomputed pilot's numerical metrics and denominators did not change;
+its report now retains rejected field tokens and reasons. These values are
+documented in [NDBC standard meteorological metadata](https://dods.ndbc.noaa.gov/thredds/dodsC/data/stdmet/46012/46012h2026.nc.html).
 
 The model sample file contains one nearest-grid scalar per UTC hour and the
 corresponding HRRR source object URI. Full GRIB bytes were not retained. To

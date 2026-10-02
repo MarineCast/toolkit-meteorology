@@ -65,6 +65,7 @@ nav:
       - Python API: reference/api.md
       - Sources and rights: DATA_SOURCES.md
   - Development:
+      - Implementation tracker: IMPLEMENTATION_TRACKER.md
       - Architecture: ARCHITECTURE.md
       - Development checks: DEVELOPMENT.md
       - Archived validation: archived-validation.md

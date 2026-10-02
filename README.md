@@ -14,6 +14,8 @@
 | Lunar context | Approximate phase, disk illumination and geometrical moon visibility | R5 × local date |
 | Daily matrix | Optional union of native daily families, with unsupported component values null | R4/R5 × local date |
 
+**October 2026 implementation status:** The released producer contract remains the six-snapshot daily weather/astronomy family above. This checkout adds row-bound acquisition evidence and candidate hourly, interval-amount, atmospheric-summary, and RONI time contracts. Those candidate contracts do not yet publish provider-backed products. The [milestone tracker](docs/IMPLEMENTATION_TRACKER.md) separates software checks, source compatibility, and empirical acceptance, with the remaining provider and regional gates explicit.
+
 The package is primarily **retrospective**. `PRECIP_MM_DAY_ESTIMATE` sums six forecast-rate snapshots multiplied by nominal four-hour intervals; it is not a measured 24-hour precipitation accumulation. Weather and astronomy do not measure species occurrence, observer effort, reporting or detection probability. Read [limitations](docs/limitations.md) before using the values as model predictors.
 
 ## Start in under five minutes, offline

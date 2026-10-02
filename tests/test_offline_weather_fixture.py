@@ -1241,6 +1241,10 @@ def test_network_free_snapshot_refuses_legacy_or_unbound_policy_evidence(
     assert not destination["manifest_path"].exists()
     assert source_inventory.read_bytes() == original_inventory
     source_manifest.write_bytes(original_manifest)
+    source_manifest.unlink()
+    with pytest.raises(ValueError, match="manifest|evidence"):
+        snapshot_existing_surface_weather_acquisition(config_path, **destination)
+    source_manifest.write_bytes(original_manifest)
     changed = pq.read_table(source_inventory).to_pandas()
     changed.loc[0, "SOURCE_URI"] = "https://example.invalid/tampered"
     pq.write_table(pa.Table.from_pandas(changed, schema=INVENTORY_SCHEMA), source_inventory)
@@ -1248,6 +1252,34 @@ def test_network_free_snapshot_refuses_legacy_or_unbound_policy_evidence(
         snapshot_existing_surface_weather_acquisition(config_path, **destination)
     assert source_manifest.read_bytes() == original_manifest
     assert not destination["manifest_path"].exists()
+
+
+@pytest.mark.parametrize("pressure_hpa", [750.0, 1150.0])
+def test_rebuild_verifier_uses_shared_pressure_hard_limit(
+    tmp_path: Path, monkeypatch, pressure_hpa: float
+) -> None:
+    config_path = _fixture_config(tmp_path)
+    build_meteorological_spatial_support(config_path, run_id="support")
+    _patch_fetch(monkeypatch, [])
+    from meteorology.surface_weather import download as module
+
+    def fetch_core(**kwargs):
+        valid = pd.Timestamp(kwargs["valid_time_utc"]).tz_convert("UTC")
+        grid = _raw_grid(valid)
+        grid["MEAN_SEA_LEVEL_PRESSURE_PA"] = pressure_hpa * 100.0
+        return grid, hrrr_aws_archive_uri(valid)
+
+    monkeypatch.setattr(module, "fetch_cropped_hrrr_grid", fetch_core)
+    download_surface_weather(config_path, max_workers=1)
+    build_surface_weather(config_path)
+    report = verify_hrrr_r5_rebuild(
+        config_path, legacy_root=tmp_path / "no-legacy",
+        output_path=tmp_path / "verification.json",
+    )
+    assert report["passed"], report["errors"]
+    assert report["pressure_validation"]["regional_warning_counts"][
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN"
+    ] > 0
 
 
 def test_custom_acquisition_destination_copies_references(tmp_path: Path, monkeypatch) -> None:
