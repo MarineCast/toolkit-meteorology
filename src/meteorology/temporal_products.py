@@ -52,6 +52,7 @@ def validate_hourly_records(
     expected_h3_cells: set[str] | None = None,
     optional_fields: tuple[str, ...] = (),
     availability_lag_hours: int | None = None,
+    expected_source_model: str = "HRRR",
     as_of_utc: str | None = None,
 ) -> dict:
     """Gate a complete candidate day of distinct source-native hourly analyses.
@@ -87,7 +88,7 @@ def validate_hourly_records(
         seen.add(key)
         if initialized != valid or record.get("forecast_hour") != 0:
             raise ValueError("Hourly analysis requires its own f00 cycle; forecast vintages need a separate product.")
-        if record.get("source_model") != "HRRR" or record.get("source_product") != "sfc":
+        if record.get("source_model") != expected_source_model or record.get("source_product") != "sfc":
             raise ValueError("Hourly source identity is not the declared HRRR sfc analysis.")
         for field in required_fields:
             value = record.get(field)

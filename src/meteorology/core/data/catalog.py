@@ -9,6 +9,8 @@ from .meteorological_schemas import (
     HRRR_CROSSWALK_SCHEMA,
     HRRR_INVENTORY_SCHEMA,
     HRRR_SAMPLE_SCHEMA,
+    HOURLY_WEATHER_INVENTORY_SCHEMA,
+    HOURLY_WEATHER_SCHEMA,
     LUNAR_SCHEMA,
     SUPPORT_SCHEMA,
     SURFACE_WEATHER_DAILY_SCHEMA,
@@ -102,6 +104,27 @@ def register_builtin_datasets() -> None:
         schema_version="3",
     )
     _register(
+        "environment.meteorological.hourly_weather.source_inventory",
+        DatasetLayer.SOURCE, DatasetFormat.PARQUET,
+        "{data_root}/raw/environment/meteorological/hourly_weather/hrrr/HOURLY_SOURCE_INVENTORY.parquet",
+        "environment.meteorological.hourly_weather.download",
+        dependencies=("environment.meteorological.spatial_support_r5",),
+        schema=HOURLY_WEATHER_INVENTORY_SCHEMA,
+        primary_key=("VALID_TIME_UTC",), schema_version="1",
+    )
+    _register(
+        "environment.meteorological.hourly_weather.h3_hourly_r5",
+        DatasetLayer.DOMAIN, DatasetFormat.DIRECTORY,
+        "{data_root}/processed/domain/environmental_layer/meteorological/hourly_weather/"
+        "H3_HOURLY_WEATHER_RES_5",
+        "environment.meteorological.hourly_weather.build",
+        dependencies=("environment.meteorological.hourly_weather.source_inventory",
+                      "environment.meteorological.spatial_support_r5"),
+        schema=HOURLY_WEATHER_SCHEMA,
+        primary_key=("H3_INDEX", "VALID_TIME_UTC"), partition_keys=("DATE",),
+        schema_version="1",
+    )
+    _register(
         "environment.meteorological.daylight.h3_daily_r4",
         DatasetLayer.DOMAIN,
         DatasetFormat.DIRECTORY,
@@ -152,4 +175,3 @@ def register_builtin_datasets() -> None:
         partition_keys=("YEAR",),
         schema_version="2",
     )
-

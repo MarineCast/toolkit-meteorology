@@ -139,6 +139,65 @@ Method: `hrrr_surface_daily_earth_wind_v5`. Support: R5; local date.
 
 Missingness: reject incomplete source/support; no zero fill. Nullable exceptions: `WIND_DIRECTION_FROM_10M_DEG`: null when mean wind vector is calm. Limitation: Retrospective model samples; local conditions can differ.
 
+## Hourly Weather Inventory
+
+Method: `hrrr_f00_hourly_source_r5_v1`. Support: R5; one UTC f00 valid time.
+
+| Field | Source field | Unit | Processing | Range | Kind | Predictor? |
+| --- | --- | --- | --- | --- | --- | --- |
+| LOCAL_DATE | configured timezone civil date of the requested HRRR cycle | ISO 8601 local calendar date | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| VALID_TIME_UTC | HRRR field valid time in UTC | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| INIT_TIME_UTC | HRRR core analysis initialization time in UTC | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| AVAILABLE_AT_UTC | declared source availability time in UTC | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SAMPLE_CHECKSUM | SHA-256 checksum of the immutable hourly H3 sample | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| CROSSWALK_CHECKSUM | SHA-256 checksum of the retained crosswalk | SHA-256 hex digest | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_GRID_HASH | checksum of ordered source-grid coordinates | SHA-256 hex digest | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| H3_CELL_COUNT | count of configured target H3 cells | count or identifier | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_OBJECT_URI | logical NOAA HRRR f00 object identity independent of mirror | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_URI | actual retrieval URI for the core HRRR fields; may be a supported mirror | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_RETRIEVED_AT_UTC | UTC time the core GRIB retrieval completed | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_EVIDENCE_KIND | retained decoded HRRR source or explicit synthetic fixture | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| DECODED_INPUT_CHECKSUM | SHA-256 checksum of the retained normalized source grid | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+
+Missingness: not applicable to complete deterministic output. Limitation: Centroid support is not an area average.
+
+## Hourly Weather
+
+Method: `hrrr_f00_hourly_h3_r5_v1`. Support: R5; H3 cell × UTC f00 valid time.
+
+| Field | Source field | Unit | Processing | Range | Kind | Predictor? |
+| --- | --- | --- | --- | --- | --- | --- |
+| H3_INDEX | H3 cell index at the declared native resolution | H3 cell identifier | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| DATE | configured timezone civil date of the valid time | ISO 8601 local calendar date | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| VALID_TIME_UTC | HRRR field valid time in UTC | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| INIT_TIME_UTC | HRRR core analysis initialization time in UTC | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| AVAILABLE_AT_UTC | declared source availability time in UTC | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| AVAILABILITY_POLICY | versioned rule used to derive the declared availability time | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| TEMPERATURE_2M_C | TMP:2 m above ground | deg C | Kelvin - 273.15 | -100..70 | continuous | True |
+| RELATIVE_HUMIDITY_2M_PCT | RH:2 m above ground | % | unit-normalized source value | 0..100 | continuous | True |
+| U_WIND_10M_MS | UGRD:10 m above ground | m/s | source value | finite | continuous | True |
+| V_WIND_10M_MS | VGRD:10 m above ground | m/s | source value | finite | continuous | True |
+| WIND_SPEED_10M_MS | UGRD, VGRD:10 m above ground | m/s | hypot(u, v) | 0..inf | continuous | True |
+| WIND_VECTOR_BASIS | published 10 m wind components use true east and north axes | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_WIND_BASIS | decoded GRIB basis before any required wind rotation | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| WIND_GUST_SURFACE_MS | GUST:surface | m/s | unit-normalized source value | 0..inf | continuous | True |
+| VISIBILITY_KM | VIS:surface | km | metres / 1000 | 0..inf | continuous | True |
+| TOTAL_CLOUD_COVER_PCT | TCDC:entire atmosphere | % | unit-normalized source value | 0..100 | continuous | True |
+| MEAN_SEA_LEVEL_PRESSURE_HPA | MSLMA:mean sea level | hPa | Pa / 100 | 700..1200 | continuous | True |
+| SOURCE_GRID_HASH | checksum of ordered source-grid coordinates | SHA-256 hex digest | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_GRID_INDEX | flattened index of nearest source-grid point | count or identifier | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_GRID_DISTANCE_M | great-circle distance from H3 centroid to selected source point | m | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_MODEL | selected HRRR model identifier | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_PRODUCT | selected HRRR GRIB product identifier | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| FORECAST_HOUR | core field forecast lead in hours | count or identifier | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_DATA_STATE | validated source-data state | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_OBJECT_URI | logical NOAA HRRR f00 object identity independent of mirror | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_URI | actual retrieval URI for the core HRRR fields; may be a supported mirror | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_RETRIEVED_AT_UTC | UTC time the core GRIB retrieval completed | ISO 8601 UTC timestamp | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+| SOURCE_EVIDENCE_KIND | retained decoded HRRR source or explicit synthetic fixture | category or calendar value | copied from validated input or deterministically derived as documented by the producer | schema and producer validation | metadata | False |
+
+Missingness: reject incomplete source/support; no zero fill. Limitation: Centroid support is not an area average.
+
 ## Daylight
 
 Method: `daylight_astronomy_v3`. Support: R4; local date.

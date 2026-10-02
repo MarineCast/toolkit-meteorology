@@ -16,6 +16,8 @@ it was generated; checked-in metadata does not certify a regional release.
 | HRRR inventory | `VALID_TIME_UTC` | One record per expected acquisition time |
 | Nearest-grid crosswalk | `H3_INDEX × SOURCE_GRID_HASH` | R5; source-grid-hash partitions |
 | Daily weather | `H3_INDEX × DATE` | R5; year/date partitions |
+| Hourly weather inventory | `VALID_TIME_UTC` | One f00 time per local civil hour |
+| Hourly weather | `H3_INDEX × VALID_TIME_UTC` | R5; local-date partitions, 23/24/25-hour days |
 | Daily daylight | `H3_INDEX × DATE` | R4; year partitions |
 | Day-of-year daylight | `H3_INDEX × DAY_OF_YEAR` | R4 lookup |
 | Daily lunar | `H3_INDEX × DATE` | R5; year partitions |
@@ -24,12 +26,11 @@ Dates use the configured product timezone; source timestamps retain UTC identity
 is part of each product's support contract even where it is not included in the row key.
 Do not join rows by order or substitute water-only H3 support for atmospheric support.
 
-Candidate modules `meteorology.temporal_products`,
-`meteorology.precipitation_intervals`, `meteorology.atmospheric_summaries`
-and `meteorology.climate_context` provide tested time and arithmetic contracts
-for future producers. They do not yet create published family manifests,
-catalog entries or H3 rows. Their fixtures establish software behavior only;
-provider compatibility and scientific accuracy gates remain in the
+The [hourly weather](hourly-weather.md) family publishes actual f00 H3 rows
+from retained decoded input. Candidate precipitation, atmospheric-summary and
+climate-context helpers still do not create published family manifests.
+Offline fixtures establish software behavior only; provider compatibility
+and scientific accuracy gates remain in the
 [implementation tracker](IMPLEMENTATION_TRACKER.md).
 
 ## Weather

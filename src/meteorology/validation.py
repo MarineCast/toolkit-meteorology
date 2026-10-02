@@ -14,7 +14,10 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from .artifacts import checksum_path, load_manifest, parquet_contract, parquet_files, resolve_portable_path, stable_hash
+from .artifacts import (
+    checksum_path, family_publication_parent, load_manifest, parquet_contract,
+    parquet_files, resolve_portable_path, stable_hash,
+)
 from .astronomy import local_civil_day_hours as _local_civil_day_hours
 from .core.data import meteorological_schemas as schemas
 from .field_contracts import (
@@ -108,6 +111,16 @@ def validate_product(manifest_path: str | Path) -> dict[str, Any]:
     # The filename is configurable. A frozen release has its own immutable copy
     # and can be validated without creating a lock file in the archive.
     preview = json.loads(path.read_text(encoding="utf-8"))
+    if preview.get("product") in {"meteorological.hourly_weather.acquire",
+                                  "meteorological.hourly_weather"}:
+        from .hourly_weather import validate_hourly_product
+        from .core.artifacts import TransactionalFamilyPublisher
+
+        parent = family_publication_parent(path.resolve(), preview)
+        if (parent / ".publication.lock").exists():
+            with TransactionalFamilyPublisher.read_locks([parent]):
+                return validate_hourly_product(path)
+        return validate_hourly_product(path)
     if preview.get("product") == "meteorological.surface_weather.download" and not preview.get("archived_hrrr_samples"):
         with acquisition_read_locks(path.parent):
             payload = load_manifest(path, verify_artifacts=False)

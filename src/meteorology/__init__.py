@@ -54,6 +54,25 @@ def build_surface_weather(config_path: str | Path = DEFAULT_CONFIG, *, start_dat
     return implementation(config_path, start_date=start_date, end_date=end_date, run_id=run_id)
 
 
+def acquire_hourly_weather(config_path: str | Path = DEFAULT_CONFIG, *, local_date: str,
+                           decoded_dir: str | Path, dry_run: bool = False) -> dict:
+    """Ingest a complete local day of retained decoded f00 grids without network access."""
+
+    from .hourly_weather import acquire_hourly_weather as implementation
+
+    return implementation(config_path, local_date=local_date, decoded_dir=decoded_dir,
+                          dry_run=dry_run)
+
+
+def build_hourly_weather(config_path: str | Path = DEFAULT_CONFIG, *,
+                         acquisition_manifest: str | Path | None = None) -> Path:
+    """Publish a separate hourly H3 atmosphere family from its pinned acquisition."""
+
+    from .hourly_weather import build_hourly_weather as implementation
+
+    return implementation(config_path, acquisition_manifest=acquisition_manifest)
+
+
 def build_daylight(config_path: str | Path = DEFAULT_CONFIG, *, start_date: str | None = None,
                    end_date: str | None = None, run_id: str | None = None) -> tuple[Path, ...]:
     """Build deterministic daily solar context at the configured H3 resolution."""
@@ -99,5 +118,5 @@ def freeze_release(manifest_path: str | Path, output_root: str | Path) -> Path:
 __all__ = [
     "__version__", "load_config", "build_spatial_support", "download_surface_weather",
     "build_surface_weather", "build_daylight", "build_lunar", "export_daily_matrix",
-    "validate_product", "freeze_release",
+    "acquire_hourly_weather", "build_hourly_weather", "validate_product", "freeze_release",
 ]

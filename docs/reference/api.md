@@ -8,6 +8,7 @@ import meteorology
 print(meteorology.__version__)
 config = meteorology.load_config()  # selected workspace
 meteorology.build_spatial_support()
+meteorology.acquire_hourly_weather(local_date="2024-01-02", decoded_dir="retained-f00", dry_run=True)
 preview = meteorology.download_surface_weather(
     start_date="2024-01-02", end_date="2024-01-02", dry_run=True
 )
@@ -23,6 +24,8 @@ For a Python process outside the workspace, set `METEOROLOGY_WORKSPACE` before l
         - build_spatial_support
         - download_surface_weather
         - build_surface_weather
+        - acquire_hourly_weather
+        - build_hourly_weather
         - build_daylight
         - build_lunar
         - export_daily_matrix
@@ -34,8 +37,9 @@ The [method registry](https://github.com/MarineCast/toolkit-meteorology/blob/mai
 
 ## Candidate processing contracts
 
-The following deeper modules are inspectable building blocks for uncompleted
-products. They do not acquire sources or publish family manifests:
+The following deeper modules provide time, interval, atmospheric derivation
+and climate-context contracts. The hourly producer uses the temporal
+contracts; the remaining modules do not publish new family manifests:
 
 ```python
 from meteorology.temporal_products import hourly_utc_instants, validate_hourly_records, summarize_hourly_window
@@ -53,6 +57,8 @@ hours. `summarize_hourly_window` reports sampled extrema and coverage without
 bridging missing hours. `sum_exact_precipitation_intervals` requires already
 verified source accumulation intervals in millimetres; a PRATE snapshot cannot
 be passed off as an amount. `select_roni_asof` returns no historical value
-without an actual retained publication timestamp. See the
+without an actual retained publication timestamp. The separate
+[hourly weather producer](../hourly-weather.md) invokes the hourly contracts
+through its published H3 family. See the
 [implementation tracker](../IMPLEMENTATION_TRACKER.md) for unverified provider,
 schema and scientific gates.

@@ -50,6 +50,11 @@ deeply valid and independently relocatable; allow for that storage cost.
 
 ## 3. Build astronomy
 
+For a separate actual-hourly f00 family from retained decoded source grids,
+follow [hourly weather](hourly-weather.md). Its offline download command
+ingests local bundles and makes zero provider requests. It does not alter the
+six-snapshot daily product.
+
 ```sh
 meteorology build daylight --start-date 2024-01-02 --end-date 2024-01-02
 meteorology build lunar --start-date 2024-01-02 --end-date 2024-01-02

@@ -10,6 +10,10 @@ seascape's wet-cell universe is not a valid substitute.
 |---|---|---|---|---:|
 | Spatial support | — | `spatial_support/build.py` | `spatial_support/inspect.py` | 4, 5, 6 |
 | Surface weather | `surface_weather/download.py` | `surface_weather/build.py` | `surface_weather/inspect.py` | 5 |
+| Hourly weather | `hourly_weather/download.py` (retained decoded input) | `hourly_weather/build.py` | `hourly_weather/inspect.py` | 5 |
+
+The distinct hourly method, schema, source support, missingness and offline
+producer are documented in [hourly weather](hourly-weather.md).
 | Daylight | — | `daylight/build.py` | `daylight/inspect.py` | 4 |
 | Lunar | — | `lunar/build.py` | `lunar/inspect.py` | 5 |
 

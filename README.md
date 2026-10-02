@@ -10,11 +10,12 @@
 | --- | --- | --- |
 | Atmospheric H3 support | Cell centroids inside a configured WGS84 box, including land and water | R4, R5, R6 |
 | Surface weather | Six four-hourly HRRR `sfc/f00` analysis samples; matched `sfc/f01` precipitation-rate snapshots | R5 × local date |
+| Hourly atmosphere | Separate actual UTC `sfc/f00` core analyses from retained decoded grids | R5 × UTC hour; 23/24/25 hours per local date |
 | Daylight | Approximate geometric day length, solar profile and daylight weights | R4 × local date; day-of-year lookup |
 | Lunar context | Approximate phase, disk illumination and geometrical moon visibility | R5 × local date |
 | Daily matrix | Optional union of native daily families, with unsupported component values null | R4/R5 × local date |
 
-**October 2026 implementation status:** The released producer contract remains the six-snapshot daily weather/astronomy family above. This checkout adds row-bound acquisition evidence and candidate hourly, interval-amount, atmospheric-summary, and RONI time contracts. Those candidate contracts do not yet publish provider-backed products. The [milestone tracker](docs/IMPLEMENTATION_TRACKER.md) separates software checks, source compatibility, and empirical acceptance, with the remaining provider and regional gates explicit.
+**October 2026 implementation status:** The six-snapshot daily weather/astronomy contract remains unchanged. A [separate hourly family](docs/hourly-weather.md) now publishes complete actual-hour f00 H3 rows from retained decoded inputs. Its offline synthetic workflow is tested; representative real decoded GRIB compatibility and regional scientific accuracy remain unrun. Interval-amount, atmospheric-summary, and RONI modules remain candidate contracts. The [milestone tracker](docs/IMPLEMENTATION_TRACKER.md) separates implementation, source compatibility, and empirical acceptance.
 
 The package is primarily **retrospective**. `PRECIP_MM_DAY_ESTIMATE` sums six forecast-rate snapshots multiplied by nominal four-hour intervals; it is not a measured 24-hour precipitation accumulation. Weather and astronomy do not measure species occurrence, observer effort, reporting or detection probability. Read [limitations](docs/limitations.md) before using the values as model predictors.
 

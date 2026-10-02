@@ -14,7 +14,16 @@ requires one run and retains the later of both input availability timestamps. An
 requires the declared assumed-lag availability policy and cannot be available before valid time.
 This is contract validation, not real-source compatibility or scientific acceptance.
 
-Date: 2026-10-02. Starting checkout: `f6228703e06b4768dd274404883157d746781a18` on clean `main`. Work is on local `codex/meteorology-complete-remaining` in a disposable clone. This tracker records tested code separately from actual source support and independent scientific acceptance. It does not turn a passing synthetic contract test into a real-source claim.
+The separate M3 hourly R5 family now has an offline retained-decoded-grid
+acquisition, immutable normalized-grid/sidecar/sample/crosswalk objects, a
+complete UTC-hour inventory, a pinned hourly build, versioned Arrow/method
+identities, CLI/API/catalog/discovery, deep source-to-H3 validation, and
+freeze/relocation. Synthetic offline tests execute 23/24/25-hour days,
+missing-hour/cell, calm wind, availability, checksum, interruption and retry
+cases. The raw decoder route uses the existing normalized HRRR grid schema;
+no real GRIB messages were retrieved or accepted as provider evidence here.
+
+Date: 2026-10-02. Original roadmap checkout: `f6228703e06b4768dd274404883157d746781a18` on clean `main`; focused continuation starts from the clean, pushed local commit `6957cba45aa6c775a6b7d30e3530180ae55005c7` on a new local `codex/meteorology-hourly-continuation` branch. This tracker records tested code separately from actual source support and independent scientific acceptance. It does not turn a passing synthetic contract test into a real-source claim.
 
 | Milestone | Implementation | Source compatibility | Empirical scientific acceptance | Affected output and exact remaining gate |
 | --- | --- | --- | --- | --- |
@@ -22,7 +31,7 @@ Date: 2026-10-02. Starting checkout: `f6228703e06b4768dd274404883157d746781a18` 
 | M1 O02 | IMPLEMENTED: rebuild verifier uses shared 700–1200 hPa hard limits and 800–1100 hPa regional warnings; structural failures separate | PASS for package fixtures; 750/1150 hPa are synthetic contract cases only | NOT_APPLICABLE_WITH_REASON: pressure screening policy, not local plausibility | Existing rebuild report; realistic regional pressure distributions remain a scientific study |
 | M1 O03 | IMPLEMENTED: per-format/per-field NDBC fills before ranges, rejected-token provenance and frozen pilot recomputation | PASS for the frozen NDBC historical standard meteorological slice and authoritative format definition | NOT_RUN for regional accuracy; existing one-buoy/day pilot metrics unchanged | NDBC comparison report; broaden sites/eras and height/interval matching |
 | M2 | IN_PROGRESS: frozen USNO, JPL and NDBC comparisons rerun; machine-readable study scope and coverage gap recorded | PARTIAL: one prior decoded HRRR example cycle; full requested domain, eras and references unverified | BLOCKED: prespecified regional inputs, thresholds, holdouts and decoded source evidence absent | `validation/study_spec_v1.json`, coverage report, retained pilot reports; no precision-horizon claim |
-| M3 | IN_PROGRESS: true UTC hourly civil-day schedule, strict f00 time × H3-cell identity/completeness, optional-field coverage and cell-selected environmental-window contracts with 23/24/25-hour tests | NOT_RUN: no representative full-core 24-hour decoded source/H3 inventory or acquisition adapter | NOT_RUN | Candidate Python temporal helpers only; no hourly published family or consumer CLI yet |
+| M3 | IMPLEMENTED for retained decoded input: separate f00 hourly H3 family with immutable acquisition, pinned build, CLI/API/catalog, deep validation and freeze/relocation; synthetic 23/24/25-hour tests | NOT_RUN for real provider: no representative full-core 24-hour decoded GRIB source inventory or archive-era fixtures | NOT_RUN for atmospheric accuracy | No live acquisition was authorized; method `hrrr_f00_hourly_h3_r5_v1` and schema `hourly-weather-r5-v1` do not certify real-source compatibility |
 | M4 | IN_PROGRESS: exact nonoverlapping accumulation arithmetic and same-run cumulative differencing with run/grid/step/reset guards, dry zero, gap/overlap, source and DST tests | BLOCKED: representative real accumulation parameter, level, units, step range, era and grid evidence absent | NOT_RUN | Candidate interval helpers only; legacy `PRECIP_MM_DAY_ESTIMATE` unchanged |
 | M5 | IN_PROGRESS: matched-height dewpoint depression and calm-aware gust factor helpers | BLOCKED: verified dewpoint/cloud-layer/ceiling/radiation source fields and archive-era fixtures absent | NOT_RUN | No new variables in the published schema/catalog; no inferred fog probability |
 | M6 | IN_PROGRESS: current-state and safety documentation updated; offline suite, build and wheel smoke recorded below | PARTIAL: fresh macOS Python 3.12 wheel and synthetic workflow passed; Linux and acquisition extras were not run | NOT_APPLICABLE_WITH_REASON: operating evidence is product-specific | No release/tag/push, no scheduled acquisition or object deletion |
@@ -59,7 +68,7 @@ No NOAA/ECCC/ERA5 provider acquisition was requested or run in this task. No ful
 
 ## Prioritized residual backlog
 
-1. Complete and review the provider-backed hourly `sfc/f00` 24-hour acquisition, sampled H3 publication, manifest/schema/catalog/CLI/deep validation/freeze path, and representative decoded fixtures over supported eras. Preserve the old six-snapshot contract.
+1. Retain representative real `sfc/f00` decoded GRIB bundles across supported eras with source metadata and an explicit provider request/cycle/byte budget, then run the hourly producer and compatibility/observational comparison. The offline hourly publication path is implemented; real source compatibility is not established.
 2. Verify actual HRRR accumulation messages and archive semantics, then wire a separate interval-amount producer with strict local-day totals, as-of policy and source-compatible tests.
 3. Verify dewpoint, cloud layers/base/ceiling, radiation and solar-angle sources/algorithms before expanding schemas or advertising those fields; add matched observational qualification.
 4. Freeze site/time/height/QC thresholds and source bytes for the regional study, quantify requested-versus-supported geography, and run independent observational and astronomy product-level comparisons with holdouts.

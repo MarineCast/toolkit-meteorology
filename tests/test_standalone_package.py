@@ -59,7 +59,9 @@ def test_packaged_defaults_match_checkout():
 
 def test_dataset_dependencies_resolve():
     from meteorology.core.data import DATASETS
-    assert len(list(DATASETS)) == 10
+    assert len(list(DATASETS)) == 12
+    assert DATASETS.get("environment.meteorological.hourly_weather.source_inventory").schema_version == "1"
+    assert DATASETS.get("environment.meteorological.hourly_weather.h3_hourly_r5").schema_version == "1"
     for spec in DATASETS:
         for dependency in spec.dependencies:
             DATASETS.get(dependency)
@@ -68,6 +70,7 @@ def test_dataset_dependencies_resolve():
 @pytest.mark.parametrize('args', [
     ['build', 'spatial-support'], ['build', 'surface-weather'], ['build', 'daylight'],
     ['build', 'lunar'], ['download', 'surface-weather'], ['inspect', 'spatial-support'],
+    ['build', 'hourly-weather'], ['download', 'hourly-weather'], ['inspect', 'hourly-weather'],
     ['inspect', 'surface-weather'], ['inspect', 'daylight'], ['inspect', 'lunar'],
     ['catalog'], ['feature-policy'], ['verify'], ['benchmark'], ['migrate-legacy'],
 ])

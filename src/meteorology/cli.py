@@ -11,6 +11,7 @@ import sys
 FAMILIES = {
     "spatial-support": "spatial_support",
     "surface-weather": "surface_weather",
+    "hourly-weather": "hourly_weather",
     "daylight": "daylight",
     "lunar": "lunar",
 }
@@ -50,7 +51,7 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser("stages", help="List offline product build order.")
     for action in ("build", "inspect", "download"):
         sub = commands.add_parser(action, help=f"{action.title()} one product; use FAMILY --help for options.")
-        sub.add_argument("family", choices=("surface-weather",) if action == "download" else FAMILIES)
+        sub.add_argument("family", choices=("surface-weather", "hourly-weather") if action == "download" else FAMILIES)
         sub.add_argument("arguments", nargs=argparse.REMAINDER)
     for action in ("verify", "catalog", "feature-policy", "benchmark", "migrate-legacy", "validate", "variables", "freeze-release", "example-offline"):
         sub = commands.add_parser(action, add_help=False)
@@ -79,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Initialized {project_root()}: {len(created)} files created")
             return 0
         if args.command == "stages":
-            print("spatial-support\nsurface-weather (requires acquired HRRR samples)\ndaylight\nlunar")
+            print("spatial-support\nsurface-weather (requires acquired HRRR samples)\nhourly-weather (requires retained decoded f00 grids)\ndaylight\nlunar")
             return 0
         if args.command in {"build", "inspect", "download"}:
             return _invoke(f"meteorology.{FAMILIES[args.family]}.{args.command}", args.arguments)

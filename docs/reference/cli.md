@@ -9,13 +9,17 @@ All commands accept `--workspace PATH` **before** the subcommand. `METEOROLOGY_W
 | `meteorology variables --json` | Inspect canonical variable inventory | Read only |
 | `meteorology download surface-weather --dry-run ...` | Preview date range, cycles and destination | No network/write |
 | `meteorology download surface-weather ...` | Acquire validated HRRR f00/f01 samples | Network and raw-data writes |
+| `meteorology download hourly-weather --date DATE --decoded-dir PATH --dry-run` | Preview true f00 hourly cycles and retained input bytes | No network/write |
+| `meteorology download hourly-weather --date DATE --decoded-dir PATH` | Ingest retained decoded f00 grids into immutable hourly acquisition | Raw-data writes; no network |
 | `meteorology build spatial-support` | Build R4/R5/R6 H3 support | Product writes |
 | `meteorology build surface-weather` | Build strict R5 daily weather | Product writes; requires complete acquisition |
+| `meteorology build hourly-weather` | Build separate strict R5 hourly atmosphere | Product writes; requires complete hourly acquisition |
 | `meteorology build daylight` / `build lunar` | Build deterministic astronomy | Product writes; no network |
 | `meteorology example-offline` | Build synthetic one-day full example | Writes a fresh workspace; no network |
 | `meteorology validate --manifest PATH` | Validate a family release | Read only, optional JSON result write |
 | `meteorology validate --daily-matrix PATH` | Validate combined native-resolution matrix | Read only, optional JSON result write |
 | `meteorology inspect FAMILY` | Render a manifest-validated HTML view | HTML write |
+| `meteorology inspect hourly-weather` | Print deep-validated hourly lineage and coverage JSON | Read only |
 | `meteorology export-daily-matrix --manifest ... --output PATH` | Combine native daily families | Writes one Parquet; refuses an existing output |
 | `meteorology freeze-release --manifest PATH --output-root PATH` | Copy validated family and declared inputs to `release_id` directory | Potentially large copy; refuses an existing release |
 | `meteorology catalog` / `feature-policy` | Regenerate reference metadata | Writes configured YAML |

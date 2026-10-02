@@ -6,12 +6,15 @@
 
 The current weather producer is **retrospective**: six local-day HRRR `sfc/f00` analyses, paired with one-hour-lead `sfc/f01` precipitation-rate forecasts. The precipitation result is an estimate from six snapshots. It is not a measured 24-hour accumulation or a future-weather forecast.
 
-The October 2026 [implementation tracker](IMPLEMENTATION_TRACKER.md) records the corrective patch, candidate temporal contracts, frozen-reference results, and remaining provider/accuracy gates. The candidate modules are not new published weather families.
+The October 2026 [implementation tracker](IMPLEMENTATION_TRACKER.md) records the corrective patch, separate [hourly H3 family](hourly-weather.md), frozen-reference results, and remaining provider/accuracy gates. Hourly offline product checks do not establish real HRRR compatibility or regional accuracy.
 
 <div class="grid cards" markdown>
 
 - :material-weather-partly-cloudy: **Surface weather**<br>
   Temperature, humidity, vector wind, gusts, visibility, cloud, pressure, and a carefully labeled precipitation estimate at H3 R5.
+
+- :material-clock-outline: **Hourly atmosphere**<br>
+  Distinct f00 values at every actual UTC hour and H3 R5 cell from retained decoded source inputs.
 
 - :material-weather-sunny: **Daylight**<br>
   Deterministic solar context at R4, including a compact 365/366-day lookup and explicit polar missingness.

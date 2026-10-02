@@ -55,6 +55,21 @@ METEOROLOGICAL_PRODUCTS = {
         ("YEAR", "DATE"),
         ("hrrr_source_inventory", "meteorological_spatial_support"),
     ),
+    "hourly_weather": MeteorologicalProduct(
+        "Hourly HRRR f00 surface atmosphere", "hourly_weather",
+        {5: "data/processed/domain/environmental_layer/meteorological/hourly_weather/"
+            "H3_HOURLY_WEATHER_RES_5"},
+        "meteorology.hourly_weather.build", "one row per H3 cell and actual UTC f00 hour",
+        ("DATE",), ("hourly_weather_source_inventory", "meteorological_spatial_support"),
+        index_columns=("H3_INDEX", "VALID_TIME_UTC"),
+    ),
+    "hourly_weather_source_inventory": MeteorologicalProduct(
+        "Hourly f00 acquisition inventory", "source_inventory",
+        {5: "data/raw/environment/meteorological/hourly_weather/hrrr/"
+            "HOURLY_SOURCE_INVENTORY.parquet"},
+        "meteorology.hourly_weather.download", "one row per actual UTC f00 source time",
+        index_columns=("VALID_TIME_UTC",),
+    ),
     "daylight_daily": MeteorologicalProduct(
         "Daily daylight and solar profile",
         "daylight",
@@ -147,6 +162,7 @@ def _role(column: str, product: MeteorologicalProduct, field: pa.Field) -> str:
             "HASH",
             "SOURCE_",
             "AVAILABLE_AT",
+            "AVAILABILITY_POLICY",
             "VALID_TIME",
             "INIT_TIME",
             "RELATIVE_PATH",
@@ -222,10 +238,15 @@ def _declared_schemas() -> dict[str, pa.Schema]:
     from meteorology.surface_weather.sampling import (
         CROSSWALK_SCHEMA,
     )
+    from meteorology.core.data.meteorological_schemas import (
+        HOURLY_WEATHER_INVENTORY_SCHEMA, HOURLY_WEATHER_SCHEMA,
+    )
 
     return {
         "meteorological_spatial_support": SUPPORT_SCHEMA,
         "surface_weather_daily": DAILY_SCHEMA,
+        "hourly_weather": HOURLY_WEATHER_SCHEMA,
+        "hourly_weather_source_inventory": HOURLY_WEATHER_INVENTORY_SCHEMA,
         "daylight_daily": DAYLIGHT_SCHEMA,
         "daylight_day_of_year": DAYLIGHT_DOY_SCHEMA,
         "lunar_daily": LUNAR_SCHEMA,

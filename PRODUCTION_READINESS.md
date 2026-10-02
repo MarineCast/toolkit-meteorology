@@ -2,13 +2,15 @@
 
 ## Current status, 2026-10-02
 
-The six-snapshot retrospective daily family remains the published producer
-contract. The [implementation tracker](docs/IMPLEMENTATION_TRACKER.md) records
-O01–O03 corrections, frozen-reference recomputation, candidate hourly/interval/RONI
-helpers, and separate implementation, source-compatibility and empirical gates.
+The six-snapshot retrospective daily family remains unchanged. A separate
+[hourly H3 atmosphere family](docs/hourly-weather.md) has passed its offline
+synthetic acquisition/build/validation/freeze/relocation path. The
+[implementation tracker](docs/IMPLEMENTATION_TRACKER.md) records O01–O03
+corrections, frozen-reference recomputation, and separate implementation,
+source-compatibility and empirical gates.
 Passing offline package tests does not establish full-domain or precision-viewing
-scientific acceptance. No new hourly, accumulation, climate or binational
-release has been published.
+scientific acceptance. No real-source hourly, accumulation, climate or
+binational release has been published.
 
 This is a local implementation review for proposed software version `0.1.0` on 2026-09-30. It does not certify a live NOAA data release, a deployed documentation site, or a published Python package.
 

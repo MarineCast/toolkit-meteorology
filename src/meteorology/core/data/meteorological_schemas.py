@@ -129,6 +129,38 @@ HRRR_SAMPLE_SCHEMA = pa.schema(
     ]
 )
 
+# A distinct f00 hourly family.  PRATE belongs to the legacy f01 rate snapshots;
+# no precipitation amount or rate is implied by these atmospheric rows.
+HOURLY_WEATHER_SCHEMA = pa.schema(
+    [
+        *(field for field in PRE_F01_SAMPLE_SCHEMA if field.name != "PRECIP_RATE_MM_HR"),
+        pa.field("SOURCE_OBJECT_URI", pa.string(), nullable=False),
+        pa.field("SOURCE_URI", pa.string(), nullable=False),
+        pa.field("SOURCE_RETRIEVED_AT_UTC", pa.string(), nullable=False),
+        pa.field("SOURCE_EVIDENCE_KIND", pa.string(), nullable=False),
+    ],
+    metadata={b"meteorology_schema_version": b"hourly-weather-r5-v1"},
+)
+
+HOURLY_WEATHER_INVENTORY_SCHEMA = pa.schema(
+    [
+        pa.field("LOCAL_DATE", pa.string(), nullable=False),
+        pa.field("VALID_TIME_UTC", pa.string(), nullable=False),
+        pa.field("INIT_TIME_UTC", pa.string(), nullable=False),
+        pa.field("AVAILABLE_AT_UTC", pa.string(), nullable=False),
+        pa.field("SAMPLE_CHECKSUM", pa.string(), nullable=False),
+        pa.field("CROSSWALK_CHECKSUM", pa.string(), nullable=False),
+        pa.field("SOURCE_GRID_HASH", pa.string(), nullable=False),
+        pa.field("H3_CELL_COUNT", pa.int32(), nullable=False),
+        pa.field("SOURCE_OBJECT_URI", pa.string(), nullable=False),
+        pa.field("SOURCE_URI", pa.string(), nullable=False),
+        pa.field("SOURCE_RETRIEVED_AT_UTC", pa.string(), nullable=False),
+        pa.field("SOURCE_EVIDENCE_KIND", pa.string(), nullable=False),
+        pa.field("DECODED_INPUT_CHECKSUM", pa.string(), nullable=False),
+    ],
+    metadata={b"meteorology_schema_version": b"hourly-weather-inventory-v1"},
+)
+
 PRE_F01_INVENTORY_SCHEMA = pa.schema(
     [
         pa.field("LOCAL_DATE", pa.string(), nullable=False),

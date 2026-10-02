@@ -63,6 +63,8 @@ def _exclusion_reason(product: str, field: Mapping[str, Any], column: str) -> st
         return "observer_effort_only_not_ecological_occurrence"
     if product == "daylight_day_of_year":
         return "alternate_lookup_duplicate_of_daily_product"
+    if product == "hourly_weather":
+        return "hourly_grain_excluded_from_native_daily_matrix"
     return DETERMINISTIC_ALIASES.get((product, column))
 
 
