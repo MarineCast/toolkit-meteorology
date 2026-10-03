@@ -101,3 +101,12 @@ def test_hourly_h3_inventory_and_optional_coverage() -> None:
                                        end_utc=hours[1]["valid_time_utc"],
                                        field="TEMPERATURE_2M_C", h3_index="b")
     assert selected["valid_hours"] == 1
+
+
+def test_hourly_window_rejects_conflicting_published_and_legacy_timestamps() -> None:
+    row = _hourly("2024-01-02")[0]
+    row["VALID_TIME_UTC"] = "2024-01-02T00:00:00Z"
+    with pytest.raises(ValueError, match="Conflicting"):
+        summarize_hourly_window([row], start_utc=row["valid_time_utc"],
+                                end_utc=_hourly("2024-01-02")[1]["valid_time_utc"],
+                                field="TEMPERATURE_2M_C")

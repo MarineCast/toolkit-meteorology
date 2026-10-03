@@ -16,6 +16,7 @@ def test_interval_total_rejects_missing_spatial_target() -> None:
                available_at_utc="2024-01-02T02:00:00Z",
                source_model="HRRR", source_product="sfc", parameter="APCP",
                source_grid_hash="same-grid-for-many-points", step_type="accum", units="mm",
+               product_kind="retrospective_accumulation",
                amount_mm=1.0)
     with pytest.raises(ValueError, match="spatial|target|point|cell"):
         sum_exact_precipitation_intervals([row], start_utc=row["interval_start_utc"],

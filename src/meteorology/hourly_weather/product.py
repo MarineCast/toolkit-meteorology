@@ -10,6 +10,7 @@ import json
 import os
 import shutil
 import uuid
+import fcntl
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -33,7 +34,7 @@ from ..artifacts import (
 from ..core.artifacts import atomic_write_json
 from ..config import DEFAULT_CONFIG_PATH, load_meteorological_config
 from ..field_contracts import FIELD_CONTRACT_VERSION, validate_fields
-from ..spatial_support.build import load_meteorological_support
+from ..spatial_support.build import SUPPORT_METHOD, load_meteorological_support
 from ..surface_weather.sampling import (
     AVAILABILITY_POLICY, SPATIAL_ACCEPTANCE_POLICY, build_nearest_grid_crosswalk,
 )
@@ -75,6 +76,9 @@ def _source_metadata(kind: str, local_date: str) -> list[dict]:
 
 def _bundle_paths(decoded_dir: Path, valid: Any) -> tuple[Path, Path]:
     stem = valid.strftime("%Y%m%dT%HZ")
+    committed = decoded_dir / stem
+    if committed.exists():
+        return committed / "grid.parquet", committed / "evidence.json"
     return decoded_dir / f"{stem}.parquet", decoded_dir / f"{stem}.json"
 
 
@@ -98,9 +102,9 @@ def retain_decoded_hourly_grid(grid: pd.DataFrame, *, valid_time_utc: str,
         raise ValueError("Unknown retained hourly source evidence kind.")
     output = Path(output_dir).resolve()
     output.mkdir(parents=True, exist_ok=True)
-    parquet_path, evidence_path = _bundle_paths(output, valid)
-    if parquet_path.exists() or evidence_path.exists():
-        raise FileExistsError("Retained hourly decoder bundle already exists.")
+    stem = valid.strftime("%Y%m%dT%HZ")
+    committed = output / stem
+    legacy_parquet, legacy_evidence = output / f"{stem}.parquet", output / f"{stem}.json"
     if set(grid.columns) != set(RAW_SCHEMA.names):
         raise ValueError("Retained grid must use the existing normalized HRRR raw schema.")
     values = grid[RAW_SCHEMA.names].copy()
@@ -117,16 +121,32 @@ def retain_decoded_hourly_grid(grid: pd.DataFrame, *, valid_time_utc: str,
                     source_evidence_kind=source_evidence_kind,
                     native_footprint_wkb_hex=footprint.wkb_hex,
                     max_nearest_distance_m=float(allowance))
-    write_table(parquet_path, table, RAW_SCHEMA)
-    atomic_write_json(evidence_path, evidence, overwrite=False)
-    try:
-        _load_decoded_grid(parquet_path, evidence_path, valid=valid, lag_hours=int(
-            (_utc(str(grid["AVAILABLE_AT_UTC"].iloc[0])) - valid).total_seconds() / 3600))
-    except BaseException:
-        parquet_path.unlink(missing_ok=True)
-        evidence_path.unlink(missing_ok=True)
-        raise
-    return parquet_path, evidence_path
+    lag_hours = int((_utc(str(grid["AVAILABLE_AT_UTC"].iloc[0])) - valid).total_seconds() / 3600)
+    lock_path = output / f".{stem}.lock"
+    with lock_path.open("a+b") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if legacy_parquet.exists() or legacy_evidence.exists():
+            raise FileExistsError("Legacy retained hourly decoder bundle already exists.")
+        candidate = output / f".{stem}.{uuid.uuid4().hex}.candidate"
+        candidate.mkdir()
+        try:
+            parquet_path, evidence_path = candidate / "grid.parquet", candidate / "evidence.json"
+            write_table(parquet_path, table, RAW_SCHEMA)
+            atomic_write_json(evidence_path, evidence, overwrite=False)
+            _load_decoded_grid(parquet_path, evidence_path, valid=valid, lag_hours=lag_hours)
+            if committed.exists():
+                existing_parquet, existing_evidence = _bundle_paths(output, valid)
+                _load_decoded_grid(existing_parquet, existing_evidence, valid=valid,
+                                   lag_hours=lag_hours)
+                if (checksum_path(parquet_path) == checksum_path(existing_parquet)
+                        and checksum_path(evidence_path) == checksum_path(existing_evidence)):
+                    return existing_parquet, existing_evidence
+                raise FileExistsError("Retained hourly decoder bundle already exists with different bytes.")
+            os.replace(candidate, committed)
+            return committed / "grid.parquet", committed / "evidence.json"
+        finally:
+            if candidate.exists():
+                shutil.rmtree(candidate)
 
 
 def _retain_file(source: Path, raw_dir: Path) -> tuple[Path, str]:
@@ -398,6 +418,10 @@ def build_hourly_weather(config_path: str | Path = DEFAULT_CONFIG_PATH, *,
                     or settings["h3_resolution"] != weather.h3_resolution
                     or settings["availability_lag_hours"] != weather.availability_lag_hours):
                 raise ValueError("Hourly acquisition policy differs from the current build configuration.")
+            support = load_meteorological_support(weather.h3_resolution, config.path)
+            if (source["spatial_bounds_wgs84"] != config.bbox
+                    or settings["support_cell_set_hash"] != cell_set_hash(support["H3_INDEX"])):
+                raise ValueError("Hourly acquisition spatial bounds or support differ from the current build configuration.")
             base = source_manifest_path.parent
             inventory_item = source["artifacts"][0]
             inventory_path = resolve_portable_path(inventory_item["path"], base=base)
@@ -447,7 +471,8 @@ def build_hourly_weather(config_path: str | Path = DEFAULT_CONFIG_PATH, *,
                              "hourly_schema_version": "hourly-weather-r5-v1"},
             artifacts=[parquet_contract(staged, published_path=destination)],
             inputs=inputs, sources=source["sources"],
-            h3_resolution=config.surface_weather.h3_resolution, spatial_bounds=config.bbox,
+            h3_resolution=config.surface_weather.h3_resolution,
+            spatial_bounds=source["spatial_bounds_wgs84"],
             temporal_coverage=source["temporal_coverage"],
             availability_semantics=source["availability_semantics"],
             units=dict(temperature="degrees Celsius", humidity="percent", wind="metres per second",
@@ -486,6 +511,22 @@ def validate_hourly_product(manifest_path: str | Path) -> dict:
         raise ValueError("Hourly manifest civil-day duration is incorrect.")
     base = path.parent
     supports = _inputs_by_role(manifest, "support", base=base)
+    support_manifests = _inputs_by_role(manifest, "support_manifest", base=base)
+    if len(support_manifests) != 1:
+        raise ValueError("Hourly product lacks one support manifest.")
+    support_manifest = load_manifest(support_manifests[0][1], verify_artifacts=False)
+    support_settings = support_manifest["resolved_config"]
+    if (support_manifest["product"] != "meteorological.spatial_support"
+            or support_manifest["spatial_bounds_wgs84"] != manifest["spatial_bounds_wgs84"]
+            or support_settings.get("bbox") != manifest["spatial_bounds_wgs84"]
+            or support_settings.get("support_method") != SUPPORT_METHOD
+            or resolved["h3_resolution"] not in support_settings.get("resolutions", [])):
+        raise ValueError("Hourly spatial bounds differ from retained support.")
+    if product == HOURLY_PRODUCT:
+        acquisitions = _inputs_by_role(manifest, "acquisition_manifest", base=base)
+        if len(acquisitions) != 1 or load_manifest(acquisitions[0][1], verify_artifacts=False)[
+                "spatial_bounds_wgs84"] != manifest["spatial_bounds_wgs84"]:
+            raise ValueError("Hourly spatial bounds differ from acquisition.")
     inventories = (_inputs_by_role(manifest, "inventory", base=base)
                    if product == HOURLY_PRODUCT else [(manifest["artifacts"][0],
                        resolve_portable_path(manifest["artifacts"][0]["path"], base=base))])

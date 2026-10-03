@@ -1,5 +1,38 @@
 # Remaining meteorology implementation tracker
 
+## 2026-10-03 seven-day offline demo and review corrections
+
+The local continuation from `88cf2815bcde1bcd8e7764c9272d5ce24b95c908`
+now rejects changed hourly support/bounds before build and checks product,
+acquisition and support spatial declarations during deep validation (R1).
+The public window helper reads published uppercase timestamps directly and
+rejects conflicting lowercase aliases (R2). Retained decoded grid/sidecar
+pairs stage and validate within a candidate directory, then commit by one
+directory rename under a per-hour lock; valid equal bundles can be reused and
+orphan candidates do not block retry (R3). Exact precipitation intervals now
+declare forecast versus retrospective kind, enforcing initialization and as-of
+rules without rejecting an available forecast solely because its valid end is
+in the future (R4). No new precipitation product or method ID is claimed.
+
+The `demo/hourly_week_offline.py` run used seven separate local-day producer
+cycles for 2024-01-02 through 2024-01-08 in the example Pacific support.
+It generated 168 synthetic f00 hours and 75,600 H3-hour rows over 450 cells.
+Every daily acquisition, product and frozen copy passed validation; the
+selected-cell weekly summary had 168/168 available sampled hours. The
+combined Parquet is explicitly a demo aggregation, not a new weekly release.
+Provider requests and network bytes were both zero. Implementation gate:
+PASS for this synthetic offline scope. Real HRRR source compatibility:
+NOT_RUN. Empirical scientific acceptance: NOT_RUN. A budgeted real-source
+week and matched observational study remain the highest-priority gates.
+
+The package suite passed `209 passed, 1 skipped` (the skipped test is the
+opt-in live HRRR test). Ruff, catalog/policy freshness, generated variable
+documentation comparison, strict MkDocs build, wheel/sdist build with an
+available local setuptools environment, Twine checks, and an outside-checkout
+installed-wheel seven-day run passed. The isolated build attempt could not
+fetch setuptools in the network-restricted environment; the successful
+fallback used local setuptools 80.9.0 with `--no-isolation`.
+
 ## 2026-10-02 focused continuation
 
 Candidate-contract regressions were reconstructed from `NEXT_CODEX_TASK.md`; its referenced

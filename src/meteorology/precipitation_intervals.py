@@ -53,6 +53,8 @@ def difference_same_run_accumulations(earlier: dict, later: dict) -> dict:
            for value in (first, second)) or second < first:
         raise ValueError("Cumulative precipitation is missing, negative, or reset within a run.")
     availability = max(_utc(row["available_at_utc"]) for row in (earlier, later))
+    if any(_utc(row["available_at_utc"]) < init for row in (earlier, later)):
+        raise ValueError("Forecast precipitation availability precedes initialization.")
     result = {
         "interval_start_utc": first_end.isoformat(), "interval_end_utc": second_end.isoformat(),
         "init_time_utc": init.isoformat(), "step_start_hour": first_step,
@@ -60,6 +62,7 @@ def difference_same_run_accumulations(earlier: dict, later: dict) -> dict:
         "source_model": earlier["source_model"], "source_product": earlier["source_product"],
         "parameter": earlier["parameter"], "source_grid_hash": earlier["source_grid_hash"],
         "spatial_basis": earlier["spatial_basis"], "step_type": "accum", "units": "mm",
+        "product_kind": "forecast_accumulation",
         "amount_mm": second - first, "modeled_precipitation_amount_mm": second - first,
     }
     for name in ("source_grid_index", "H3_INDEX", "mapping_identity"):
@@ -94,11 +97,19 @@ def sum_exact_precipitation_intervals(
         if target_identity is not None and target != target_identity:
             raise ValueError("Precipitation spatial target changes inside the requested interval.")
         target_identity = target
-        if _utc(row["init_time_utc"]) > left:
+        initialized = _utc(row["init_time_utc"])
+        if initialized > left:
             raise ValueError("Precipitation initialization follows interval start.")
         available = _utc(row["available_at_utc"])
-        if available < right:
-            raise ValueError("Precipitation availability precedes interval end.")
+        kind = row.get("product_kind")
+        if kind == "forecast_accumulation":
+            if available < initialized:
+                raise ValueError("Forecast precipitation availability precedes initialization.")
+        elif kind == "retrospective_accumulation":
+            if available < right:
+                raise ValueError("Retrospective precipitation availability precedes interval end.")
+        else:
+            raise ValueError("Precipitation product kind must be explicit and supported.")
         if as_of is not None and available > as_of:
             raise ValueError("Precipitation amount was unavailable at the requested as-of time.")
         if row.get("step_type") != "accum" or row.get("units") != "mm":

@@ -20,6 +20,7 @@ def _intervals(date: str) -> list[dict]:
                          source_model="HRRR", source_product="sfc", parameter="APCP",
                          source_grid_hash="fixture-grid", source_grid_index=8,
                          spatial_basis="native_grid_point", step_type="accum", units="mm",
+                         product_kind="retrospective_accumulation",
                          amount_mm=0.0))
         cursor = following
     return rows
@@ -66,6 +67,7 @@ def test_cumulative_difference_requires_one_run_and_verified_step_bounds() -> No
     assert result["modeled_precipitation_amount_mm"] == 3.5
     assert result["step_start_hour"] == 1
     assert result["available_at_utc"] == "2024-01-02T04:00:00+00:00"
+    assert result["product_kind"] == "forecast_accumulation"
     assert sum_exact_precipitation_intervals([result],
                                              start_utc=result["interval_start_utc"],
                                              end_utc=result["interval_end_utc"])[
@@ -77,3 +79,39 @@ def test_cumulative_difference_requires_one_run_and_verified_step_bounds() -> No
                     dict(later, source_grid_index=9)):
         with pytest.raises(ValueError):
             difference_same_run_accumulations(earlier, changed)
+
+
+def test_future_forecast_interval_uses_publication_and_asof_not_valid_end() -> None:
+    base = dict(source_model="HRRR", source_product="sfc", parameter="APCP",
+                source_grid_hash="grid", source_grid_index=8,
+                spatial_basis="native_grid_point", init_time_utc="2024-01-02T00:00:00Z",
+                step_type="accum", units="mm", step_start_hour=0,
+                available_at_utc="2024-01-02T00:20:00Z")
+    first = dict(base, valid_time_utc="2024-01-02T01:00:00Z", step_end_hour=1,
+                 amount_mm=1.0)
+    second = dict(base, valid_time_utc="2024-01-02T02:00:00Z", step_end_hour=2,
+                  amount_mm=3.0)
+    interval = difference_same_run_accumulations(first, second)
+    assert sum_exact_precipitation_intervals(
+        [interval], start_utc=interval["interval_start_utc"],
+        end_utc=interval["interval_end_utc"], as_of_utc="2024-01-02T00:30:00Z",
+    )["modeled_precipitation_amount_mm"] == 2.0
+    with pytest.raises(ValueError, match="as-of"):
+        sum_exact_precipitation_intervals(
+            [interval], start_utc=interval["interval_start_utc"],
+            end_utc=interval["interval_end_utc"], as_of_utc="2024-01-02T00:10:00Z")
+    with pytest.raises(ValueError, match="initialization"):
+        difference_same_run_accumulations(dict(first, available_at_utc="2024-01-01T23:59:00Z"),
+                                          second)
+    with pytest.raises(ValueError, match="interval end"):
+        sum_exact_precipitation_intervals(
+            [dict(interval, product_kind="retrospective_accumulation")],
+            start_utc=interval["interval_start_utc"], end_utc=interval["interval_end_utc"])
+    next_cycle = dict(interval, interval_start_utc=interval["interval_end_utc"],
+                      interval_end_utc="2024-01-02T03:00:00Z",
+                      init_time_utc="2024-01-02T01:00:00Z",
+                      available_at_utc="2024-01-02T01:20:00Z", amount_mm=4.0)
+    assert sum_exact_precipitation_intervals(
+        [interval, next_cycle], start_utc=interval["interval_start_utc"],
+        end_utc=next_cycle["interval_end_utc"],
+        as_of_utc="2024-01-02T01:30:00Z")["modeled_precipitation_amount_mm"] == 6.0

@@ -116,7 +116,12 @@ def summarize_hourly_window(
     h3_index: str | None = None,
     as_of_utc: str | None = None,
 ) -> dict:
-    """Summarize start-of-hour samples without filling unknown one-hour slots."""
+    """Summarize published or helper-native hourly rows without filling unknown slots."""
+    def timestamp(row: dict, canonical: str, legacy: str) -> datetime:
+        if canonical in row and legacy in row and _utc(row[canonical]) != _utc(row[legacy]):
+            raise ValueError(f"Conflicting hourly {canonical} and {legacy} timestamps.")
+        return _utc(row[canonical] if canonical in row else row[legacy])
+
     start, end = _utc(start_utc), _utc(end_utc)
     duration = (end - start).total_seconds() / 3600
     if (duration <= 0 or duration != int(duration)
@@ -130,13 +135,13 @@ def summarize_hourly_window(
             continue
         if h3_index is None and "H3_INDEX" in row:
             raise ValueError("Select an H3 cell before summarizing a multi-cell hourly window.")
-        valid = _utc(row["valid_time_utc"])
+        valid = timestamp(row, "VALID_TIME_UTC", "valid_time_utc")
         if not start <= valid < end:
             continue
         if valid in by_time:
             raise ValueError(f"Duplicate hourly window time: {valid.isoformat()}")
         value = row.get(field)
-        available = _utc(row["available_at_utc"])
+        available = timestamp(row, "AVAILABLE_AT_UTC", "available_at_utc")
         by_time[valid] = (
             float(value) if isinstance(value, (int, float)) and isfinite(value)
             and (as_of is None or available <= as_of) else None

@@ -56,7 +56,12 @@ assert gust_factor(0.0, 0.0, 0.0) is None
 hours. `summarize_hourly_window` reports sampled extrema and coverage without
 bridging missing hours. `sum_exact_precipitation_intervals` requires already
 verified source accumulation intervals in millimetres; a PRATE snapshot cannot
-be passed off as an amount. `select_roni_asof` returns no historical value
+be passed off as an amount. Each interval declares `product_kind`:
+`forecast_accumulation` permits availability after initialization but before
+the future interval end, while `retrospective_accumulation` requires
+availability at or after the interval end. Both enforce the as-of cutoff.
+This arithmetic helper does not publish a precipitation product.
+`select_roni_asof` returns no historical value
 without an actual retained publication timestamp. The separate
 [hourly weather producer](../hourly-weather.md) invokes the hourly contracts
 through its published H3 family. See the

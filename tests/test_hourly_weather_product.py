@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from pathlib import Path
 
@@ -25,7 +26,7 @@ from meteorology.spatial_support.build import (
     build_meteorological_spatial_support, load_meteorological_support,
 )
 from meteorology.surface_weather.source import RAW_SCHEMA, _grid_hash
-from meteorology.temporal_products import hourly_utc_instants
+from meteorology.temporal_products import hourly_utc_instants, summarize_hourly_window
 from meteorology.validation import validate_product
 
 
@@ -95,6 +96,15 @@ def test_hourly_offline_acquire_build_validate_freeze_and_relocate(tmp_path: Pat
                             / "H3_HOURLY_WEATHER_RES_5/date=2024-01-02/part-000.parquet").to_pandas()
     assert product["WIND_SPEED_10M_MS"].eq(0).all()
     assert "PRECIP_RATE_MM_HR" not in product
+    cell = product["H3_INDEX"].iloc[0]
+    selected = product.loc[product["H3_INDEX"] == cell].to_dict("records")
+    start, end = selected[0]["VALID_TIME_UTC"], selected[4]["VALID_TIME_UTC"]
+    summary = summarize_hourly_window(selected, start_utc=start, end_utc=end,
+                                      field="WIND_SPEED_10M_MS", h3_index=cell)
+    assert summary["valid_hours"] == 4 and summary["sampled_mean"] == 0
+    assert summarize_hourly_window(selected, start_utc=start, end_utc=end,
+                                   field="WIND_SPEED_10M_MS", h3_index=cell,
+                                   as_of_utc=start)["valid_hours"] == 0
     frozen = freeze_release(manifest, tmp_path / "releases")
     moved = tmp_path / "frozen" / frozen.parent.name
     moved.parent.mkdir()
@@ -211,3 +221,99 @@ def test_retention_helper_uses_existing_normalized_decoder_contract(tmp_path: Pa
     )
     assert pq.read_schema(retained).equals(RAW_SCHEMA, check_metadata=False)
     assert json.loads(sidecar.read_text())["source_object_uri"].startswith("synthetic://")
+    assert (retained, sidecar) == retain_decoded_hourly_grid(
+        frame, valid_time_utc=evidence["valid_time_utc"], source_uri=evidence["source_uri"],
+        retrieved_at_utc=evidence["retrieved_at_utc"], output_dir=tmp_path / "retained",
+        source_evidence_kind="synthetic_fixture")
+
+
+def test_hourly_build_rejects_changed_or_rebuilt_spatial_support(tmp_path: Path, monkeypatch) -> None:
+    config_path, decoded, _ = _setup(tmp_path / "workspace", monkeypatch)
+    acquired = acquire_hourly_weather(config_path, local_date="2024-01-02", decoded_dir=decoded)
+    product = build_hourly_weather(config_path)
+    assert validate_hourly_product(product)["valid"]
+    before = checksum_path(product)
+    common_path = config_path.parents[1] / "common.yaml"
+    original = common_path.read_text()
+    common_path.write_text(original.replace("max_lat: 49.70", "max_lat: 49.50"))
+    with pytest.raises(ValueError, match="support|bounding box|spatial"):
+        build_hourly_weather(config_path)
+    assert checksum_path(product) == before
+    build_meteorological_spatial_support(config_path)
+    with pytest.raises(ValueError, match="support|spatial"):
+        build_hourly_weather(config_path)
+    assert checksum_path(product) == before
+    assert acquired["source_evidence_kind"] == "synthetic_fixture"
+
+
+def test_retained_bundle_failure_has_no_final_half_pair(tmp_path: Path, monkeypatch) -> None:
+    config_path, decoded, _ = _setup(tmp_path / "workspace", monkeypatch)
+    source = sorted(decoded.glob("*.parquet"))[0]
+    frame = pq.read_table(source).to_pandas()
+    metadata = json.loads(source.with_suffix(".json").read_text())
+    config = load_meteorological_config(config_path)
+    frame.attrs["native_footprint"] = box(
+        config.bbox["min_lon"] - 0.1, config.bbox["min_lat"] - 0.1,
+        config.bbox["max_lon"] + 0.1, config.bbox["max_lat"] + 0.1)
+    frame.attrs["max_nearest_distance_m"] = 1000.0
+    import meteorology.hourly_weather.product as module
+
+    original_json = module.atomic_write_json
+    monkeypatch.setattr(module, "atomic_write_json", lambda *args, **kwargs: (_ for _ in ()).throw(
+        RuntimeError("injected sidecar failure")))
+    output = tmp_path / "retained"
+    kwargs = dict(valid_time_utc=metadata["valid_time_utc"], source_uri=metadata["source_uri"],
+                  retrieved_at_utc=metadata["retrieved_at_utc"], output_dir=output,
+                  source_evidence_kind="synthetic_fixture")
+    with pytest.raises(RuntimeError, match="sidecar failure"):
+        retain_decoded_hourly_grid(frame, **kwargs)
+    assert not list(output.rglob("*.parquet")) and not list(output.rglob("*.json"))
+    monkeypatch.setattr(module, "atomic_write_json", original_json)
+    parquet_path, evidence_path = retain_decoded_hourly_grid(frame, **kwargs)
+    assert parquet_path.is_file() and evidence_path.is_file()
+    original = (checksum_path(parquet_path), checksum_path(evidence_path))
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: retain_decoded_hourly_grid(frame, **kwargs), range(2)))
+    assert results == [(parquet_path, evidence_path)] * 2
+    assert (checksum_path(parquet_path), checksum_path(evidence_path)) == original
+    with pytest.raises(FileExistsError, match="different bytes"):
+        retain_decoded_hourly_grid(frame, **{**kwargs, "source_uri": "synthetic://changed"})
+    assert (checksum_path(parquet_path), checksum_path(evidence_path)) == original
+
+
+def test_retained_bundle_retries_after_serialization_validation_and_orphan(tmp_path: Path,
+                                                                         monkeypatch) -> None:
+    config_path, decoded, _ = _setup(tmp_path / "workspace", monkeypatch)
+    source = sorted(decoded.glob("*.parquet"))[0]
+    frame = pq.read_table(source).to_pandas()
+    metadata = json.loads(source.with_suffix(".json").read_text())
+    config = load_meteorological_config(config_path)
+    frame.attrs["native_footprint"] = box(
+        config.bbox["min_lon"] - 0.1, config.bbox["min_lat"] - 0.1,
+        config.bbox["max_lon"] + 0.1, config.bbox["max_lat"] + 0.1)
+    frame.attrs["max_nearest_distance_m"] = 1000.0
+    output = tmp_path / "retained"
+    kwargs = dict(valid_time_utc=metadata["valid_time_utc"], source_uri=metadata["source_uri"],
+                  retrieved_at_utc=metadata["retrieved_at_utc"], output_dir=output,
+                  source_evidence_kind="synthetic_fixture")
+    import meteorology.hourly_weather.product as module
+
+    write = module.write_table
+    monkeypatch.setattr(module, "write_table", lambda *args, **kwargs: (_ for _ in ()).throw(
+        RuntimeError("injected serialization failure")))
+    with pytest.raises(RuntimeError, match="serialization failure"):
+        retain_decoded_hourly_grid(frame, **kwargs)
+    monkeypatch.setattr(module, "write_table", write)
+    assert not list(output.rglob("*.parquet"))
+    bad = frame.copy()
+    bad.attrs = frame.attrs.copy()
+    bad["SOURCE_GRID_HASH"] = "bad-grid-hash"
+    with pytest.raises(ValueError, match="grid hash"):
+        retain_decoded_hourly_grid(bad, **kwargs)
+    assert not list(output.rglob("*.parquet"))
+    orphan = output / f'.{source.stem}.dead.candidate'
+    orphan.mkdir()
+    (orphan / "grid.parquet").write_bytes(b"interrupted")
+    retained, sidecar = retain_decoded_hourly_grid(frame, **kwargs)
+    assert retained.is_file() and sidecar.is_file()
+    assert (orphan / "grid.parquet").read_bytes() == b"interrupted"

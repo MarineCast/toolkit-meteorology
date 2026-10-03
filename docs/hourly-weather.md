@@ -43,7 +43,12 @@ availability block the complete local-day release.
 
 Initialize a fresh workspace and build its atmospheric support first. Supply
 one retained normalized-grid Parquet plus JSON sidecar for every expected UTC
-hour. Filenames use `YYYYmmddTHHZ.parquet` and `.json`. Parquet must match
+hour. Legacy flat filenames use `YYYYmmddTHHZ.parquet` and `.json`.
+`retain_decoded_hourly_grid()` commits each pair in a `YYYYmmddTHHZ/`
+directory with `grid.parquet` and `evidence.json`. It validates a private
+candidate before promotion, serializes same-hour writers, and reuses an
+existing committed pair only when the validated bytes match. An interrupted
+candidate is ignored on retry. Parquet must match
 `surface_weather.source.RAW_SCHEMA`, the same normalized grid schema emitted
 by the current HRRR decoder. JSON contains `valid_time_utc`,
 `source_grid_hash`, `source_uri`, `source_object_uri`, `retrieved_at_utc`,
@@ -75,7 +80,9 @@ content-addressed objects, samples H3, and publishes the inventory/manifest
 only after a complete day. Failed acquisition leaves reusable unreferenced
 objects for manual inspection. A rerun revalidates the bundles and reuses
 matching immutable objects. The build pins the consumed acquisition and
-support generations; freeze copies every referenced input for relocation.
+support generations; the build rejects changed spatial bounds or support,
+and validation compares the product, acquisition and support declarations.
+Freeze copies every referenced input for relocation.
 Do not delete objects automatically or change the existing daily workspace.
 
 Python consumers can call `meteorology.acquire_hourly_weather`,
@@ -84,11 +91,32 @@ published Parquet as `H3_INDEX × VALID_TIME_UTC`, with local `DATE` as a
 partition label. `summarize_hourly_window` requires an H3 cell selection and
 returns sampled extrema, mean and observed-hour coverage over a whole-hour
 UTC window. It does not interpolate gaps or turn an instantaneous value into
-a measured hourly average.
+a measured hourly average. Published Parquet rows can be passed directly with
+`VALID_TIME_UTC` and `AVAILABLE_AT_UTC`. The older lowercase aliases remain
+accepted, with conflicting pairs rejected.
 
 `meteorology freeze-release --manifest <hourly-manifest> --output-root <root>`
 produces a checksum-backed relocatable copy. The standalone hourly family is
 not included in `export-daily-matrix`, whose native daily contract is stable.
+
+## Seven-day offline demonstration
+
+From a source checkout with the package installed, run the bounded synthetic
+demo into two fresh disposable paths:
+
+```bash
+python demo/hourly_week_offline.py --start-date 2024-01-02 \
+  --workspace /tmp/meteorology-week-workspace \
+  --output /tmp/meteorology-week-output
+```
+
+The script generates 168 explicitly synthetic normalized f00 grids, then runs
+the ordinary one-day acquisition, build, deep validation and freeze route for
+each of seven Pacific local dates. It creates a combined Parquet and JSON
+summary for inspection. The combined table is a demo aggregation of seven
+validated daily releases, not a published weekly product or evidence of NOAA
+source compatibility. The workspace and output paths must be fresh; the script
+makes zero provider requests.
 
 ## Qualification state
 
