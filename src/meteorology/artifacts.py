@@ -166,7 +166,9 @@ def parquet_contract(
             raise ValueError(f"Parquet schema drift detected: {item}")
         row_count += int(parquet.metadata.num_rows)
         if h3_column in schema.names:
-            cells.update(str(value) for value in parquet.read([h3_column])[h3_column].to_pylist())
+            for batch in parquet.iter_batches(columns=[h3_column], batch_size=65_536):
+                cells.update(str(value) for value in batch.column(0).to_pylist()
+                             if value is not None)
     contract = {
         "path": portable_path(published_path or path),
         "checksum": checksum_path(path),

@@ -210,19 +210,6 @@ def _format_inventory(records: list[dict]) -> str:
     )
 
 
-def list_hrrr_variable_names(ds_or_parts: Any) -> list[str]:
-    """Return compact variable labels for all HRRR dataset parts."""
-    return [
-        (
-            f"part={record['dataset_part']} var={record['var_name']} "
-            f"shortName={record.get('GRIB_shortName')} "
-            f"name={record.get('GRIB_name')} "
-            f"typeOfLevel={record.get('GRIB_typeOfLevel')}"
-        )
-        for record in describe_hrrr_dataset_parts(ds_or_parts)
-    ]
-
-
 def _search_code(search: str) -> str:
     match = re.search(r":?([A-Z][A-Z0-9]+):", str(search))
     return match.group(1) if match else str(search).strip(":").split(":")[0].upper()

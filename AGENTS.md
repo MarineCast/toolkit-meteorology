@@ -94,8 +94,18 @@ Global skill defaults do not override repository scope or code-only extraction. 
 Daily matrix behavior: `PYTHONPATH=src python -m pytest tests/test_daily_matrix.py -q`.
 Contract and CLI are documented in `docs/daily-matrix.md`.
 
+Compact weather summary and input-contract checks: `python -m pytest -q
+tests/test_weather_summary.py tests/test_hourly_weather_product.py
+tests/test_precipitation_intervals.py`. See `docs/weather-summaries.md` for
+temporal/spatial support, availability and memory boundaries; these exports do not
+qualify future forecast skill or real provider accuracy.
+
 Roadmap PR-01 through PR-04 checks: `python -m pytest -q
 tests/test_field_contracts.py tests/test_independent_validation.py
 tests/test_source_and_catalog.py tests/test_production_contracts.py` and then
 `python -m pytest -q`. The bounded NOAA compatibility test is opt-in:
 `METEOROLOGY_LIVE_HRRR=1 python -m pytest -q tests/test_live_hrrr.py`.
+
+Live-week budget, range-response, resumption and dry-run checks:
+`python -m pytest -q tests/test_live_week_demo.py`. Read `docs/live-week-demo.md`
+before executing `meteorology demo-hourly-week`; ordinary tests never acquire data.

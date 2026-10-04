@@ -17,6 +17,7 @@ All commands accept `--workspace PATH` **before** the subcommand. `METEOROLOGY_W
 | `meteorology build daylight` / `build lunar` | Build deterministic astronomy | Product writes; no network |
 | `meteorology example-offline` | Build synthetic one-day full example | Writes a fresh workspace; no network |
 | `meteorology validate --manifest PATH` | Validate a family release | Read only, optional JSON result write |
+| `meteorology export-weather-summary --manifest PATH --output-dir PATH` | Export daily/weekly native-H3 and regional statistics; optional `--as-of-utc` | Reads validated hourly releases; writes a new summary and manifest |
 | `meteorology validate --daily-matrix PATH` | Validate combined native-resolution matrix | Read only, optional JSON result write |
 | `meteorology inspect FAMILY` | Render a manifest-validated HTML view | HTML write |
 | `meteorology inspect hourly-weather` | Print deep-validated hourly lineage and coverage JSON | Read only |
@@ -28,3 +29,8 @@ All commands accept `--workspace PATH` **before** the subcommand. `METEOROLOGY_W
 Run `meteorology COMMAND --help` or `meteorology build FAMILY --help` for the exact options. Invalid dates/configuration, missing GRIB dependencies and checksum mismatches return actionable errors. A download over seven local days requires `--allow-large-download`; `--dry-run` is always available without that flag. `--workers` is constrained to 1–16.
 
 `validate` prints a JSON result, exits 0 on success and 1 on validation failure. `--json-output PATH` saves the same result for automation. A synthetic example is always marked as synthetic in its source manifest and weather provenance.
+
+`meteorology demo-hourly-week --output <directory> [--start-date YYYY-MM-DD]
+[--max-requests 1600] [--max-bytes 4294967296] [--dry-run]` runs the
+[bounded live one-week example](../live-week-demo.md). The start must be a Monday;
+dry-run issues no requests and creates no workspace.
