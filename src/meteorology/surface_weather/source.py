@@ -106,6 +106,13 @@ RAW_VARIABLE_COLUMNS = {
     "mean_sea_level_pressure_pa": "MEAN_SEA_LEVEL_PRESSURE_PA",
 }
 
+# The hourly atmospheric product does not consume precipitation. Keep the legacy
+# raw schema unchanged for the six-snapshot daily producer.
+HOURLY_RAW_SCHEMA = pa.schema(
+    [field for field in RAW_SCHEMA if field.name != "PRECIP_RATE_KG_M2_S"],
+    metadata={b"meteorology_schema_version": b"hourly-decoded-atmosphere-v1"},
+)
+
 
 def _unit_text(value: Any) -> str:
     return str(value or "").strip().lower().replace(" ", "")
@@ -218,44 +225,22 @@ def _grid_hash(latitudes: pd.Series, longitudes: pd.Series) -> str:
     return stable_hash(pairs)
 
 
-def normalize_cropped_grid(
-    flat: pd.DataFrame,
-    *,
-    variable_mapping: Mapping[str, tuple[Any, str] | None],
-    valid_time_utc: pd.Timestamp,
-    availability_lag_hours: int,
-) -> pd.DataFrame:
-    """Convert the cropped Herbie frame to the immutable raw-grid schema."""
-
-    units_by_variable: dict[str, str] = {}
-    for source_name in RAW_VARIABLE_COLUMNS:
-        mapping = variable_mapping.get(source_name)
-        if mapping is None:
-            raise ValueError(f"Required HRRR variable was not mapped: {source_name}")
-        dataset, variable_name = mapping
-        attrs = getattr(dataset[variable_name], "attrs", {}) or {}
-        units = attrs.get("units", attrs.get("GRIB_units"))
-        units_by_variable[source_name] = str(units or "")
-    return normalize_flat_grid(
-        flat,
-        units_by_variable=units_by_variable,
-        valid_time_utc=valid_time_utc,
-        availability_lag_hours=availability_lag_hours,
-    )
-
-
 def normalize_flat_grid(
     flat: pd.DataFrame,
     *,
     units_by_variable: Mapping[str, str],
     valid_time_utc: pd.Timestamp,
     availability_lag_hours: int,
+    include_precipitation: bool = True,
 ) -> pd.DataFrame:
     """Normalize an identified HRRR grid independent of its storage format."""
 
     if flat.empty:
         raise ValueError("HRRR cropped source grid is empty.")
-    missing = sorted(set(HRRR_VARIABLES).difference(flat.columns))
+    variables = {name: column for name, column in RAW_VARIABLE_COLUMNS.items()
+                 if include_precipitation or name != "precip_rate_kg_m2_s"}
+    schema = RAW_SCHEMA if include_precipitation else HOURLY_RAW_SCHEMA
+    missing = sorted(set(variables).difference(flat.columns))
     if missing:
         raise ValueError(f"HRRR cropped source grid is missing variables: {missing}")
     output = pd.DataFrame(
@@ -265,10 +250,10 @@ def normalize_flat_grid(
             "SOURCE_LON": pd.to_numeric(flat["hrrr_lon"], errors="raise").astype("float64"),
         }
     )
-    missing_units = sorted(set(RAW_VARIABLE_COLUMNS).difference(units_by_variable))
+    missing_units = sorted(set(variables).difference(units_by_variable))
     if missing_units:
         raise ValueError(f"HRRR source grid is missing unit metadata: {missing_units}")
-    for source_name, output_name in RAW_VARIABLE_COLUMNS.items():
+    for source_name, output_name in variables.items():
         output[output_name] = normalize_hrrr_values(
             flat[source_name], variable=source_name, units=str(units_by_variable[source_name])
         )
@@ -288,10 +273,10 @@ def normalize_flat_grid(
     output.insert(8, "FORECAST_HOUR", FORECAST_HOUR)
     output.insert(9, "SOURCE_GRID_HASH", grid_hash)
     output.insert(10, "SOURCE_WIND_BASIS", source_wind_basis)
-    if output[RAW_COLUMNS].isna().any().any():
+    if output[schema.names].isna().any().any():
         null_columns = output.columns[output.isna().any()].tolist()
         raise ValueError(f"HRRR raw source grid contains null values: {null_columns}")
-    result = output[RAW_COLUMNS]
+    result = output[schema.names]
     result.attrs.update(flat.attrs)
     return result
 
@@ -333,50 +318,65 @@ def fetch_cropped_hrrr_fields(
             verbose=show_logs,
         )
         dataset = source.xarray(_combined_search(requested), remove_grib=True)
-        mapping = infer_required_hrrr_variables(
-            dataset,
-            requested,
-            allow_missing=False,
-            reject_ambiguous=True,
+        flat, units_by_variable = decode_hrrr_fields(
+            dataset, valid_time_utc=valid, bbox=bbox,
+            bbox_padding_degrees=bbox_padding_degrees, variables=requested,
+            forecast_hour=hour,
         )
-        validate_decoded_source_times(mapping, valid_time_utc=valid, forecast_hour=hour)
-        padded = BoundingBox(
-            min_lat=float(bbox["min_lat"]) - float(bbox_padding_degrees),
-            max_lat=float(bbox["max_lat"]) + float(bbox_padding_degrees),
-            min_lon=float(bbox["min_lon"]) - float(bbox_padding_degrees),
-            max_lon=float(bbox["max_lon"]) + float(bbox_padding_degrees),
-        )
-        wind_basis = _decoded_wind_basis(mapping)
-        flat = dataset_to_flat_variable_grid(
-            dataset, mapping, padded, pad_deg=0.0, wind_basis=wind_basis
-        )
-        first_dataset, first_variable = next(iter(mapping.values()))
-        first_values = first_dataset[first_variable].squeeze(drop=True).values
-        native_lat, native_lon = _lat_lon_for_values(first_dataset, first_values.shape)
-        requested_bounds = BoundingBox(
-            min_lat=float(bbox["min_lat"]), max_lat=float(bbox["max_lat"]),
-            min_lon=float(bbox["min_lon"]), max_lon=float(bbox["max_lon"]),
-        )
-        coverage = validate_grid_coverage(
-            native_lat, native_lon, flat, requested_bounds
-        )
-        flat.attrs["max_nearest_distance_m"] = coverage.max_nearest_distance_m
-        flat.attrs["native_footprint"] = coverage.native_footprint
-        if wind_basis is not None:
-            flat.attrs["source_wind_basis"] = wind_basis
-        units_by_variable: dict[str, str] = {}
-        for output_name, mapping_value in mapping.items():
-            if mapping_value is None:
-                raise ValueError(f"Required HRRR variable was not mapped: {output_name}")
-            variable_dataset, variable_name = mapping_value
-            attrs = getattr(variable_dataset[variable_name], "attrs", {}) or {}
-            units_by_variable[output_name] = str(attrs.get("units", attrs.get("GRIB_units")) or "")
         source_name = str(getattr(source, "grib_source", None) or "")
         sources = getattr(source, "SOURCES", {}) or {}
         uri = str(
             sources.get(source_name) or getattr(source, "grib", None) or source_name or "unknown"
         )
     return flat, units_by_variable, uri
+
+
+def decode_hrrr_fields(dataset: Any, *, valid_time_utc: pd.Timestamp,
+                       bbox: Mapping[str, float], bbox_padding_degrees: float,
+                       variables: Mapping[str, str], forecast_hour: int = 0
+                       ) -> tuple[pd.DataFrame, dict[str, str]]:
+    """Apply the same identity, wind and spatial gates to an already decoded source."""
+    valid = pd.Timestamp(valid_time_utc)
+    requested, hour = dict(variables), forecast_hour
+    mapping = infer_required_hrrr_variables(
+        dataset,
+        requested,
+        allow_missing=False,
+        reject_ambiguous=True,
+    )
+    validate_decoded_source_times(mapping, valid_time_utc=valid, forecast_hour=hour)
+    padded = BoundingBox(
+        min_lat=float(bbox["min_lat"]) - float(bbox_padding_degrees),
+        max_lat=float(bbox["max_lat"]) + float(bbox_padding_degrees),
+        min_lon=float(bbox["min_lon"]) - float(bbox_padding_degrees),
+        max_lon=float(bbox["max_lon"]) + float(bbox_padding_degrees),
+    )
+    wind_basis = _decoded_wind_basis(mapping)
+    flat = dataset_to_flat_variable_grid(
+        dataset, mapping, padded, pad_deg=0.0, wind_basis=wind_basis
+    )
+    first_dataset, first_variable = next(iter(mapping.values()))
+    first_values = first_dataset[first_variable].squeeze(drop=True).values
+    native_lat, native_lon = _lat_lon_for_values(first_dataset, first_values.shape)
+    requested_bounds = BoundingBox(
+        min_lat=float(bbox["min_lat"]), max_lat=float(bbox["max_lat"]),
+        min_lon=float(bbox["min_lon"]), max_lon=float(bbox["max_lon"]),
+    )
+    coverage = validate_grid_coverage(
+        native_lat, native_lon, flat, requested_bounds
+    )
+    flat.attrs["max_nearest_distance_m"] = coverage.max_nearest_distance_m
+    flat.attrs["native_footprint"] = coverage.native_footprint
+    if wind_basis is not None:
+        flat.attrs["source_wind_basis"] = wind_basis
+    units_by_variable: dict[str, str] = {}
+    for output_name, mapping_value in mapping.items():
+        if mapping_value is None:
+            raise ValueError(f"Required HRRR variable was not mapped: {output_name}")
+        variable_dataset, variable_name = mapping_value
+        attrs = getattr(variable_dataset[variable_name], "attrs", {}) or {}
+        units_by_variable[output_name] = str(attrs.get("units", attrs.get("GRIB_units")) or "")
+    return flat, units_by_variable
 
 
 def normalize_forecast_precip_grid(
@@ -482,6 +482,7 @@ def fetch_cropped_hrrr_grid(
     bbox: Mapping[str, float],
     bbox_padding_degrees: float,
     availability_lag_hours: int,
+    include_precipitation: bool = True,
 ) -> tuple[pd.DataFrame, str]:
     """Fetch one HRRR analysis and return a strict cropped source-grid frame."""
 
@@ -490,6 +491,8 @@ def fetch_cropped_hrrr_grid(
         bbox=bbox,
         bbox_padding_degrees=bbox_padding_degrees,
         availability_lag_hours=availability_lag_hours,
+        variables={name: selector for name, selector in HRRR_VARIABLES.items()
+                   if include_precipitation or name != "precip_rate_kg_m2_s"},
     )
     return (
         normalize_flat_grid(
@@ -497,6 +500,7 @@ def fetch_cropped_hrrr_grid(
             units_by_variable=units_by_variable,
             valid_time_utc=valid_time_utc,
             availability_lag_hours=availability_lag_hours,
+            include_precipitation=include_precipitation,
         ),
         uri,
     )

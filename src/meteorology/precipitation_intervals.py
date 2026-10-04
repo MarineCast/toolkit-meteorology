@@ -100,6 +100,17 @@ def sum_exact_precipitation_intervals(
         initialized = _utc(row["init_time_utc"])
         if initialized > left:
             raise ValueError("Precipitation initialization follows interval start.")
+        # Interval-native callers may omit GRIB step labels. When supplied,
+        # require both and bind them to the exact interval they describe.
+        if "step_start_hour" in row or "step_end_hour" in row:
+            first, last = row.get("step_start_hour"), row.get("step_end_hour")
+            if (type(first) is not int or type(last) is not int
+                    or first < 0 or last <= first
+                    or (left - initialized).total_seconds() != first * 3600
+                    or (right - initialized).total_seconds() != last * 3600):
+                raise ValueError("Precipitation step bounds and interval timestamps disagree.")
+        if "valid_time_utc" in row and _utc(row["valid_time_utc"]) != right:
+            raise ValueError("Precipitation valid time differs from interval end.")
         available = _utc(row["available_at_utc"])
         kind = row.get("product_kind")
         if kind == "forecast_accumulation":

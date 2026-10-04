@@ -29,6 +29,7 @@ For a Python process outside the workspace, set `METEOROLOGY_WORKSPACE` before l
         - build_daylight
         - build_lunar
         - export_daily_matrix
+        - export_weather_summary
         - validate_product
         - freeze_release
       show_source: false

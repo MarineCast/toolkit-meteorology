@@ -30,6 +30,8 @@ jobs:
           path: site
 
   deploy:
+    # Merging code validates documentation; publishing requires a separate manual run.
+    if: github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: ubuntu-24.04
     environment:

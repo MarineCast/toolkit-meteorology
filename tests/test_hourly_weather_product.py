@@ -25,7 +25,7 @@ from meteorology.releases import freeze_release
 from meteorology.spatial_support.build import (
     build_meteorological_spatial_support, load_meteorological_support,
 )
-from meteorology.surface_weather.source import RAW_SCHEMA, _grid_hash
+from meteorology.surface_weather.source import HOURLY_RAW_SCHEMA, RAW_SCHEMA, _grid_hash
 from meteorology.temporal_products import hourly_utc_instants, summarize_hourly_window
 from meteorology.validation import validate_product
 
@@ -218,8 +218,13 @@ def test_retention_helper_uses_existing_normalized_decoder_contract(tmp_path: Pa
         source_uri=evidence["source_uri"],
         retrieved_at_utc=evidence["retrieved_at_utc"],
         output_dir=tmp_path / "retained", source_evidence_kind="synthetic_fixture",
+        source_receipt={"selected_grib_sha256": "fixture-only"},
     )
-    assert pq.read_schema(retained).equals(RAW_SCHEMA, check_metadata=False)
+    receipt = json.loads((retained.parent / "transfer.json").read_text())
+    assert receipt["grid_sha256"] == checksum_path(retained)
+    assert receipt["evidence_sha256"] == checksum_path(sidecar)
+    assert receipt["selected_grib_sha256"] == "fixture-only"
+    assert pq.read_schema(retained).equals(HOURLY_RAW_SCHEMA, check_metadata=True)
     assert json.loads(sidecar.read_text())["source_object_uri"].startswith("synthetic://")
     assert (retained, sidecar) == retain_decoded_hourly_grid(
         frame, valid_time_utc=evidence["valid_time_utc"], source_uri=evidence["source_uri"],
@@ -317,3 +322,105 @@ def test_retained_bundle_retries_after_serialization_validation_and_orphan(tmp_p
     retained, sidecar = retain_decoded_hourly_grid(frame, **kwargs)
     assert retained.is_file() and sidecar.is_file()
     assert (orphan / "grid.parquet").read_bytes() == b"interrupted"
+
+
+def test_hourly_input_does_not_require_unused_precipitation(tmp_path, monkeypatch):
+    from meteorology.hourly_weather.product import _load_decoded_grid
+    from meteorology.temporal_products import _utc
+
+    config, decoded, cells = _setup(tmp_path / "workspace", monkeypatch)
+    for i, path in enumerate(sorted(decoded.glob("*.parquet"))):
+        table = pq.read_table(path)
+        if i % 2:
+            # A historical raw-schema bundle may contain unusable f00 PRATE.
+            col = table.schema.get_field_index("PRECIP_RATE_KG_M2_S")
+            table = table.set_column(col, table.schema.field(col),
+                                    pa.array([float("nan")] * cells, from_pandas=False))
+        else:
+            table = table.select(HOURLY_RAW_SCHEMA.names).cast(HOURLY_RAW_SCHEMA)
+        pq.write_table(table, path)
+    acquired = acquire_hourly_weather(config, local_date="2024-01-02", decoded_dir=decoded)
+    assert validate_hourly_product(acquired["manifest"])["row_count"] == cells * 24
+    assert validate_product(build_hourly_weather(config))["valid"]
+    path = sorted(decoded.glob("*.parquet"))[0]
+    table = pq.read_table(path)
+    col = table.schema.get_field_index("VISIBILITY_M")
+    table = table.set_column(col, table.schema.field(col),
+                            pa.array([float("nan")] * cells, from_pandas=False))
+    pq.write_table(table, path)
+    with pytest.raises(ValueError, match="non-finite"):
+        _load_decoded_grid(path, path.with_suffix(".json"),
+                           valid=_utc(table["VALID_TIME_UTC"][0].as_py()), lag_hours=6)
+
+
+def test_compact_summary_dst_asof_lineage_and_relocation(tmp_path, monkeypatch):
+    from meteorology import export_weather_summary
+    from meteorology.weather_summary import SCHEMA
+
+    manifests = []
+    for day in ("2024-03-09", "2024-03-10"):
+        config, decoded, cells = _setup(tmp_path / day, monkeypatch, day=day)
+        acquire_hourly_weather(config, local_date=day, decoded_dir=decoded)
+        manifests.append(freeze_release(build_hourly_weather(config), tmp_path / "source-releases"))
+    output = tmp_path / "summary"
+    manifest = export_weather_summary(manifests[::-1], output)
+    assert validate_product(manifest)["valid"]
+    assert pq.read_schema(output / "weather-summary.parquet").equals(SCHEMA, check_metadata=True)
+    frame = pq.read_table(output / "weather-summary.parquet").to_pandas()
+    regional = frame.loc[(frame.SPATIAL_SCOPE == "region") & (frame.METRIC == "TEMPERATURE_2M_C")]
+    week = regional.loc[regional.PERIOD == "week"].iloc[0]
+    assert week.EXPECTED_CELL_HOURS == 167 * cells
+    assert week.VALID_CELL_HOURS == 47 * cells
+    assert week.COVERAGE_FRACTION == 47 / 167
+    assert week.STATUS == "PARTIAL"
+    assert week.SAMPLED_MEAN == pytest.approx((24 * 18.5 + 23 * 18) / 47)
+    assert frame.loc[frame.METRIC == "WIND_SPEED_10M_MS", "SAMPLED_MEAN"].eq(0).all()
+    assert frame.loc[frame.SPATIAL_SCOPE == "h3", "H3_INDEX"].nunique() == cells
+    payload = json.loads(manifest.read_text())
+    assert payload["artifacts"][0]["h3_cell_count"] == cells
+    assert payload["resolved_config"]["source_evidence_kind"] == "synthetic_fixture"
+    with pytest.raises(FileExistsError):
+        export_weather_summary(manifests, output)
+    with pytest.raises(ValueError, match="unique contiguous"):
+        export_weather_summary([manifests[0], manifests[0]], tmp_path / "duplicate")
+
+    cutoff = "2024-03-10T15:00:00Z"
+    assert cli_main(["export-weather-summary", "--manifest", str(manifests[0]),
+                     "--manifest", str(manifests[1]), "--output-dir", str(tmp_path / "asof"),
+                     "--spatial-scope", "region", "--as-of-utc", cutoff]) == 0
+    asof = pq.read_table(tmp_path / "asof/weather-summary.parquet").to_pandas()
+    last_day = asof.loc[(asof.PERIOD == "day") & (asof.LOCAL_START_DATE == "2024-03-10")]
+    assert last_day.VALID_CELL_HOURS.eq(2 * cells).all()
+    assert last_day.COVERAGE_FRACTION.eq(2 / 23).all()
+    frozen = freeze_release(manifest, tmp_path / "frozen")
+    (tmp_path / "2024-03-09").rename(tmp_path / "hidden-day1")
+    (tmp_path / "2024-03-10").rename(tmp_path / "hidden-day2")
+    output.rename(tmp_path / "hidden-summary")
+    (tmp_path / "source-releases").rename(tmp_path / "hidden-source-releases")
+    assert validate_product(frozen)["valid"]
+
+
+def test_hourly_decode_selector_can_omit_precipitation(tmp_path, monkeypatch):
+    import meteorology.surface_weather.source as source
+
+    config, decoded, _ = _setup(tmp_path / "workspace", monkeypatch)
+    table = pq.read_table(sorted(decoded.glob("*.parquet"))[0]).to_pandas()
+    variables = {k: v for k, v in source.RAW_VARIABLE_COLUMNS.items() if k != "precip_rate_kg_m2_s"}
+    flat = pd.DataFrame({k: table[v] for k, v in variables.items()})
+    flat["hrrr_lat"], flat["hrrr_lon"] = table.SOURCE_LAT, table.SOURCE_LON
+    flat.attrs["source_wind_basis"] = "earth_relative"
+    units = dict(zip(variables, ["K", "%", "m/s", "m/s", "m/s", "m", "%", "Pa"], strict=True))
+
+    def fetch(**kwargs):
+        assert "precip_rate_kg_m2_s" not in kwargs["variables"]
+        return flat, units, "synthetic://decoder"
+
+    monkeypatch.setattr(source, "fetch_cropped_hrrr_fields", fetch)
+    normalized, uri = source.fetch_cropped_hrrr_grid(
+        valid_time_utc=pd.Timestamp(table.VALID_TIME_UTC.iloc[0]),
+        bbox={}, bbox_padding_degrees=0, availability_lag_hours=6,
+        include_precipitation=False,
+    )
+    assert list(normalized) == HOURLY_RAW_SCHEMA.names
+    assert uri == "synthetic://decoder"
+    assert normalized.TEMPERATURE_2M_K.eq(table.TEMPERATURE_2M_K).all()

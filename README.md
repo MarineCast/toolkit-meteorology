@@ -11,6 +11,7 @@
 | Atmospheric H3 support | Cell centroids inside a configured WGS84 box, including land and water | R4, R5, R6 |
 | Surface weather | Six four-hourly HRRR `sfc/f00` analysis samples; matched `sfc/f01` precipitation-rate snapshots | R5 × local date |
 | Hourly atmosphere | Separate actual UTC `sfc/f00` core analyses from retained decoded grids | R5 × UTC hour; 23/24/25 hours per local date |
+| [Compact weather summaries](docs/weather-summaries.md) | Sampled daily and weekly means/extrema with coverage and optional as-of filtering | Native R5 and whole-region × period × metric |
 | Daylight | Approximate geometric day length, solar profile and daylight weights | R4 × local date; day-of-year lookup |
 | Lunar context | Approximate phase, disk illumination and geometrical moon visibility | R5 × local date |
 | Daily matrix | Optional union of native daily families, with unsupported component values null | R4/R5 × local date |
@@ -34,6 +35,10 @@ meteorology --workspace ./weather-demo validate \
 ```
 
 `example-offline` creates explicitly synthetic one-day HRRR-like inputs, then runs the normal support, weather, daylight, lunar and matrix builders. It requires a fresh workspace, makes no network requests and refuses to replace existing products. It is a package workflow check, not a live NOAA data certification. The [quickstart](docs/getting-started/quickstart.md) also shows a clean wheel install outside the checkout.
+
+For a bounded, resumable real-data example with daily/weekly H3 and regional
+Parquet outputs, follow the [one-week demo](docs/live-week-demo.md). It records
+transfer budgets, runtime, process memory and retained evidence storage.
 
 ## Real HRRR workflow
 
