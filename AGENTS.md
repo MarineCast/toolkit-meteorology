@@ -126,3 +126,10 @@ regular installed-wheel check outside this checkout. See
 `docs/CDS_JOB_INTEGRATION_AND_PILOTS.md`. The tests use mocked HTTP and generated
 GRIB only. `python -m meteorology.era5.pilot plan --study-config ...` is offline;
 `run` performs provider access and requires the independently reviewed exact plan.
+
+Separate bounded native HRRR UTC-day pilot: install `.[test,native-pilot]`, run
+`python -m pytest -q tests/test_hrrr_native_day.py tests/test_hrrr_native_source.py`,
+then the full required suite and installed-wheel checks from outside the checkout.
+Read `docs/HRRR_NATIVE_DAY_PILOT.md` before execution. Mocked HTTP and generated
+GRIB tests do not qualify actual NOAA archive coverage. `native_day plan` is offline;
+`native_day run` uses the exact reviewed source/date/bbox/caps and private cache.
