@@ -96,17 +96,16 @@ def resolve_config_path(explicit_path=None):
 
 
 def _check_selection_policy(config, require_approved):
-    policy = config['domain'].get('selection_policy')
-    if policy is not None:
-        if not config['domain'].get('bbox_role') or not config['domain'].get('geometry_status'):
-            raise ValueError('selection policy requires explicit envelope role and geometry status')
-        if policy['status'] == 'approved' and not policy['approval']:
-            raise ValueError('approved selection policy requires approval provenance')
-        if require_approved and (policy['status'] != 'approved' or
-                policy['mask_status'] != 'source_relative_validated' or
-                config['domain']['geometry_status'] != 'source_relative_validated' or
-                config['grid_registry']['status'] != 'validated'):
-            raise ValueError('production requires validated coastal mask, geometry and registry')
+    # Coastal production gates do not depend on an optional policy being present.
+    # Schema requires these fields even for planning; malformed/null policies fail there.
+    policy = config['domain']['selection_policy']
+    if policy['status'] == 'approved' and not policy['approval']:
+        raise ValueError('approved selection policy requires approval provenance')
+    if require_approved and (policy['status'] != 'approved' or
+            policy['mask_status'] != 'source_relative_validated' or
+            config['domain']['geometry_status'] != 'source_relative_validated' or
+            config['grid_registry']['status'] != 'validated'):
+        raise ValueError('production requires validated coastal mask, geometry and registry')
 
 
 def _validate(path=None, require_approved=True):

@@ -113,3 +113,8 @@ before executing `meteorology demo-hourly-week`; ordinary tests never acquire da
 Shared-study selection/provenance checks: `python -m pytest -q tests/test_shared_study.py`
 then the full suite and installed-wheel preflight from outside the checkout.
 See `docs/shared-study.md`; proposed geometry and pending registries reject production.
+
+For changes to separate retrospective source helpers, run
+`python -m pytest -q tests/test_era5.py tests/test_shared_study.py` followed by
+the full required suite and an installed-wheel planning check. ERA5 GRIB fixture
+checks need the `era5` extra; no provider or credential access is required.

@@ -11,8 +11,8 @@ from meteorology.study import load_study_config, planning_report, validate_study
 from meteorology.artifacts import manifest_payload
 from meteorology.hourly_weather.product import _paths
 
-FIXTURE = Path(__file__).parent / 'fixtures' / 'study.proposed.v1.json'
-CONFIG_HASH = 'b1f811ff8b3c47bc571805a5845fc55a410ccd6bd08dfc254899b387903ed7f5'
+FIXTURE = Path(__file__).parent / 'fixtures' / 'study.coastal-policy.v1.json'
+CONFIG_HASH = 'bacf22ea2b0beb32d1ef5607f52b2f6104419dd329edf25657bca196acc8018c'
 GEOMETRY_HASH = '6d79e4dfd29a4ada66625e20fdcd01e7bfe6076bf6ebb4c449581eb3a0cdfb68'
 
 
@@ -93,7 +93,7 @@ def test_standalone_and_shared_requested_native_config_mapping(tmp_path, monkeyp
     config['domain']['status'] = 'approved'
     config['domain']['approval'] = dict(approved_at='2026-10-06T00:00:00Z', source_message_id='test', scope='rectangular_selection_only', statement='test approval')
     selected.write_text(json.dumps(config))
-    with pytest.raises(ValueError, match='registry remains pending'):
+    with pytest.raises(ValueError, match='validated coastal mask'):
         load_meteorological_config(study_config=selected)
 
 
@@ -253,8 +253,8 @@ def test_policy_approval_cannot_bypass_pending_support(tmp_path, pending):
 
 
 @pytest.mark.parametrize('mutation,match', [
-    (lambda c: c['domain'].pop('bbox_role'), 'explicit envelope role'),
-    (lambda c: c['domain'].pop('geometry_status'), 'explicit envelope role'),
+    (lambda c: c['domain'].pop('bbox_role'), 'missing='),
+    (lambda c: c['domain'].pop('geometry_status'), 'missing='),
     (lambda c: c['domain']['selection_policy'].update(approval=None), 'approval provenance'),
     (lambda c: c['domain']['selection_policy']['approval'].update(approved_at='2026-10-06T00:00:00'), 'requires timezone'),
     (lambda c: c['domain']['selection_policy'].update(offshore_distance_m=24000), 'constant'),
@@ -266,3 +266,22 @@ def test_policy_contract_rejects_invalid_selection(tmp_path, mutation, match):
     selected.write_text(json.dumps(config))
     with pytest.raises(ValueError, match=match):
         load_study_config(selected, planning=True)
+
+
+def test_omitted_selection_policy_cannot_bypass_pending_geometry(tmp_path):
+    config = json.loads(COASTAL_FIXTURE.read_bytes())
+    config['domain']['status'] = 'approved'
+    config['domain']['approval'] = dict(approved_at='2026-10-06T00:00:00Z', source_message_id='test', scope='rectangular_selection_only', statement='test approval')
+    config['domain'].pop('selection_policy')
+    config['grid_registry'].update(status='validated', mask_revision='synthetic', mask_sha256='a'*64, memberships=[dict(resolution=5, role='water_reporting', relative_path='test', count=1, sha256='b'*64)])
+    selected = tmp_path/'omitted-policy.json'
+    selected.write_text(json.dumps(config))
+    for planning in (True, False):
+        with pytest.raises(ValueError, match='selection_policy'):
+            load_study_config(selected, planning=planning)
+    assert not (tmp_path/'Data').exists()
+
+
+def test_legacy_rectangle_config_requires_explicit_coastal_contract_migration():
+    with pytest.raises(ValueError, match='selection_policy'):
+        load_study_config(Path(__file__).parent/'fixtures'/'study.proposed.v1.json', planning=True)
