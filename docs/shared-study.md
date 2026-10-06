@@ -84,3 +84,12 @@ Parsing, canonical identity, and raw-file checksum use one captured config byte
 snapshot. The packaged schema is also captured once per load. Approval metadata
 and revision notes follow the current shared schema; approved status requires
 explicit approval provenance and its timestamp requires a timezone.
+
+The coastal policy v1 contract approves ocean-side water within 22224 metres
+(12 nautical miles) of the intended qualified coastal reach, plus the requested
+inland waters. The bbox is an acquisition planning envelope, not a reporting
+universe. Policy approval does not certify geometry: production requires
+source-relative validated geometry, coastal mask and registry as well as approved
+policy/domain status. Native meteorology support and interpolation halos can
+extend outside reporting water; this adapter retains their separate provenance
+and does not materialize the coastal mask.

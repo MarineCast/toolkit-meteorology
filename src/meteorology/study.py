@@ -95,6 +95,20 @@ def resolve_config_path(explicit_path=None):
     return Path(selected).expanduser().resolve()
 
 
+def _check_selection_policy(config, require_approved):
+    policy = config['domain'].get('selection_policy')
+    if policy is not None:
+        if not config['domain'].get('bbox_role') or not config['domain'].get('geometry_status'):
+            raise ValueError('selection policy requires explicit envelope role and geometry status')
+        if policy['status'] == 'approved' and not policy['approval']:
+            raise ValueError('approved selection policy requires approval provenance')
+        if require_approved and (policy['status'] != 'approved' or
+                policy['mask_status'] != 'source_relative_validated' or
+                config['domain']['geometry_status'] != 'source_relative_validated' or
+                config['grid_registry']['status'] != 'validated'):
+            raise ValueError('production requires validated coastal mask, geometry and registry')
+
+
 def _validate(path=None, require_approved=True):
     path = resolve_config_path(path)
     raw = path.read_bytes()
@@ -110,6 +124,7 @@ def _validate(path=None, require_approved=True):
         raise ValueError('domain remains proposed; production run requires approved geometry')
     if config['domain']['status'] == 'approved' and not config['domain'].get('approval'):
         raise ValueError('approved domain requires explicit approval provenance')
+    _check_selection_policy(config, require_approved)
     registry = config['grid_registry']
     if registry['status'] == 'validated':
         if not registry['mask_revision'] or not registry['mask_sha256'] or not registry['memberships']:
@@ -164,6 +179,7 @@ def validate_study_identity(identity):
     check(config, read_json(Path(__file__).parent / 'resources' / 'study.schema.json'))
     if config['domain']['status'] == 'approved' and not config['domain'].get('approval'):
         raise ValueError('approved domain requires explicit approval provenance')
+    _check_selection_policy(config, False)
     expected = hashlib.sha256(canonical_bytes(config)).hexdigest()
     if identity['config_sha256'] != expected or identity['geometry_sha256'] != geometry_identity(config):
         raise ValueError('embedded shared study canonical identity mismatch')

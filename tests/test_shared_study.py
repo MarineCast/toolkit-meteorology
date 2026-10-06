@@ -213,3 +213,56 @@ def test_approved_status_requires_provenance(tmp_path):
     selected.write_text(json.dumps(config))
     with pytest.raises(ValueError, match='approval provenance'):
         load_study_config(selected, planning=True)
+
+COASTAL_FIXTURE = Path(__file__).parent / 'fixtures' / 'study.coastal-policy.v1.json'
+COASTAL_HASH = 'bacf22ea2b0beb32d1ef5607f52b2f6104419dd329edf25657bca196acc8018c'
+
+
+def test_approved_coastal_policy_is_planning_envelope_only():
+    identity = load_study_config(COASTAL_FIXTURE, planning=True)
+    assert identity['config_sha256'] == COASTAL_HASH
+    domain = identity['study_config']['domain']
+    assert domain['selection_policy']['status'] == 'approved'
+    assert domain['selection_policy']['offshore_distance_m'] == 22224
+    assert domain['bbox_role'] == 'acquisition_planning_envelope_only'
+    assert domain['geometry_status'] == 'pending_qualified_coastline_validation'
+    validate_study_identity(identity)
+    with pytest.raises(ValueError, match='proposed'):
+        load_study_config(COASTAL_FIXTURE)
+
+
+@pytest.mark.parametrize('pending', ['geometry', 'mask', 'registry', 'policy'])
+def test_policy_approval_cannot_bypass_pending_support(tmp_path, pending):
+    config = json.loads(COASTAL_FIXTURE.read_bytes())
+    config['domain']['status'] = 'approved'
+    config['domain']['approval'] = dict(approved_at='2026-10-06T00:00:00Z', source_message_id='test', scope='rectangular_selection_only', statement='test approval')
+    config['domain']['geometry_status'] = 'source_relative_validated'
+    policy = config['domain']['selection_policy']
+    policy['mask_status'] = 'source_relative_validated'
+    config['grid_registry'].update(status='validated', mask_revision='synthetic-test-only', mask_sha256='a'*64,
+        memberships=[dict(resolution=5, role='water_reporting', relative_path='test.json', count=1, sha256='b'*64)])
+    if pending == 'geometry': config['domain']['geometry_status'] = 'pending_qualified_coastline_validation'
+    elif pending == 'mask': policy['mask_status'] = 'pending_source_qualified_build'
+    elif pending == 'registry': config['grid_registry']['status'] = 'pending_validated_marine_mask'
+    else: policy['status'] = 'proposed'
+    selected = tmp_path/'study.json'
+    selected.write_text(json.dumps(config))
+    load_study_config(selected, planning=True)
+    with pytest.raises(ValueError, match='validated coastal mask, geometry and registry'):
+        load_study_config(selected)
+
+
+@pytest.mark.parametrize('mutation,match', [
+    (lambda c: c['domain'].pop('bbox_role'), 'explicit envelope role'),
+    (lambda c: c['domain'].pop('geometry_status'), 'explicit envelope role'),
+    (lambda c: c['domain']['selection_policy'].update(approval=None), 'approval provenance'),
+    (lambda c: c['domain']['selection_policy']['approval'].update(approved_at='2026-10-06T00:00:00'), 'requires timezone'),
+    (lambda c: c['domain']['selection_policy'].update(offshore_distance_m=24000), 'constant'),
+])
+def test_policy_contract_rejects_invalid_selection(tmp_path, mutation, match):
+    config = json.loads(COASTAL_FIXTURE.read_bytes())
+    mutation(config)
+    selected = tmp_path/'study.json'
+    selected.write_text(json.dumps(config))
+    with pytest.raises(ValueError, match=match):
+        load_study_config(selected, planning=True)
