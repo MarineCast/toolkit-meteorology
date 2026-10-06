@@ -19,7 +19,7 @@ PARAMETERS = {167:('t2m','K'),168:('d2m','K'),165:('u10','m s**-1'),
 NORMALIZATION_METHOD = 'era5-cds-regular-latlon-message-v1'
 
 
-def normalize_message(metadata: dict, latitude, longitude, values) -> pd.DataFrame:
+def normalize_message(metadata: dict, latitude, longitude, values, *, budget=None) -> pd.DataFrame:
     """Validate decoded metadata before conversion; missing values stay missing."""
     if metadata.get('dataset') != DATASET or metadata.get('product_type') != 'reanalysis':
         raise ValueError('Expected CDS ERA5 single-level reanalysis, not a substitute source.')
@@ -62,6 +62,9 @@ def normalize_message(metadata: dict, latitude, longitude, values) -> pd.DataFra
         if (_utc(metadata['init_time_utc']) != valid or metadata.get('endStep') != 0):
             raise ValueError('Instantaneous ERA5 analysis must have its own zero-step valid time.')
         left = valid
+    if budget is not None:
+        from .resources import ROW_BYTES,COPIES
+        budget.checkpoint(additional_memory=np.size(values)*ROW_BYTES*COPIES)
     lat,lon,data = [np.asarray(v,dtype='float64').ravel() for v in (latitude,longitude,values)]
     lon = (lon+180)%360-180
     if len(data)==0 or not (len(lat)==len(lon)==len(data)):
@@ -89,14 +92,16 @@ def normalize_message(metadata: dict, latitude, longitude, values) -> pd.DataFra
         raise ValueError('Source-file SHA256 receipt is required.')
     coords = np.column_stack((lat,lon)).astype('<f8').tobytes()
     grid_hash=hashlib.sha256(coords).hexdigest()
-    return pd.DataFrame(dict(SOURCE_GRID_INDEX=np.arange(len(data)), SOURCE_LAT=lat,SOURCE_LON=lon,
+    frame=pd.DataFrame(dict(SOURCE_GRID_INDEX=np.arange(len(data)), SOURCE_LAT=lat,SOURCE_LON=lon,
         SOURCE_GRID_HASH=grid_hash,SOURCE_GRID_SIZE=len(data),VALID_TIME_UTC=valid.isoformat(),INTERVAL_START_UTC=left.isoformat(),
         PARAMETER=name,VALUE=data,EXPVER=expver,CONSOLIDATION='final' if expver==1 else 'preliminary_ERA5T',
         RETRIEVED_AT_UTC=retrieved.isoformat(),SOURCE_SHA256=metadata['source_sha256'],
         SOURCE_DATASET=DATASET,SOURCE_UNITS=units, NORMALIZATION_METHOD=NORMALIZATION_METHOD))
+    if budget is not None:budget.checkpoint()
+    return frame
 
 
-def consolidate(records: pd.DataFrame, *, as_of_utc: str | None = None) -> pd.DataFrame:
+def consolidate(records: pd.DataFrame, *, as_of_utc: str | None = None, expected_native_indices=None) -> pd.DataFrame:
     """Within one captured release prefer final 1 over 5; never overwrite old releases."""
     if records.empty:
         return records.copy()
@@ -105,7 +110,7 @@ def consolidate(records: pd.DataFrame, *, as_of_utc: str | None = None) -> pd.Da
     if len(set(records.SOURCE_GRID_HASH)) != 1:
         raise ValueError('A source chunk cannot mix grids.')
     if (records.SOURCE_GRID_SIZE.nunique()!=1 or
-            set(records.SOURCE_GRID_INDEX)!=set(range(int(records.SOURCE_GRID_SIZE.iloc[0])))):
+            set(records.SOURCE_GRID_INDEX)!=(set(expected_native_indices) if expected_native_indices is not None else set(range(int(records.SOURCE_GRID_SIZE.iloc[0]))))):
         raise ValueError('Native source grid point universe is incomplete.')
     if not set(records.EXPVER)<= {1,5}:
         raise ValueError('Unrecognized expver in normalized records.')
@@ -120,10 +125,11 @@ def consolidate(records: pd.DataFrame, *, as_of_utc: str | None = None) -> pd.Da
     return records.sort_values('EXPVER').drop_duplicates(keys,keep='first').sort_values(keys).reset_index(drop=True)
 
 
-def decode_grib(path: str | Path, *, retrieved_at_utc: str) :
+def decode_grib(path: str | Path, *, retrieved_at_utc: str, budget=None):
     """Read one message at a time; ecCodes is an optional isolated acquisition extra."""
     import eccodes as ec
     path=Path(path)
+    if budget is not None:budget.checkpoint(additional_memory=path.stat().st_size)
     sha=checksum_path(path)
     count=0
     with path.open('rb') as handle:
@@ -141,13 +147,16 @@ def decode_grib(path: str | Path, *, retrieved_at_utc: str) :
                     retrieved_at_utc=retrieved_at_utc,source_sha256=sha,
                     step_units='hours' if get('stepUnits')==1 else 'unsupported')
                 if meta['paramId'] in (165,166): meta['uvRelativeToGrid']=get('uvRelativeToGrid')
+                if budget is not None:
+                    from .resources import ROW_BYTES,COPIES
+                    budget.checkpoint(additional_memory=int(get('numberOfDataPoints'))*ROW_BYTES*COPIES)
                 values=np.asarray(ec.codes_get_values(message),dtype='float64')
                 if get('bitmapPresent'):
                     bitmap=np.asarray(ec.codes_get_array(message,'bitmap'))
                     values=np.where(bitmap==0,np.nan,values)
                 count+=1
                 yield normalize_message(meta,ec.codes_get_array(message,'latitudes'),
-                    ec.codes_get_array(message,'longitudes'),values)
+                    ec.codes_get_array(message,'longitudes'),values,budget=budget)
             finally:
                 ec.codes_release(message)
     if not count: raise ValueError('GRIB source contains no messages.')

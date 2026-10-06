@@ -61,7 +61,7 @@ historical provider publication time is unknown, not fabricated from a 5-day lag
 
 These APIs are source-processing helpers with synthetic verification. They do not
 publish a final Data release, generate a coastal mask, implement a marine H3
-crosswalk, submit CDS jobs, or claim real-source completeness. Production publication
+a qualified real marine H3 crosswalk, submit CDS jobs, or claim real-source completeness. Production publication
 and actual authenticated bounded acquisition remain gated integration work.
 
 ## Access and source facts
@@ -93,7 +93,7 @@ hourly UTC daily accumulation.
 ## Resource and retention plan
 
 Start after access and source-budget approval with one two-day ERA5 pilot. Suggested
-caps: 128MiB transfer, 256MiB staging, 512MiB RAM, 1 worker, 1h local compute. Transfer
+caps: 128MiB transfer, 1GiB staging, 512MiB RAM, 1 worker, 1h local compute. Transfer
 size is unknown until measured; the planner's float64 lower bound is not an HTTP
 quote or Python peak memory estimate. With roughly 21GiB free at preflight, do not
 reserve the entire historical hourly H3 matrix. The coast worker's separate 4GiB
@@ -124,3 +124,39 @@ python -m pytest -q
 ```
 
 The live NOAA test stays opt-in; no provider request is needed for these regressions.
+
+## Bounded execution and review repair
+
+The old raw-array memory estimate omitted normalized metadata and working copies.
+The revised planner rejects the independent review's 5,241,600-byte cap. It models
+2048 bytes per normalized row (numeric arrays, index, nullable values, bounded
+identity strings and object overhead), two expver vintages, four live copies and
+128MiB worker baseline. A full native day is distinguished from the working set:
+processing uses one day and 64 native points per aggregation batch, with 4096-row
+Parquet reads. The normalized-day staging allowance plus reserved raw input must
+also fit. The proposed scratch cap is now 1GiB, still below the 2GiB meteorology
+allocation; this is a reviewed proposal, not live-pilot budget approval.
+
+`era5.execution.process_native_day` gates on current production-qualified shared
+selection before file access. It streams message normalization to compact native
+Parquet, then aggregates fixed point batches. It preflights source bytes, grid size
+and planned allocations, checks measured process peak RSS/time at checkpoints and
+checks owned staging before writes and terminal commit. Metric floats have stable
+nullable Arrow schemas even when a whole point batch is missing. Output is a fresh
+source-processing checkpoint, not a final marine product; interruptions retain
+partials and RUN_STATE, without a terminal MANIFEST. Existing inputs are read only.
+
+`era5.resources.bounded_transfer` is a component for an approved official-response
+opener, not a CDS job-submission client. One worker owns a persistent transfer lease;
+request and byte reservations are committed before opening. Restart cannot reset
+reservations or change caps. Reads never exceed the remaining allowance. Unknown-
+length responses exhausting it stop unpromoted rather than reading an extra byte.
+Incomplete payloads and interruptions retain receipts/partials. No access token or
+provider response body is logged. Official job submission, polling and result URL
+qualification still need their bounded integration before a live source pilot.
+
+These are conservative preallocation estimates and cooperative fail-stop checks.
+They do not promise OS-level prevention of an allocation or wall-clock overrun
+inside pandas, Arrow or ecCodes; exceeding work stops at the next checkpoint and
+never gains terminal publication. Standalone helper calls without a Budget remain
+unbounded and must not be used as the reviewed pilot executor.

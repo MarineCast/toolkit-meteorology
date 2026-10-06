@@ -26,7 +26,7 @@ METRICS = {
 }
 
 
-def utc_daily(records: pd.DataFrame, *, day: str, as_of_utc: str | None = None) -> pd.DataFrame:
+def utc_daily(records: pd.DataFrame, *, day: str, as_of_utc: str | None = None, expected_native_indices=None, budget=None) -> pd.DataFrame:
     """One native grid, one UTC day, field-specific strict 24-slot completeness.
 
     No H3 downscaling or water-mask approximation occurs here. RH uses a versioned
@@ -34,7 +34,10 @@ def utc_daily(records: pd.DataFrame, *, day: str, as_of_utc: str | None = None) 
     """
     start=datetime.combine(date.fromisoformat(day),datetime.min.time(),timezone.utc)
     end=start+timedelta(days=1)
-    records=consolidate(records,as_of_utc=as_of_utc)
+    if budget is not None:
+        from .resources import ROW_BYTES,COPIES
+        budget.checkpoint(additional_memory=len(records)*ROW_BYTES*COPIES)
+    records=consolidate(records,as_of_utc=as_of_utc,expected_native_indices=expected_native_indices)
     if records.empty: raise ValueError('Daily summaries require an explicitly represented native grid.')
     times=pd.to_datetime(records.VALID_TIME_UTC,utc=True)
     if any((t.minute,t.second,t.microsecond)!=(0,0,0) for t in times):
@@ -43,6 +46,7 @@ def utc_daily(records: pd.DataFrame, *, day: str, as_of_utc: str | None = None) 
         raise ValueError('Pass only this day and its next-midnight boundary; do not load full history.')
     results=[]
     for index,group in records.groupby('SOURCE_GRID_INDEX',sort=True):
+        if budget is not None:budget.checkpoint()
         if any(group[col].nunique()!=1 for col in ('SOURCE_LAT','SOURCE_LON','SOURCE_GRID_HASH')):
             raise ValueError('Native point coordinates change inside daily chunk.')
         group=group.copy()
@@ -89,4 +93,5 @@ def utc_daily(records: pd.DataFrame, *, day: str, as_of_utc: str | None = None) 
             row[prefix+'_EXPECTED_HOURS']=24
             row[prefix+'_COVERAGE_FRACTION']=count/24
         results.append(row)
+    if budget is not None:budget.checkpoint()
     return pd.DataFrame(results)

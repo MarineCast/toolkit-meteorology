@@ -30,7 +30,7 @@ def access_preflight() -> dict:
 
 def request_plan(study_config, *, start: str, end_exclusive: str,
                  max_days: int = 2, transfer_cap: int = 128*1024**2,
-                 staging_cap: int = 256*1024**2, memory_cap: int = 512*1024**2) -> dict:
+                 staging_cap: int = 1024*1024**2, memory_cap: int = 512*1024**2) -> dict:
     """Plan a bounded pilot with complete precipitation boundary; never submit it.
 
     The regular 0.25 degree grid is the CDS distribution grid, not the 31-km
@@ -76,14 +76,18 @@ def request_plan(study_config, *, start: str, end_exclusive: str,
                      year=[str(last.year)], month=[f'{last.month:02}'], day=[f'{last.day:02}'],
                      time=['00:00'], area=area, grid=[.25,.25], data_format='grib',
                      download_format='unarchived'))
+    from .resources import memory_estimate
+    memory=memory_estimate(cells,source_bytes=transfer_cap)
     decoded = cells*(days*24*len(VARIABLES)+1)*8
-    if decoded > staging_cap or cells*len(VARIABLES)*25*8*4 > memory_cap:
+    if (decoded > staging_cap or memory['normalized_full_day_estimate_bytes']+transfer_cap > staging_cap
+            or memory['bounded_working_set_estimate_bytes'] > memory_cap):
         raise ValueError('Decoded lower-bound or conservative one-day working set exceeds cap.')
     return dict(dataset=DATASET, source_family='ERA5_separate_retrospective_baseline',
                 method='era5-cds-hourly-plan-v1', study_identity=identity,
                 interval=dict(start=start,end_exclusive=end_exclusive,timezone='UTC'),
                 execution='planning_only_no_network', jobs=jobs, unique_valid_hours=hours,
                 distribution_grid_points=cells, decoded_float64_payload_lower_bound_bytes=decoded,
+                memory_preflight=memory,
                 transfer_estimate='unknown_until_measured_pilot; numeric cap is not an estimate',
                 caps=dict(transfer_bytes=transfer_cap,staging_bytes=staging_cap,memory_bytes=memory_cap,
                           compute_seconds=3600,workers=1),
