@@ -101,6 +101,8 @@ def _rows(state: dict, cells: list[str], day: date, period: str,
 def export_weather_summary(manifest_paths: list[str | Path], output_dir: str | Path, *,
                            spatial_scope: str = "both", as_of_utc: str | None = None) -> Path:
     """Export nine atmospheric metrics without retaining a multi-day frame in memory."""
+    from .study import reject_study_selection
+    reject_study_selection("export-weather-summary")
     if spatial_scope not in {"h3", "region", "both"} or not manifest_paths:
         raise ValueError("Provide hourly manifests and spatial scope h3, region or both.")
     cutoff = _utc(as_of_utc) if as_of_utc is not None else None

@@ -80,6 +80,11 @@ def main(argv: list[str] | None = None) -> int:
             from .study import planning_report
             print(json.dumps(planning_report(args.study_config), indent=2))
             return 0
+        from .study import load_study_config, reject_study_selection
+        if args.command in {'build', 'inspect', 'download'}:
+            load_study_config()  # Validate selection before dispatch, including help paths.
+        else:
+            reject_study_selection(args.command)
         from .core.config.paths import project_root
         if args.command == "export-daily-matrix":
             from .daily_matrix import export

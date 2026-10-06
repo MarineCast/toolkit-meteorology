@@ -91,6 +91,7 @@ def test_standalone_and_shared_requested_native_config_mapping(tmp_path, monkeyp
     # Changing approval status alone cannot turn pending membership into production support.
     config = json.loads(selected.read_text())
     config['domain']['status'] = 'approved'
+    config['domain']['approval'] = dict(approved_at='2026-10-06T00:00:00Z', source_message_id='test', scope='rectangular_selection_only', statement='test approval')
     selected.write_text(json.dumps(config))
     with pytest.raises(ValueError, match='registry remains pending'):
         load_meteorological_config(study_config=selected)
@@ -131,3 +132,84 @@ def test_manifest_identity_and_scientific_buffer_changes_are_pinned():
     updated = manifest_payload(**{**kwargs, 'study_identity':changed})
     assert updated['release_id'] != manifest['release_id']
     assert updated['resolved_config']['shared_study']['geometry_sha256'] == GEOMETRY_HASH
+
+
+@pytest.mark.parametrize('arguments', [
+    ['export-daily-matrix', '--manifest', 'input.json', '--output', 'out.parquet'],
+    ['export-weather-summary'], ['freeze-release'], ['init'], ['stages'],
+    ['verify'], ['catalog'], ['feature-policy'], ['benchmark'], ['migrate-legacy'],
+    ['validate'], ['variables'], ['example-offline'], ['demo-hourly-week'],
+    ['build', 'spatial-support'], ['inspect', 'spatial-support'],
+    ['download', 'hourly-weather'],
+])
+def test_cli_missing_selector_fails_before_dispatch(tmp_path, monkeypatch, arguments):
+    def forbidden(*args, **kwargs):
+        pytest.fail('dispatched before validating selected study')
+    monkeypatch.setattr('meteorology.cli._invoke', forbidden)
+    monkeypatch.setattr('meteorology.daily_matrix.export', forbidden)
+    monkeypatch.setattr('meteorology.cli.initialize_workspace', forbidden)
+    with pytest.raises(SystemExit) as failure:
+        main(['--study-config', str(tmp_path / 'missing.json'), *arguments])
+    assert failure.value.code == 2
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize('command', ['export-daily-matrix', 'export-weather-summary', 'freeze-release'])
+def test_input_bound_apis_reject_selected_study_before_io(monkeypatch, tmp_path, command):
+    from meteorology.daily_matrix import export
+    from meteorology.weather_summary import export_weather_summary
+    from meteorology.releases import freeze_release
+    call = {'export-daily-matrix': lambda: export([tmp_path/'missing'], tmp_path/'out'),
+            'export-weather-summary': lambda: export_weather_summary([tmp_path/'missing'], tmp_path/'out'),
+            'freeze-release': lambda: freeze_release(tmp_path/'missing', tmp_path/'out')}[command]
+    monkeypatch.setenv('MARINECAST_STUDY_CONFIG', str(FIXTURE))
+    with pytest.raises(ValueError, match='does not support study selection'):
+        call()
+    monkeypatch.setenv('MARINECAST_STUDY_CONFIG', str(tmp_path/'missing-study'))
+    with pytest.raises(FileNotFoundError):
+        call()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_identity_uses_one_captured_config_snapshot(tmp_path, monkeypatch):
+    import meteorology.study as study
+    selected = tmp_path/'study.json'
+    original = FIXTURE.read_bytes()
+    selected.write_bytes(original)
+    replacement = json.loads(original)
+    replacement['time']['start'] = '2010-01-01'
+    real_parse = study.parse_json_bytes
+    def replace_after_capture(raw):
+        if raw == original:
+            selected.write_text(json.dumps(replacement))
+        return real_parse(raw)
+    monkeypatch.setattr(study, 'parse_json_bytes', replace_after_capture)
+    identity = load_study_config(selected, planning=True)
+    assert identity['requested_time']['start'] == '2009-01-01'
+    assert identity['config_sha256'] == CONFIG_HASH
+    assert identity['raw_file_sha256'] == hashlib.sha256(original).hexdigest()
+    assert hashlib.sha256(selected.read_bytes()).hexdigest() != identity['raw_file_sha256']
+
+
+@pytest.mark.parametrize('timestamp', ['2026-10-06T00:00:00Z', '2026-10-06T01:00:00+01:00', '2026-10-06T00:00:00'])
+def test_current_approval_fields_and_timezone(tmp_path, timestamp):
+    config = json.loads(FIXTURE.read_bytes())
+    config['domain'].update(status='approved', revision_note='Pending smaller rectangle', approval=dict(
+        approved_at=timestamp, source_message_id='test', scope='rectangular_selection_only', statement='test approval'))
+    selected = tmp_path/'study.json'
+    selected.write_text(json.dumps(config))
+    if timestamp.endswith('00:00:00'):
+        with pytest.raises(ValueError, match='requires timezone'):
+            load_study_config(selected, planning=True)
+    else:
+        identity = load_study_config(selected, planning=True)
+        validate_study_identity(identity)
+
+
+def test_approved_status_requires_provenance(tmp_path):
+    config = json.loads(FIXTURE.read_bytes())
+    config['domain']['status'] = 'approved'
+    selected = tmp_path/'study.json'
+    selected.write_text(json.dumps(config))
+    with pytest.raises(ValueError, match='approval provenance'):
+        load_study_config(selected, planning=True)

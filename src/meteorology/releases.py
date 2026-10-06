@@ -45,6 +45,8 @@ def freeze_release(manifest_path: str | Path, output_root: str | Path) -> Path:
     canonical acquisition inventory. This is an explicit potentially large copy.
     """
 
+    from .study import reject_study_selection
+    reject_study_selection("freeze-release")
     source_manifest = Path(manifest_path).resolve()
     preview = json.loads(source_manifest.read_text(encoding="utf-8"))
     product = preview.get("product")

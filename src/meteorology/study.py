@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Validate MarineCast study v1 JSON; no runtime or sibling-repo dependencies."""
-from datetime import date
+from datetime import date, datetime
 import hashlib
 import json
 import math
@@ -23,9 +23,13 @@ def unique_object(pairs):
     return result
 
 
-def read_json(path):
-    return json.loads(Path(path).read_text(encoding='utf-8'), object_pairs_hook=unique_object,
+def parse_json_bytes(raw):
+    return json.loads(raw.decode('utf-8'), object_pairs_hook=unique_object,
                       parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)))
+
+
+def read_json(path):
+    return parse_json_bytes(Path(path).read_bytes())
 
 
 def check(value, schema, path='$'):
@@ -64,6 +68,10 @@ def check(value, schema, path='$'):
             if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', value):
                 raise ValueError(f'{path}: expected YYYY-MM-DD')
             date.fromisoformat(value)
+        if schema.get('format') == 'date-time':
+            parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
+            if parsed.tzinfo is None:
+                raise ValueError(f'{path}: approval timestamp requires timezone')
     if type(value) in (int, float) and value < schema.get('minimum', -math.inf):
         raise ValueError(f'{path}: below minimum')
 
@@ -89,8 +97,10 @@ def resolve_config_path(explicit_path=None):
 
 def _validate(path=None, require_approved=True):
     path = resolve_config_path(path)
-    config = read_json(path)
-    check(config, read_json(Path(__file__).parent / 'resources' / 'study.schema.json'))
+    raw = path.read_bytes()
+    schema_raw = (Path(__file__).parent / 'resources' / 'study.schema.json').read_bytes()
+    config = parse_json_bytes(raw)
+    check(config, parse_json_bytes(schema_raw))
     if date.fromisoformat(config['time']['start']) >= date.fromisoformat(config['time']['end_exclusive']):
         raise ValueError('requested date interval must have start < end_exclusive')
     geometry_hash = geometry_identity(config)
@@ -98,6 +108,8 @@ def _validate(path=None, require_approved=True):
         raise ValueError('geometry_sha256 mismatch: update revision and identity deliberately')
     if require_approved and config['domain']['status'] != 'approved':
         raise ValueError('domain remains proposed; production run requires approved geometry')
+    if config['domain']['status'] == 'approved' and not config['domain'].get('approval'):
+        raise ValueError('approved domain requires explicit approval provenance')
     registry = config['grid_registry']
     if registry['status'] == 'validated':
         if not registry['mask_revision'] or not registry['mask_sha256'] or not registry['memberships']:
@@ -108,7 +120,8 @@ def _validate(path=None, require_approved=True):
     root = Path(config['storage']['data_root'])
     if root.is_absolute():
         raise ValueError('data_root must be portable and relative to the config file')
-    return config, {'study_id': config['study_id'], 'domain_status': config['domain']['status'],
+    return config, {'raw_file_sha256': hashlib.sha256(raw).hexdigest(),
+                    'schema_sha256': hashlib.sha256(schema_raw).hexdigest(), 'study_id': config['study_id'], 'domain_status': config['domain']['status'],
                     'domain_revision': config['domain']['revision'],
                     'geometry_sha256': geometry_hash,
                     'config_sha256': hashlib.sha256(canonical_bytes(config)).hexdigest(),
@@ -129,10 +142,7 @@ def load_study_config(explicit_path=None, *, planning=False):
     config, identity = _validate(selected, require_approved=not planning)
     if not planning and config['grid_registry']['status'] != 'validated':
         raise ValueError('shared study reporting registry remains pending; production requires pinned memberships')
-    path = resolve_config_path(selected)
-    identity.update(raw_file_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
-                    schema_sha256=hashlib.sha256((Path(__file__).parent / 'resources' / 'study.schema.json').read_bytes()).hexdigest(),
-                    requested_time=dict(config['time']),
+    identity.update(requested_time=dict(config['time']),
                     producer_buffer=dict(config['producer_buffers']['meteorology']),
                     native_support_role='rectangle_centroid_atmospheric_companion_not_water_reporting',
                     study_config=config)
@@ -152,6 +162,8 @@ def validate_study_identity(identity):
     """Check embedded canonical identity without opening the original host config."""
     config = identity['study_config']
     check(config, read_json(Path(__file__).parent / 'resources' / 'study.schema.json'))
+    if config['domain']['status'] == 'approved' and not config['domain'].get('approval'):
+        raise ValueError('approved domain requires explicit approval provenance')
     expected = hashlib.sha256(canonical_bytes(config)).hexdigest()
     if identity['config_sha256'] != expected or identity['geometry_sha256'] != geometry_identity(config):
         raise ValueError('embedded shared study canonical identity mismatch')
@@ -167,3 +179,10 @@ def validate_study_identity(identity):
     for name in ('raw_file_sha256', 'schema_sha256'):
         if not re.fullmatch('[0-9a-f]{64}', identity.get(name, '')):
             raise ValueError(f'embedded shared study {name} is invalid')
+
+
+def reject_study_selection(command):
+    """Input-bound utilities cannot apply a selected study; fail before any I/O."""
+    identity = load_study_config(planning=True)
+    if identity is not None:
+        raise ValueError(f'{command} does not support study selection; use pinned input manifests without a selector')

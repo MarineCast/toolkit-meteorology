@@ -71,3 +71,16 @@ python -m pytest -q
 An installed-wheel preflight must be checked from outside the source checkout,
 including packaged schema presence and the same canonical hashes. Provider
 acquisition is excluded from these checks.
+
+Selected-study command policy: `study-preflight` supports planning, and `build`,
+`inspect`, and `download` validate production selection before dispatch. All other
+CLI commands reject a selector after validating it, before file access or mutation.
+Input-bound daily matrix, weather summary, and freeze APIs likewise reject an
+environment selector: their pinned manifests establish scope, and this adapter
+does not remap those inputs to a newly selected study. Use these utilities with
+no selector. This explicit restriction preserves standalone behavior.
+
+Parsing, canonical identity, and raw-file checksum use one captured config byte
+snapshot. The packaged schema is also captured once per load. Approval metadata
+and revision notes follow the current shared schema; approved status requires
+explicit approval provenance and its timestamp requires a timezone.
