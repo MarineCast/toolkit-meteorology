@@ -197,3 +197,29 @@ def test_foreign_metric_columns_do_not_blend_sources(tmp_path):
     source['HRRR_TEMPERATURE_2M_C']=0
     with pytest.raises(ValueError,match='cannot be blended'):
         project_native_daily(source,crosswalk,meta,member,source_family='ERA5')
+
+
+def test_extra_source_metric_without_status_rejected(tmp_path):
+    member,*_=registry(tmp_path)
+    frame=native();frame['ERA5_WIND_SPEED_10M_M_S']=float('inf')
+    cross,meta=nearest_native_crosswalk(frame,member,source_family='ERA5')
+    with pytest.raises(ValueError,match='Uncontracted'):
+        project_native_daily(frame,cross,meta,member,source_family='ERA5')
+
+
+def test_canonical_cells_must_match_artifact_hash(tmp_path):
+    member,*_=registry(tmp_path)
+    cells=tuple(sorted((*member.cells[:-1],h3.latlng_to_cell(51.5,-128,5))))
+    forged=replace(member,cells=cells,canonical_membership_sha256=hashlib.sha256(('\n'.join(cells)+'\n').encode()).hexdigest())
+    with pytest.raises(ValueError,match='pinned registry'):
+        nearest_native_crosswalk(native(),forged,source_family='ERA5')
+
+
+def test_exact_file_mask_rejects_directory(tmp_path):
+    from meteorology.artifacts import checksum_path
+    _,study,*_=registry(tmp_path)
+    directory=tmp_path/'mask-tree';directory.mkdir();(directory/'one').write_bytes(b'synthetic')
+    config=json.loads(study.read_text());config['grid_registry']['mask_sha256']=checksum_path(directory)
+    study.write_text(json.dumps(config))
+    with pytest.raises(ValueError,match='regular file'):
+        load_reporting_membership(study,mask_path=directory,mask_hash_policy='sha256_exact_file_bytes')

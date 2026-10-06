@@ -1,6 +1,8 @@
 # CDS lifecycle integration and two separate pilot proposals
 
-Status: proposed, no provider job submitted, no pilot authorized. Native source
+Status: concrete ERA5 native pilot runner implemented; no weather job submitted.
+Parent accepts the proposed caps contingent on independent review of this exact
+source/date/bbox/RSS/runtime plan and verification of existing dataset terms. Native source
 qualification can precede the real marine mask; it does not qualify final H3
 membership, coastal support, or the requested historical period.
 
@@ -25,15 +27,40 @@ explicitly not scientific qualification; GRIB magic alone is not source validati
 Existing strict ERA5 decoder, expver consolidation and independent daily checks
 remain required. Existing production study/mask gates remain in place.
 
-Important boundary: method-level reservations do not bound hidden SDK HTTP calls.
-No live adapter is enabled in this change. Before any pilot, implement and review
-an HTTP transport enforcing per-response streaming limits, aggregate requests and
-bytes, connect/read deadlines, no hidden retries/redirects, official CDS endpoint
-ownership, approved storage host ownership and no token forwarding. Use official
-non-waiting submission and job lookup, never convenience wait/download methods.
-Do not enable cleanup or licence acceptance. Metadata/results errors must be
-redacted at the application boundary as well as in receipts. Provider exceptions
-are propagated by this low-level runner; callers must not log their text.
+Concrete transport: `CDSHTTPProvider` implements the official datastore v1 HTTPS
+protocol directly, following ecmwf-datastores-client 0.5.3 process/job/result
+endpoints. Each actual API call reserves 64 KiB and one request; results use the
+separate stream reservation. The transport disables ambient proxies, redirects,
+retries, debug logging and licence updates. API ownership is exactly
+cds.climate.copernicus.eu; this exact pilot permits only
+object-store.os-api.cci2.ecmwf.int for job-returned result URLs. TLS verification
+uses the default trusted context. Storage GETs receive no API token. All network
+and parsing exceptions are sanitized. Default socket timeout is 15 seconds,
+limited to the remaining aggregate elapsed budget. Chunk/checkpoint enforcement
+is cooperative and does not imply OS preemption inside native calls.
+
+Current public catalogue evidence:
+https://cds.climate.copernicus.eu/api/catalogue/v1/collections/reanalysis-era5-single-levels
+The catalogue declares CC-BY-4.0, licence id cc-by revision 1, and cci2-hosted
+resources. The runtime rechecks the exact licence links then checks the account's
+existing accepted-licence list by GET only. On 2026-10-06, two bounded metadata
+checks (three GETs total, 7,888 bytes received) found the expected response schema
+but no matching cc-by revision 1 acceptance. No terms were accepted. This is an
+observed terms blocker, not a new budget-approval request.
+
+The runnable exact plan is `python -m meteorology.era5.pilot plan
+--study-config /path/to/config/study.v1.json`. After independent review clears,
+execution uses `python -m meteorology.era5.pilot run --study-config ...
+--plan-json ERA5_EXACT_PILOT_PLAN.json --output /fresh/owned/scratch
+--credential-env-file /existing/MarineCast/.env`. There is no token argument or
+credential copy. The output plan must byte-semantically match the regenerated
+exact request and current study identity. Whole-pilot transfer/time and staging
+accounting includes both jobs, receipts, source inputs and processing. Job polling
+resumes retain job IDs; interrupted downloads are inspectable failures. Complete
+processing retains separate native output and adds independent hourly-slot,
+precipitation-window, count/missingness and numerical QA for all 81 metric rows.
+A production mask is not required for explicit native source testing, and final
+H3 qualification remains false throughout. No bulk-history executor is implied.
 
 ## ERA5 proposal: one UTC day, nine distribution points
 
@@ -102,8 +129,10 @@ No NOAA request has been made for this proposal. Preserve shared cached inputs.
 ## Review and publication gates
 
 Existing local auth setup is unchanged; PAT authentication was verified separately.
-Dataset terms have not been proven by that check and must never be auto-accepted.
-Review the transport adapter and this estimate before approving exact identities.
+Authentication does not prove dataset terms acceptance. The new bounded terms
+check found the currently required acceptance absent; terms must never be auto-accepted.
+Independent review must clear the repair and transport before the live pilot;
+the accepted resource caps do not need a second budget approval.
 Use fresh owned scratch directories, then perform hourly/daily independent checks,
 finite/missing values, time duplication, precipitation windows, source checksums,
 code/dependency pins and resource receipts. No MarineCast/Data release until the

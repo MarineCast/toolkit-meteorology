@@ -154,3 +154,31 @@ def test_bounded_native_pipeline_streams_two_point_batches_with_nullable_schema(
     assert pq.ParquetFile(path.parent/'native-daily.parquet').num_row_groups==2
     assert source.is_file()
     assert manifest['period_complete'] is False
+
+
+def test_interleaved_reused_budget_never_rolls_back(tmp_path):
+    from io import BytesIO
+    from meteorology.era5.resources import Budget,Limits,bounded_transfer,LimitExceeded
+    class Response(BytesIO):
+        def __init__(self):
+            super().__init__(b'abcd'); self.headers={'Content-Length':'4'}
+    limits=Limits(requests=2,transfer_bytes=8)
+    a=Budget(limits,rss=lambda:0);b=Budget(limits,rss=lambda:0)
+    bounded_transfer(Response,tmp_path/'a.grib',budget=a,reservation_bytes=4)
+    bounded_transfer(Response,tmp_path/'b.grib',budget=b,reservation_bytes=4)
+    with pytest.raises(LimitExceeded):
+        bounded_transfer(Response,tmp_path/'c.grib',budget=a,reservation_bytes=4)
+    state=json.loads((tmp_path/'TRANSFER_BUDGET.json').read_text())
+    assert state['requests']==2 and state['received_transfer_bytes']==8
+    assert not (tmp_path/'c.grib').exists()
+
+
+def test_rebinding_same_budget_preserves_elapsed_without_double_count(tmp_path):
+    from meteorology.era5.resources import Budget,Limits
+    clock=[0]
+    b=Budget(Limits(),rss=lambda:0,clock=lambda:clock[0])
+    path=tmp_path/'budget.json';b.bind_journal(path)
+    clock[0]=5;b.persist();b.bind_journal(path)
+    assert b.receipt()['elapsed_seconds']==5
+    clock[0]=8;b.bind_journal(path)
+    assert b.receipt()['elapsed_seconds']==8

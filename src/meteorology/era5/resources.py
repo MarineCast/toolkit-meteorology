@@ -55,12 +55,13 @@ class Limits:
 
 
 class Budget:
-    def __init__(self,limits: Limits,*,rss=None,clock=None):
+    def __init__(self,limits: Limits,*,rss=None,clock=None,staging_root=None):
         if (any(type(v) is not int or v<=0 for v in (limits.memory_bytes,limits.staging_bytes,limits.transfer_bytes,limits.requests))
                 or not math.isfinite(limits.seconds) or not 0<limits.seconds<=3600 or limits.workers!=1
                 or limits.memory_bytes>1024*MIB or limits.staging_bytes>2048*MIB):
             raise ValueError('Positive resource caps and exactly one worker are required.')
         self.limits=limits
+        self.staging_root=None if staging_root is None else Path(staging_root).resolve()
         self.clock=clock or time.monotonic
         self.started=self.clock()
         self.rss=rss or (lambda:int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss*(1 if sys.platform=='darwin' else 1024)))
@@ -69,13 +70,14 @@ class Budget:
 
     def bind_journal(self,path):
         path=Path(path)
-        if self.journal==path:return
-        if self.journal is not None:raise ValueError('One budget cannot switch persistent transfer runs.')
+        same_run=self.journal==path
+        local_elapsed=self.previous_elapsed+self.clock()-self.started
+        if self.journal is not None and not same_run:raise ValueError('One budget cannot switch persistent transfer runs.')
         if path.exists():
             state=json.loads(path.read_text())
             if state['limits']!=vars(self.limits):raise ValueError('Resume requires original resource caps.')
             self.requests=state['requests'];self.reserved=state['reserved_transfer_bytes']
-            self.received=state['received_transfer_bytes'];self.peak_rss=state['peak_rss_bytes'];self.previous_elapsed=state['elapsed_seconds']
+            self.received=state['received_transfer_bytes'];self.peak_rss=state['peak_rss_bytes'];self.previous_elapsed=max(state['elapsed_seconds'],local_elapsed) if same_run else state['elapsed_seconds']
             self.started=self.clock()
         self.journal=path
         self.persist()
@@ -91,6 +93,10 @@ class Budget:
 
     def check_disk(self,root: Path,*,additional_bytes=0):
         self.checkpoint()
+        if self.staging_root is not None:
+            if not Path(root).resolve().is_relative_to(self.staging_root):
+                raise ValueError('Staging path escapes owned aggregate budget root.')
+            root=self.staging_root
         size=sum(p.stat().st_size for p in root.rglob('*') if p.is_file()) if root.exists() else 0
         if size+additional_bytes>self.limits.staging_bytes:raise LimitExceeded('Owned staging byte cap exceeded.')
 

@@ -18,7 +18,7 @@ from .resources import (Budget,LimitExceeded,POINT_BATCH,PARQUET_BATCH,ROW_BYTES
 
 
 def process_native_day(study_config, source_files: list[tuple[Path,str]], destination: Path, *,
-                       day: str, budget: Budget) -> Path:
+                       day: str, budget: Budget, native_source_pilot: bool=False) -> Path:
     """Stream normalization, then aggregate fixed native-point batches in one worker.
 
     source_files carry captured retrieval instants. Existing source files are read
@@ -27,7 +27,7 @@ def process_native_day(study_config, source_files: list[tuple[Path,str]], destin
     marine membership creation occurs. Standalone helper APIs without budget are
     unbounded and are not an approved pilot execution path.
     """
-    identity=load_study_config(study_config)
+    identity=load_study_config(study_config,planning=True) if native_source_pilot else load_study_config(study_config)
     if identity is None:raise ValueError('Bounded processing requires explicit production-qualified study selection.')
     if not source_files or len(source_files)>4:raise ValueError('One-day processing accepts 1–4 bounded source files.')
     if not date.fromisoformat(identity['requested_time']['start'])<=date.fromisoformat(day)<date.fromisoformat(identity['requested_time']['end_exclusive']):
@@ -110,7 +110,8 @@ def process_native_day(study_config, source_files: list[tuple[Path,str]], destin
         os.replace(normalized,destination/'normalized-native.parquet')
         os.replace(daily,destination/'native-daily.parquet')
         manifest=dict(status='COMPLETE_SOURCE_PROCESSING_CHECKPOINT_NOT_FINAL_REPORTING',day=day,
-                      shared_study=identity,source_family='ERA5',source_authentication='not_inferred_from_GRIB_headers',
+                      shared_study=identity,native_source_pilot=native_source_pilot,
+                      final_h3_qualification=False,source_family='ERA5',source_authentication='not_inferred_from_GRIB_headers',
                       inputs=inputs,artifacts=receipts,budget=budget.receipt(),grid_points=grid_size,
                       requested_time=identity['requested_time'],actual_days=[day],period_complete=False)
         atomic_json(destination/'MANIFEST.json',manifest) # terminal commit, written last

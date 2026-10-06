@@ -118,3 +118,11 @@ For changes to separate retrospective source helpers, run
 `python -m pytest -q tests/test_era5.py tests/test_shared_study.py` followed by
 the full required suite and an installed-wheel planning check. ERA5 GRIB fixture
 checks need the `era5` extra; no provider or credential access is required.
+
+Bounded native source pilot regression checks: `python -m pytest -q
+tests/test_era5_resources.py tests/test_marine_reporting.py tests/test_era5_jobs.py
+tests/test_era5_transport.py tests/test_era5_pilot.py`, then the full suite and
+regular installed-wheel check outside this checkout. See
+`docs/CDS_JOB_INTEGRATION_AND_PILOTS.md`. The tests use mocked HTTP and generated
+GRIB only. `python -m meteorology.era5.pilot plan --study-config ...` is offline;
+`run` performs provider access and requires the independently reviewed exact plan.

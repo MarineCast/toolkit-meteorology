@@ -15,7 +15,7 @@ import re
 import time
 
 from .planning import DATASET
-from .resources import Budget, LimitExceeded, atomic_json, bounded_transfer
+from .resources import Budget, LimitExceeded, atomic_json, _bounded_transfer_locked
 
 REQUEST_KEYS = {'product_type', 'variable', 'year', 'month', 'day', 'time', 'area',
                 'grid', 'data_format', 'download_format'}
@@ -41,7 +41,7 @@ def request_identity(request: dict, *, study_sha256: str) -> str:
 def run_job(provider, request: dict, directory: Path, *, study_sha256: str,
             budget: Budget, approved_identity: str, download_reservation: int,
             poll_seconds: float = 5, poll_window_seconds: float = 300,
-            max_polls: int = 12, sleep=time.sleep):
+            max_polls: int = 12, sleep=time.sleep, journal_path: Path | None = None):
     """Resume a known job; never automatically retry an ambiguous submission.
 
     Explicit approved_identity is a caller authorization witness, not a review
@@ -58,12 +58,14 @@ def run_job(provider, request: dict, directory: Path, *, study_sha256: str,
         raise ValueError('Positive bounded polling and download limits required.')
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
-    with (directory / '.job.lock').open('a+b') as lease:
+    journal=Path(journal_path) if journal_path is not None else directory/'TRANSFER_BUDGET.json'
+    if not journal.parent.is_dir():raise ValueError('Owned budget parent must exist.')
+    with (journal.parent / '.transfer.lock').open('a+b') as lease:
         try:
             fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             raise ValueError('Another worker owns this job.') from None
-        budget.bind_journal(directory / 'TRANSFER_BUDGET.json')
+        budget.bind_journal(journal)
         path = directory / 'JOB_STATE.json'
         binding = dict(identity=identity, dataset=DATASET, study_sha256=study_sha256,
                        download_reservation=download_reservation)
@@ -90,7 +92,10 @@ def run_job(provider, request: dict, directory: Path, *, study_sha256: str,
             atomic_json(path, state)
 
         def call(method, *args):
-            budget.reserve_transfer(METADATA_RESERVATION)
+            if not getattr(provider,'handles_http_budget',False):
+                budget.reserve_transfer(METADATA_RESERVATION)
+            elif provider.budget is not budget:
+                raise ValueError('HTTP provider must use the lifecycle budget object.')
             try:
                 return method(*args)
             finally:
@@ -136,7 +141,7 @@ def run_job(provider, request: dict, directory: Path, *, study_sha256: str,
             state['status'] = 'DOWNLOADING'
             save()
             try:
-                receipt = bounded_transfer(opener, directory / 'source.grib', budget=budget,
+                receipt = _bounded_transfer_locked(opener, directory / 'source.grib', budget=budget,
                                            reservation_bytes=download_reservation)
             except BaseException:
                 state['status'] = 'DOWNLOAD_INCOMPLETE'
@@ -150,7 +155,8 @@ def run_job(provider, request: dict, directory: Path, *, study_sha256: str,
                 save()
                 raise ValueError('Downloaded payload is not GRIB; no scientific completion receipt.')
             state.update(status='COMPLETE_DOWNLOAD_NOT_SCIENTIFICALLY_QUALIFIED',
-                         sha256=transfer['sha256'], bytes=transfer['received_bytes'])
+                         sha256=transfer['sha256'], bytes=transfer['received_bytes'],
+                         retrieved_at_utc=__import__('datetime').datetime.now(__import__('datetime').timezone.utc).isoformat())
             save()
             return state
         finally:

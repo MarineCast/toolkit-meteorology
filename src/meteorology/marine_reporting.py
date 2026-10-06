@@ -79,6 +79,8 @@ def load_reporting_membership(study_config, *, mask_path: str | Path,
     if artifact_hash!=entry['sha256']: raise ValueError('Membership artifact SHA256 mismatch.')
     if mask_hash_policy!='sha256_exact_file_bytes':
         raise ValueError('Mask hash policy requires its matching owner verifier; no guessed file-byte identity.')
+    if not Path(mask_path).is_file():
+        raise ValueError('Exact-file mask witness must be a regular file.')
     mask_hash=checksum_path(Path(mask_path))
     if mask_hash!=registry['mask_sha256']: raise ValueError('Materialized mask SHA256 mismatch.')
     cells=_parse_membership_ids(raw)
@@ -108,6 +110,7 @@ def _require_qualified_membership(membership):
     declarations=[entry for entry in registry['memberships'] if entry['role']=='water_reporting'
                   and entry['resolution']==membership.resolution]
     if (len(declarations)!=1 or declarations[0]['sha256']!=membership.artifact_sha256 or
+        membership.canonical_membership_sha256!=membership.artifact_sha256 or
         declarations[0]['count']!=len(membership.cells) or membership.resolution!=5 or registry['mask_sha256']!=membership.mask_sha256 or
         registry['mask_revision']!=membership.mask_revision or
         membership.cells!=tuple(sorted(set(membership.cells))) or
@@ -241,6 +244,10 @@ def project_native_daily(native: pd.DataFrame, crosswalk: pd.DataFrame, metadata
         raise ValueError('Foreign source metric columns cannot be blended into a marine source product.')
     metrics=[c for c in native.columns if c.startswith(source_family+'_') and c.endswith('_STATUS')]
     if not metrics: raise ValueError('Native daily metrics require source-prefixed status/coverage contracts.')
+    contracted={status.removesuffix('_STATUS')+suffix for status in metrics
+                for suffix in ('','_STATUS','_VALID_HOURS','_EXPECTED_HOURS','_COVERAGE_FRACTION')}
+    if any(c.startswith(source_family+'_') and c not in contracted for c in native.columns):
+        raise ValueError('Uncontracted source metric column; every metric requires complete status/count/coverage.')
     for status in metrics:
         value=status.removesuffix('_STATUS')
         cols=[value,value+'_VALID_HOURS',value+'_EXPECTED_HOURS',value+'_COVERAGE_FRACTION']
