@@ -89,3 +89,17 @@ def test_maps_pressure_identity_is_198_and_eta_192_is_rejected(tmp_path):
     finally:ec.codes_release(m)
     with pytest.raises(ValueError,match='field/level/centre'):
         decode(files,bbox)
+
+
+def test_same_dimensions_with_different_earth_geometry_rejected(tmp_path):
+    ec=pytest.importorskip('eccodes');files,bbox=gribs(tmp_path)
+    for name,path in files.items():
+        with path.open('rb') as stream:m=ec.codes_grib_new_from_file(stream)
+        try:
+            ec.codes_set(m,'shapeOfTheEarth',1)
+            ec.codes_set(m,'scaleFactorOfRadiusOfSphericalEarth',0)
+            ec.codes_set(m,'scaledValueOfRadiusOfSphericalEarth',6300000 if name=='u_wind_10m_ms' else 6371229)
+            with path.open('wb') as stream:ec.codes_write(m,stream)
+        finally:ec.codes_release(m)
+    with pytest.raises(ValueError,match='source grid changed'):
+        decode(files,bbox)

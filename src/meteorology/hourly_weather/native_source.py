@@ -37,7 +37,10 @@ METRIC_INPUTS={
 GRID_KEYS=('gridType','Nx','Ny','latitudeOfFirstGridPointInDegrees',
            'longitudeOfFirstGridPointInDegrees','LoVInDegrees','Latin1InDegrees','Latin2InDegrees',
            'DxInMetres','DyInMetres','iScansNegatively','jScansPositively',
-           'jPointsAreConsecutive','alternativeRowScanning','shapeOfTheEarth')
+           'jPointsAreConsecutive','alternativeRowScanning','shapeOfTheEarth','LaDInDegrees','projectionCentreFlag',
+           'scaleFactorOfRadiusOfSphericalEarth','scaledValueOfRadiusOfSphericalEarth',
+           'scaleFactorOfEarthMajorAxis','scaledValueOfEarthMajorAxis',
+           'scaleFactorOfEarthMinorAxis','scaledValueOfEarthMinorAxis')
 GEOD=Geod(ellps='WGS84')
 
 
