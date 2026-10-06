@@ -118,6 +118,9 @@ def atomic_json(path: Path,value):
     with tmp.open('w') as f:
         json.dump(value,f,indent=2);f.write('\n');f.flush();os.fsync(f.fileno())
     os.replace(tmp,path)
+    parent=os.open(path.parent,os.O_RDONLY)
+    try:os.fsync(parent)
+    finally:os.close(parent)
 
 
 def _bounded_transfer_locked(open_response,destination: Path,*,budget: Budget,reservation_bytes: int):
