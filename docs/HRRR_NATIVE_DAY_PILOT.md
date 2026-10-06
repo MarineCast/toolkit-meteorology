@@ -81,3 +81,8 @@ The pressure field is specifically NOAA MSLMA (MAPS system reduction), GRIB2
 category 3 parameter 198. MSLET (Eta reduction, parameter 192) has the same units
 but is a different field and is rejected. The generated-GRIB regression explicitly
 checks the primary-table numeric identity and rejects the neighboring parameter.
+
+Interrupted-hour preflight checksum-validates every completed selected range before
+new field acquisition. It budgets only outstanding requests and exact range bytes;
+a fully cached hour can decode/promote at the original request/transfer caps.
+Prior successful and failed reservations remain charged without resetting counters.

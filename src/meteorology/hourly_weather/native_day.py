@@ -85,12 +85,11 @@ class NativeHTTP:
         self.budget=budget;self.plan=plan
         self.opener=opener or build_opener(ProxyHandler({}),HTTPSHandler(context=ssl.create_default_context()),NoRedirect())
 
-    def transfer(self,uri,folder,prefix,*,valid,reservation,byte_range=None):
+    def cached_transfer(self,uri,folder,prefix,*,valid,reservation,byte_range=None):
         allowed={cycle['uri'] for cycle in self.plan['cycles']}
         if uri not in allowed and uri not in {u+'.idx' for u in allowed}:raise ArchiveError('URI is outside exact NOAA pilot objects.')
         binding=dict(uri=uri,valid_time_utc=valid.isoformat(),byte_range=list(byte_range) if byte_range else None,
                      reservation=reservation,plan_sha256=self.plan['plan_sha256'])
-        folder.mkdir(parents=True,exist_ok=True)
         extension='grib2' if byte_range else 'idx'
         existing=sorted(folder.glob(f'{prefix}-a*.{extension}.source.json'))
         attempts=[]
@@ -106,7 +105,14 @@ class NativeHTTP:
                 if (metadata.get('status')!='HTTP_HEADERS_QUALIFIED' or receipt.get('status')!='COMPLETE' or
                         path.stat().st_size!=receipt.get('received_bytes') or _sha(path,self.budget)!=receipt.get('sha256')):
                     raise ArchiveError('Cached source bytes differ from their qualified receipt.')
-                return path,metadata
+                return (path,metadata),attempts,binding
+        return None,attempts,binding
+
+    def transfer(self,uri,folder,prefix,*,valid,reservation,byte_range=None):
+        cached,attempts,binding=self.cached_transfer(uri,folder,prefix,valid=valid,reservation=reservation,byte_range=byte_range)
+        if cached is not None:return cached
+        folder.mkdir(parents=True,exist_ok=True)
+        extension='grib2' if byte_range else 'idx'
         attempt=max(attempts,default=-1)+1
         path=folder/f'{prefix}-a{attempt}.{extension}'
         metadata=dict(binding,status='PLANNED')
@@ -180,18 +186,25 @@ def _fetch_hour(cycle,root,http,plan,budget,decoder):
         raise ArchiveError('Index cycle identity differs from requested UTC hour.')
     ranges=selected_ranges(text)
     if any(b-a+1>plan['max_field_bytes'] for a,b in ranges):raise LimitExceeded('Selected nationwide field exceeds 32 MiB source cap.')
-    if budget.reserved+sum(b-a+1 for a,b in ranges)>budget.limits.transfer_bytes or budget.requests+8>budget.limits.requests:
-        raise LimitExceeded('Remaining budget cannot cover one complete uncached source cycle.')
     # selected_ranges sorts by offsets; resolve field name independently from inventory.
     lines=[line for line in text.splitlines() if line.strip()];offsets=[int(line.split(':',2)[1]) for line in lines]
-    files={};source_artifacts=[];etags=set()
+    planned=[]
     for name,selector in FIELDS.items():
         matches=[i for i,line in enumerate(lines) if selector in line]
         if len(matches)!=1:raise ArchiveError('Ambiguous native field identity in index.')
         i=matches[0];span=(offsets[i],offsets[i+1]-1)
         if not any(marker in lines[i].split(':') for marker in ('anl','0 hour fcst')):
             raise ArchiveError('Selected index field is not an instantaneous f00 analysis.')
-        field,meta=http.transfer(cycle['uri'],folder,name,valid=valid,reservation=span[1]-span[0]+1,byte_range=span)
+        cached,_,_=http.cached_transfer(cycle['uri'],folder,name,valid=valid,reservation=span[1]-span[0]+1,byte_range=span)
+        planned.append((name,span,cached))
+    # Validate all reusable fields before reserving or opening any outstanding one.
+    outstanding=[span for _,span,cached in planned if cached is None]
+    if (budget.reserved+sum(b-a+1 for a,b in outstanding)>budget.limits.transfer_bytes or
+            budget.requests+len(outstanding)>budget.limits.requests):
+        raise LimitExceeded('Remaining budget cannot cover outstanding source cycle transfers.')
+    files={};source_artifacts=[];etags=set()
+    for name,span,cached in planned:
+        field,meta=cached if cached is not None else http.transfer(cycle['uri'],folder,name,valid=valid,reservation=span[1]-span[0]+1,byte_range=span)
         files[name]=field;etags.add(meta['etag'])
         for path in (field,field.with_suffix(field.suffix+'.source.json'),field.with_suffix(field.suffix+'.receipt.json')):
             source_artifacts.append(dict(path=path.name,sha256=_sha(path,budget)))

@@ -202,3 +202,60 @@ def test_independent_qa_rejects_finite_wrong_unit_conversion(tmp_path):
     with pytest.raises(ValueError,match='unit/wind conversion disagrees'):
         run_day(STUDY,exact_plan(STUDY),tmp_path/'out',opener=Archive(),decoder=wrong)
     assert not (tmp_path/'out'/'MANIFEST.json').exists()
+
+
+@pytest.mark.parametrize('complete_fields',[8,3])
+def test_resume_charges_only_outstanding_fields_at_original_caps(tmp_path,complete_fields):
+    from meteorology.hourly_weather.native_day import _fetch_hour
+    p=exact_plan(STUDY);root=tmp_path/'out';root.mkdir();archive=Archive()
+    b=Budget(Limits(**p['limits']),rss=lambda:0,staging_root=root)
+    b.bind_journal(root/'TRANSFER_BUDGET.json')
+    # Prior attempts remain charged; allow the initial index/eight fields plus
+    # one extra failed range when interruption occurs in a field.
+    b.requests=300-9-(complete_fields<8)
+    b.reserved=p['limits']['transfer_bytes']-p['index_reservation']-64-8*(complete_fields<8)
+    b.persist();initial=b.receipt()
+    def interrupted_decoder(*args,**kwargs):raise RuntimeError('decode interrupted')
+    if complete_fields<8:archive.interrupt=(0,complete_fields)
+    error=RuntimeError if complete_fields==8 else ConnectionResetError
+    with pytest.raises(error):
+        _fetch_hour(p['cycles'][0],root,NativeHTTP(b,p,opener=archive),p,b,interrupted_decoder)
+    old=b.receipt();count=len(archive.calls);partials=list(root.rglob('*.partial'))
+    b2=Budget(Limits(**p['limits']),rss=lambda:0,staging_root=root)
+    b2.bind_journal(root/'TRANSFER_BUDGET.json')
+    frame,_=_fetch_hour(p['cycles'][0],root,NativeHTTP(b2,p,opener=archive),p,b2,decoded)
+    assert len(frame)==4 and len(archive.calls)-count==8-complete_fields
+    assert b2.requests==300 and b2.reserved==p['limits']['transfer_bytes']
+    assert b2.requests==old['requests']+8-complete_fields
+    assert b2.reserved==old['reserved_transfer_bytes']+8*(8-complete_fields)
+    assert b2.received>=old['received_transfer_bytes']
+    assert old['requests']>=initial['requests'] and all(path.exists() for path in partials)
+
+
+def test_partial_field_cache_corruption_fails_before_outstanding_transfer(tmp_path):
+    from meteorology.hourly_weather.native_day import _fetch_hour
+    p=exact_plan(STUDY);root=tmp_path/'out';root.mkdir();archive=Archive(interrupt=(0,3))
+    b=Budget(Limits(**p['limits']),rss=lambda:0,staging_root=root)
+    b.bind_journal(root/'TRANSFER_BUDGET.json');http=NativeHTTP(b,p,opener=archive)
+    with pytest.raises(ConnectionResetError):_fetch_hour(p['cycles'][0],root,http,p,b,decoded)
+    cached=next(root.rglob('temperature_2m_k-a0.grib2'));cached.write_bytes(b'BADbytes')
+    count=len(archive.calls);reserved=b.reserved;requests=b.requests
+    with pytest.raises(ArchiveError,match='qualified receipt'):
+        _fetch_hour(p['cycles'][0],root,http,p,b,decoded)
+    assert len(archive.calls)==count and b.reserved==reserved and b.requests==requests
+
+
+def test_failed_range_reservation_cannot_be_reset_for_resume(tmp_path):
+    from meteorology.hourly_weather.native_day import _fetch_hour
+    p=exact_plan(STUDY);root=tmp_path/'out';root.mkdir();archive=Archive(interrupt=(0,3))
+    b=Budget(Limits(**p['limits']),rss=lambda:0,staging_root=root)
+    b.bind_journal(root/'TRANSFER_BUDGET.json')
+    b.requests=291;b.reserved=p['limits']['transfer_bytes']-p['index_reservation']-64;b.persist()
+    with pytest.raises(ConnectionResetError):
+        _fetch_hour(p['cycles'][0],root,NativeHTTP(b,p,opener=archive),p,b,decoded)
+    state=b.receipt();count=len(archive.calls);partials=list(root.rglob('*.partial'))
+    b2=Budget(Limits(**p['limits']),rss=lambda:0,staging_root=root);b2.bind_journal(root/'TRANSFER_BUDGET.json')
+    with pytest.raises(LimitExceeded,match='outstanding'):
+        _fetch_hour(p['cycles'][0],root,NativeHTTP(b2,p,opener=archive),p,b2,decoded)
+    assert len(archive.calls)==count and b2.requests==state['requests']
+    assert b2.reserved==state['reserved_transfer_bytes'] and all(path.exists() for path in partials)
