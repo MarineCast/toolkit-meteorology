@@ -573,6 +573,7 @@ def _publish_complete_acquisition(
             product="meteorological.surface_weather.download",
             run_id=run_id,
             config_path=config_path,
+            study_identity=config.study_identity,
             resolved_config={
                 "field_contract_version": FIELD_CONTRACT_VERSION,
                 "start_date": start,

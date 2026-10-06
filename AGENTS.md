@@ -109,3 +109,7 @@ tests/test_source_and_catalog.py tests/test_production_contracts.py` and then
 Live-week budget, range-response, resumption and dry-run checks:
 `python -m pytest -q tests/test_live_week_demo.py`. Read `docs/live-week-demo.md`
 before executing `meteorology demo-hourly-week`; ordinary tests never acquire data.
+
+Shared-study selection/provenance checks: `python -m pytest -q tests/test_shared_study.py`
+then the full suite and installed-wheel preflight from outside the checkout.
+See `docs/shared-study.md`; proposed geometry and pending registries reject production.

@@ -33,3 +33,7 @@ All notable changes to this package are recorded here. Software versions follow 
 - The source migration from OrcaCast is historical; downstream application integration and large regional release checks remain separate.
 
 No GitHub, Pages or PyPI release is implied by this changelog entry.
+
+## Local review candidate — shared study v1
+
+- Add explicit shared-study preflight/config selection with portable Data-root resolution, canonical identity, production approval/registry gates, and source-derived summary provenance. Standalone workspace configuration remains available. No provider adapter, marine mask, acquisition or publication is added.

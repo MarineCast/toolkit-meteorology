@@ -131,6 +131,7 @@ def export_weather_summary(manifest_paths: list[str | Path], output_dir: str | P
         settings = {key: first["resolved_config"][key] for key in policy_keys}
         for _, _, manifest in entries:
             if (any(manifest["resolved_config"][key] != settings[key] for key in policy_keys)
+                    or manifest["resolved_config"].get("shared_study") != first["resolved_config"].get("shared_study")
                     or manifest["spatial_bounds_wgs84"] != first["spatial_bounds_wgs84"]
                     or manifest["method_version"] != first["method_version"]):
                 raise ValueError("Hourly releases have incompatible support, source or time policies.")
@@ -188,6 +189,7 @@ def export_weather_summary(manifest_paths: list[str | Path], output_dir: str | P
             payload = manifest_payload(
                 product=PRODUCT, run_id=f"summary-{uuid.uuid4().hex[:12]}",
                 config_path=entries[0][1], resolved_config=resolved,
+                study_identity=first["resolved_config"].get("shared_study"),
                 artifacts=[parquet_contract(staged, published_path=destination)],
                 inputs=inputs, sources=sources, h3_resolution=5,
                 spatial_bounds=first["spatial_bounds_wgs84"], temporal_coverage=coverage,
