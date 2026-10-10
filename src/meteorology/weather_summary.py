@@ -101,6 +101,8 @@ def _rows(state: dict, cells: list[str], day: date, period: str,
 def export_weather_summary(manifest_paths: list[str | Path], output_dir: str | Path, *,
                            spatial_scope: str = "both", as_of_utc: str | None = None) -> Path:
     """Export nine atmospheric metrics without retaining a multi-day frame in memory."""
+    from .study import reject_study_selection
+    reject_study_selection("export-weather-summary")
     if spatial_scope not in {"h3", "region", "both"} or not manifest_paths:
         raise ValueError("Provide hourly manifests and spatial scope h3, region or both.")
     cutoff = _utc(as_of_utc) if as_of_utc is not None else None
@@ -131,6 +133,7 @@ def export_weather_summary(manifest_paths: list[str | Path], output_dir: str | P
         settings = {key: first["resolved_config"][key] for key in policy_keys}
         for _, _, manifest in entries:
             if (any(manifest["resolved_config"][key] != settings[key] for key in policy_keys)
+                    or manifest["resolved_config"].get("shared_study") != first["resolved_config"].get("shared_study")
                     or manifest["spatial_bounds_wgs84"] != first["spatial_bounds_wgs84"]
                     or manifest["method_version"] != first["method_version"]):
                 raise ValueError("Hourly releases have incompatible support, source or time policies.")
@@ -188,6 +191,7 @@ def export_weather_summary(manifest_paths: list[str | Path], output_dir: str | P
             payload = manifest_payload(
                 product=PRODUCT, run_id=f"summary-{uuid.uuid4().hex[:12]}",
                 config_path=entries[0][1], resolved_config=resolved,
+                study_identity=first["resolved_config"].get("shared_study"),
                 artifacts=[parquet_contract(staged, published_path=destination)],
                 inputs=inputs, sources=sources, h3_resolution=5,
                 spatial_bounds=first["spatial_bounds_wgs84"], temporal_coverage=coverage,

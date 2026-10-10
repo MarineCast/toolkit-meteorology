@@ -50,6 +50,10 @@ HOURLY_PRODUCT = "meteorological.hourly_weather"
 
 
 def _paths(config: Any) -> tuple[Path, Path, Path, Path]:
+    if config.study_identity is not None:
+        root = Path(config.study_identity["resolved_data_root"]) / "meteorology"
+        raw = root / "raw" / "hourly_weather" / "hrrr"
+        return raw, raw / "HOURLY_SOURCE_INVENTORY.parquet", raw / "ACQUISITION_MANIFEST.json", root / "native" / "hourly_weather"
     path = config.path.resolve()
     if path.parent.name == "data" and path.parent.parent.name == "config":
         root = path.parent.parent.parent
@@ -382,6 +386,7 @@ def acquire_hourly_weather(config_path: str | Path = DEFAULT_CONFIG_PATH, *,
                         HOURLY_WEATHER_INVENTORY_SCHEMA)
             payload = manifest_payload(
                 product=ACQUISITION_PRODUCT, run_id=run_id, config_path=config.path,
+                study_identity=config.study_identity,
                 resolved_config=dict(local_date=local_date, timezone=weather.timezone,
                                      h3_resolution=weather.h3_resolution,
                                      availability_lag_hours=weather.availability_lag_hours,
@@ -473,6 +478,7 @@ def build_hourly_weather(config_path: str | Path = DEFAULT_CONFIG_PATH, *,
                        checksum=checksum_path(source_manifest_path))]
         payload = manifest_payload(
             product=HOURLY_PRODUCT, run_id=run_id, config_path=config.path,
+            study_identity=config.study_identity,
             resolved_config={**source["resolved_config"], "source_release_id": source["release_id"],
                              "hourly_schema_version": "hourly-weather-r5-v1"},
             artifacts=[parquet_contract(staged, published_path=destination)],

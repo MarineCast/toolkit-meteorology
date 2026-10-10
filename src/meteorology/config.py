@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Mapping
@@ -132,6 +132,7 @@ class MeteorologicalConfig:
     surface_weather: SurfaceWeatherConfig
     daylight: DaylightConfig
     lunar: LunarConfig
+    study_identity: dict[str, Any] | None = None
 
     def support_path(self, resolution: int) -> Path:
         resolution = int(resolution)
@@ -346,9 +347,14 @@ def _load_lunar(section: Mapping[str, Any]) -> LunarConfig:
     )
 
 
-def load_meteorological_config(path: str | Path = DEFAULT_CONFIG_PATH) -> MeteorologicalConfig:
+def load_meteorological_config(path: str | Path = DEFAULT_CONFIG_PATH, *,
+                               study_config: str | Path | None = None,
+                               planning: bool = False) -> MeteorologicalConfig:
     """Load the canonical meteorological configuration from a domain or project YAML."""
 
+    from .study import load_study_config
+
+    study_identity = load_study_config(study_config, planning=planning)
     config_path = resolve_config_path(path)
     raw = load_data_config(config_path, domains="METEOROLOGICAL_LAYER")
     if not isinstance(raw, Mapping):
@@ -430,4 +436,31 @@ def load_meteorological_config(path: str | Path = DEFAULT_CONFIG_PATH) -> Meteor
         raise ValueError("daylight.start_date must not follow daylight.end_date.")
     if pd.Timestamp(config.lunar.start_date) > pd.Timestamp(config.lunar.end_date):
         raise ValueError("lunar.start_date must not follow lunar.end_date.")
+    if study_identity is not None:
+        study = study_identity["study_config"]
+        west, south, east, north = study["domain"]["bbox_wgs84"]
+        end = (pd.Timestamp(study["time"]["end_exclusive"]) - pd.Timedelta(days=1)).date().isoformat()
+        period = dict(start_date=study["time"]["start"], end_date=end, timezone="UTC")
+        root = Path(study_identity["resolved_data_root"]) / "meteorology"
+        raw_root = root / "raw" / "surface_weather" / "hrrr"
+        native = root / "native"
+        config = replace(config,
+            bbox=dict(min_lon=west, min_lat=south, max_lon=east, max_lat=north),
+            study_identity=study_identity,
+            support_output_dir=native / "spatial_support",
+            support_manifest_path=native / "spatial_support" / "MANIFEST.json",
+            surface_weather=replace(config.surface_weather, **period,
+                bbox_padding_degrees=study["producer_buffers"]["meteorology"]["legacy_bbox_padding_degrees"],
+                raw_dir=raw_root, working_inventory_path=raw_root / "HRRR_R5_WORKING_INVENTORY.parquet",
+                inventory_path=raw_root / "HRRR_R5_SOURCE_INVENTORY.parquet",
+                acquisition_manifest_path=raw_root / "R5_DOWNLOAD_MANIFEST.json",
+                daily_output_dir=native / "surface_weather" / "H3_SURFACE_WEATHER_DAILY_RES_5",
+                manifest_path=native / "surface_weather" / "MANIFEST.json"),
+            daylight=replace(config.daylight, **period,
+                daily_output_dir=native / "daylight" / "H3_DAYLIGHT_DAILY_RES_4",
+                day_of_year_output_path=native / "daylight" / "H3_DAYLIGHT_DOY_RES_4.parquet",
+                manifest_path=native / "daylight" / "MANIFEST.json"),
+            lunar=replace(config.lunar, **period,
+                daily_output_dir=native / "lunar" / "H3_LUNAR_DAILY_RES_5",
+                manifest_path=native / "lunar" / "MANIFEST.json"))
     return config

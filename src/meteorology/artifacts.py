@@ -203,9 +203,14 @@ def manifest_payload(
     units: Mapping[str, str] | None = None,
     limitations: Sequence[str] = (),
     method_version: str | None = None,
+    study_identity: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if not artifacts:
         raise ValueError("A meteorological manifest must contain at least one artifact.")
+    if study_identity is not None:
+        from .study import validate_study_identity
+        validate_study_identity(study_identity)
+        resolved_config = {**resolved_config, "shared_study": dict(study_identity)}
     live_code = code_state()
     method = method_version or METHOD_VERSIONS.get(product, "unregistered_fixture")
     identity = {
@@ -320,6 +325,9 @@ def validate_manifest(
             raise ValueError("Meteorological manifest release_id does not match its inputs and outputs.")
     if payload["resolved_config_hash"] != stable_hash(payload["resolved_config"]):
         raise ValueError("Meteorological manifest resolved-config hash is invalid.")
+    if "shared_study" in payload["resolved_config"]:
+        from .study import validate_study_identity
+        validate_study_identity(payload["resolved_config"]["shared_study"])
     if not isinstance(payload["code_dirty"], bool):
         raise ValueError("Meteorological manifest code_dirty must be boolean.")
     if not isinstance(payload["code_source_hash"], str) or not payload["code_source_hash"]:

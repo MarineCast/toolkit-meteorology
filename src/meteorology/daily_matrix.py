@@ -114,6 +114,8 @@ def combine_frames(frames: dict[str, pd.DataFrame]) -> tuple[pd.DataFrame, dict]
 
 def export(manifest_paths: list[Path], output: Path) -> Path:
     """Verify complete native manifests, export one Parquet with yearly row groups."""
+    from .study import reject_study_selection
+    reject_study_selection("export-daily-matrix")
     if output.exists():
         raise FileExistsError(output)
     parents = []

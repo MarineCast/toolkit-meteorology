@@ -67,6 +67,7 @@ def load_meteorological_support(
     resolved = manifest.get("resolved_config", {})
     if (
         resolved.get("bbox") != config.bbox
+        or resolved.get("shared_study") != config.study_identity
         or resolved.get("support_method") != SUPPORT_METHOD
         or int(resolution) not in resolved.get("resolutions", [])
     ):
@@ -118,6 +119,7 @@ def build_meteorological_spatial_support(
             product="meteorological.spatial_support",
             run_id=run_id,
             config_path=config.path,
+            study_identity=config.study_identity,
             resolved_config={
                 "bbox": config.bbox,
                 "resolutions": config.support_resolutions,

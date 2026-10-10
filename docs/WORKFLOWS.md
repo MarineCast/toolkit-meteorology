@@ -142,3 +142,17 @@ its working family. The export does not acquire data or remove retained sources.
 After all three dated families are built over the same interval, use the
 [daily matrix exporter](daily-matrix.md). It preserves date and native resolution,
 checks complete manifest provenance, and produces a single H3/date × variable Parquet.
+
+## Explicit shared study request
+
+Use `meteorology --study-config /path/to/study.v1.json study-preflight` for a
+read-only planning report. Production rejects proposed geometry and pending
+marine reporting registries. See [shared-study](shared-study.md) for standalone
+compatibility, requested-versus-actual dates, Data-root selection and provenance.
+
+## Separate retrospective ERA5 and HRRR planning
+
+See [ERA5 and HRRR retrospective contracts](era5-retrospective.md) for the
+bounded network-free planners, source normalization, UTC daily semantics and
+explicit access/support gates. These helpers do not change the existing HRRR
+methods or publish a final marine reporting release.

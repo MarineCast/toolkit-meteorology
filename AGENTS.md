@@ -109,3 +109,27 @@ tests/test_source_and_catalog.py tests/test_production_contracts.py` and then
 Live-week budget, range-response, resumption and dry-run checks:
 `python -m pytest -q tests/test_live_week_demo.py`. Read `docs/live-week-demo.md`
 before executing `meteorology demo-hourly-week`; ordinary tests never acquire data.
+
+Shared-study selection/provenance checks: `python -m pytest -q tests/test_shared_study.py`
+then the full suite and installed-wheel preflight from outside the checkout.
+See `docs/shared-study.md`; proposed geometry and pending registries reject production.
+
+For changes to separate retrospective source helpers, run
+`python -m pytest -q tests/test_era5.py tests/test_shared_study.py` followed by
+the full required suite and an installed-wheel planning check. ERA5 GRIB fixture
+checks need the `era5` extra; no provider or credential access is required.
+
+Bounded native source pilot regression checks: `python -m pytest -q
+tests/test_era5_resources.py tests/test_marine_reporting.py tests/test_era5_jobs.py
+tests/test_era5_transport.py tests/test_era5_pilot.py`, then the full suite and
+regular installed-wheel check outside this checkout. See
+`docs/CDS_JOB_INTEGRATION_AND_PILOTS.md`. The tests use mocked HTTP and generated
+GRIB only. `python -m meteorology.era5.pilot plan --study-config ...` is offline;
+`run` performs provider access and requires the independently reviewed exact plan.
+
+Separate bounded native HRRR UTC-day pilot: install `.[test,native-pilot]`, run
+`python -m pytest -q tests/test_hrrr_native_day.py tests/test_hrrr_native_source.py`,
+then the full required suite and installed-wheel checks from outside the checkout.
+Read `docs/HRRR_NATIVE_DAY_PILOT.md` before execution. Mocked HTTP and generated
+GRIB tests do not qualify actual NOAA archive coverage. `native_day plan` is offline;
+`native_day run` uses the exact reviewed source/date/bbox/caps and private cache.

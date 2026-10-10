@@ -8,6 +8,7 @@
 | --- | --- |
 | `cli` | Workspace selection, initialization and delegation to family commands |
 | `config` | Validated product configuration |
+| `study` | Optional portable shared-study v1 validation, selection and canonical provenance; no sibling imports |
 | `spatial_support` | Deterministic full-bbox atmospheric H3 support |
 | `surface_weather` | HRRR acquisition, identity validation, sampling, aggregation and inspection |
 | `astronomy`, `daylight`, `lunar` | Deterministic astronomical calculations and publication |
@@ -69,3 +70,9 @@ have been removed; their old deep imports are no longer supported. The active da
 atomic writers, publication machinery and scientific product contracts are retained.
 Read [workflows](WORKFLOWS.md) before invoking producers and [migration](MIGRATION.md) for the
 remaining OrcaCast integration boundary.
+
+For an explicit shared input, [shared-study](shared-study.md) documents the
+production approval/registry gates and producer-owned paths under the relative
+Data root. Full rectangle atmospheric companions remain distinct from marine
+reporting membership. The packaged JSON schema is separately pinned in embedded
+study provenance; actual source coverage remains independent of requested dates.

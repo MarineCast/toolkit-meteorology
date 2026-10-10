@@ -46,14 +46,16 @@ def _invoke(module: str, arguments: list[str]) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", type=Path, help="Data/config root (or METEOROLOGY_WORKSPACE).")
+    parser.add_argument("--study-config", type=Path, help="Explicit shared study JSON (or MARINECAST_STUDY_CONFIG); no implicit lookup.")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("init", help="Initialize configuration; preserve existing files.")
+    commands.add_parser("study-preflight", help="Validate the selected study for planning; no files or provider requests.")
     commands.add_parser("stages", help="List offline product build order.")
     for action in ("build", "inspect", "download"):
         sub = commands.add_parser(action, help=f"{action.title()} one product; use FAMILY --help for options.")
         sub.add_argument("family", choices=("surface-weather", "hourly-weather") if action == "download" else FAMILIES)
         sub.add_argument("arguments", nargs=argparse.REMAINDER)
-    for action in ("verify", "catalog", "feature-policy", "benchmark", "migrate-legacy", "validate", "variables", "freeze-release", "example-offline", "export-weather-summary", "demo-hourly-week"):
+    for action in ("verify", "catalog", "feature-policy", "benchmark", "migrate-legacy", "validate", "variables", "freeze-release", "example-offline", "export-weather-summary", "demo-hourly-week", "era5-plan", "hrrr-plan"):
         sub = commands.add_parser(action, add_help=False)
         sub.add_argument("arguments", nargs=argparse.REMAINDER)
     matrix = commands.add_parser("export-daily-matrix", help="Combine native daily weather and astronomy.")
@@ -62,14 +64,29 @@ def main(argv: list[str] | None = None) -> int:
     args, extra = parser.parse_known_args(argv)
     if extra:
         # Forward --help and other flags for commands with no family argument.
-        if args.command in {"verify", "catalog", "feature-policy", "benchmark", "migrate-legacy", "validate", "variables", "freeze-release", "example-offline", "export-weather-summary", "demo-hourly-week"}:
+        if args.command in {"verify", "catalog", "feature-policy", "benchmark", "migrate-legacy", "validate", "variables", "freeze-release", "example-offline", "export-weather-summary", "demo-hourly-week", "era5-plan", "hrrr-plan"}:
             args.arguments = extra + args.arguments
         else:
             parser.error(f"unrecognized arguments: {' '.join(extra)}")
+    old_study = os.environ.get("MARINECAST_STUDY_CONFIG")
+    if args.study_config is not None:
+        os.environ["MARINECAST_STUDY_CONFIG"] = str(args.study_config.expanduser().resolve())
     old = os.environ.get("METEOROLOGY_WORKSPACE")
     if args.workspace is not None:
         os.environ["METEOROLOGY_WORKSPACE"] = str(args.workspace.expanduser().resolve())
     try:
+        if args.command == "study-preflight":
+            import json
+            from .study import planning_report
+            print(json.dumps(planning_report(args.study_config), indent=2))
+            return 0
+        from .study import load_study_config, reject_study_selection
+        if args.command in {'era5-plan', 'hrrr-plan'}:
+            load_study_config(planning=True)
+        elif args.command in {'build', 'inspect', 'download'}:
+            load_study_config()  # Validate selection before dispatch, including help paths.
+        else:
+            reject_study_selection(args.command)
         from .core.config.paths import project_root
         if args.command == "export-daily-matrix":
             from .daily_matrix import export
@@ -96,11 +113,17 @@ def main(argv: list[str] | None = None) -> int:
             "example-offline": "offline_example",
             "export-weather-summary": "weather_summary",
             "demo-hourly-week": "week_demo",
+            "era5-plan": "era5.plan",
+            "hrrr-plan": "hourly_weather.retrospective_plan",
         }
         return _invoke(f"meteorology.{modules[args.command]}", args.arguments)
     except (ValueError, FileNotFoundError, FileExistsError, RuntimeError, ImportError) as exc:
         parser.exit(2, f"meteorology: {exc}\n")
     finally:
+        if old_study is None:
+            os.environ.pop("MARINECAST_STUDY_CONFIG", None)
+        else:
+            os.environ["MARINECAST_STUDY_CONFIG"] = old_study
         if old is None:
             os.environ.pop("METEOROLOGY_WORKSPACE", None)
         else:

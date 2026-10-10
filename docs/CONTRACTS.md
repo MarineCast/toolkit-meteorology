@@ -211,3 +211,10 @@ That policy excludes metadata and exact deterministic aliases. It does not delet
 `apply_feature_policy` accepts the exported matrix's native component prefixes and preserves
 `DATE`, `H3_INDEX` and `H3_RESOLUTION`; R4 and R5 rows remain separate and require an explicit
 downstream alignment decision.
+
+## Separate retrospective ERA5 and HRRR planning
+
+See [ERA5 and HRRR retrospective contracts](era5-retrospective.md) for the
+bounded network-free planners, source normalization, UTC daily semantics and
+explicit access/support gates. These helpers do not change the existing HRRR
+methods or publish a final marine reporting release.

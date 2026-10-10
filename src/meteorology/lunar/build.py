@@ -114,6 +114,7 @@ def build_lunar(
             product="meteorological.lunar",
             run_id=run_id,
             config_path=config.path,
+            study_identity=config.study_identity,
             resolved_config={
                 "start_date": start,
                 "end_date": end,
