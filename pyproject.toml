@@ -25,7 +25,7 @@ classifiers = [
 ]
 dependencies = [
   "branca>=0.7", "folium>=0.20", "geopandas>=1", "h3>=4", "numpy>=1.26", "pandas>=2.1",
-  "pyarrow>=14", "pydantic>=2", "pyproj>=3.6", "PyYAML>=6",
+  "psutil>=5.9", "pyarrow>=14", "pydantic>=2", "pyproj>=3.6", "PyYAML>=6",
   "scikit-learn>=1.4", "shapely>=2", "xarray>=2024.1",
 ]
 

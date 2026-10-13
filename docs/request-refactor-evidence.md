@@ -38,3 +38,10 @@ stream decode, 2.240 s, 279,019,520 bytes historical peak RSS, 983,194 retained 
 256 daily rows. Timing and memory are environment-specific; operation counts
 are the deterministic regression criterion. This does not measure provider speed
 or establish observed regional accuracy.
+
+Baseline Ruff and strict MkDocs passed after installing the declared development
+extras. First point-block result: **43,264 records read**, exactly once per block,
+676 physical row groups; one decode stream. 1.985 s, 305,053,696 bytes current/peak
+RSS, 3,220,992 retained bytes. The small row groups trade Parquet metadata/storage
+for selective reads; this workload uses about 3.3 times the previous storage.
+There is no timing threshold or claimed real-provider speedup.

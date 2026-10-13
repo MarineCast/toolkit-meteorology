@@ -18,6 +18,8 @@ import resource
 import sys
 import time
 
+import psutil
+
 MIB = 1024**2
 ROW_BYTES = 2048  # arrays/index + bounded identity strings/nullable values/Python overhead
 COPIES = 4  # concat, selection/consolidation/sort, group/pivot and output overlap
@@ -65,7 +67,7 @@ class Limits:
 
 
 class Budget:
-    def __init__(self, limits: Limits, *, rss=None, clock=None, staging_root=None):
+    def __init__(self, limits: Limits, *, rss=None, peak_rss=None, clock=None, staging_root=None):
         if (
             any(
                 type(v) is not int or v <= 0
@@ -87,12 +89,12 @@ class Budget:
         self.staging_root = None if staging_root is None else Path(staging_root).resolve()
         self.clock = clock or time.monotonic
         self.started = self.clock()
-        self.rss = rss or (
-            lambda: int(
-                resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-                * (1 if sys.platform == "darwin" else 1024)
-            )
-        )
+        self.rss = rss or (lambda: psutil.Process().memory_info().rss)
+        # Historical high-water reporting is independent from admission.
+        self.historical_peak = peak_rss or (lambda: int(
+            resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            * (1 if sys.platform == "darwin" else 1024)))
+        self.current_rss = 0
         self.requests = 0
         self.reserved = 0
         self.received = 0
@@ -131,7 +133,8 @@ class Budget:
         if self.previous_elapsed + self.clock() - self.started > self.limits.seconds:
             raise LimitExceeded("Compute time cap exceeded at cooperative checkpoint.")
         measured = self.rss()
-        self.peak_rss = max(self.peak_rss, measured)
+        self.current_rss = measured
+        self.peak_rss = max(self.peak_rss, measured, self.historical_peak())
         if measured + additional_memory > self.limits.memory_bytes:
             raise LimitExceeded(
                 "Memory cap exceeded by measured RSS plus planned allocation; use a fresh worker/smaller chunk."
@@ -165,6 +168,7 @@ class Budget:
             reserved_transfer_bytes=self.reserved,
             received_transfer_bytes=self.received,
             peak_rss_bytes=self.peak_rss,
+            current_rss_bytes=self.current_rss,
             elapsed_seconds=self.previous_elapsed + self.clock() - self.started,
             enforcement="cooperative estimate/checkpoint checks; streamed byte cap; no OS hard-memory preemption",
         )

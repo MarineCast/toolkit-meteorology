@@ -27,7 +27,7 @@ PARAMETERS = {
 NORMALIZATION_METHOD = "era5-cds-regular-latlon-message-v1"
 
 
-def normalize_message(metadata: dict, latitude, longitude, values, *, budget=None) -> pd.DataFrame:
+def normalize_message(metadata: dict, latitude, longitude, values, *, budget=None, geometry_cache=None) -> pd.DataFrame:
     """Validate decoded metadata before conversion; missing values stay missing."""
     if metadata.get("dataset") != DATASET or metadata.get("product_type") != "reanalysis":
         raise ValueError("Expected CDS ERA5 single-level reanalysis, not a substitute source.")
@@ -97,15 +97,27 @@ def normalize_message(metadata: dict, latitude, longitude, values, *, budget=Non
         raise ValueError("Source coordinate/value shapes disagree or are empty.")
     if not (np.isfinite(lat).all() and np.isfinite(lon).all()) or np.any(abs(lat) > 90):
         raise ValueError("Invalid source coordinates.")
-    order = np.lexsort((lon, lat))
-    lat, lon, data = lat[order], lon[order], data[order]
-    if len(set(zip(lat, lon))) != len(data):
-        raise ValueError("Duplicate source grid point.")
-    if len(np.unique(lat)) * len(np.unique(lon)) != len(data):
-        raise ValueError("Regular grid rectangle has missing source coordinates.")
-    for axis in (np.unique(lat), np.unique(lon)):
-        if len(axis) > 1 and not np.allclose(np.diff(axis), 0.25, rtol=0, atol=1e-8):
-            raise ValueError("Coordinates disagree with declared 0.25 degree grid.")
+    coordinate_identity = hashlib.sha256(
+        np.column_stack((lat, lon)).astype("<f8").tobytes()).hexdigest()
+    cached = None if geometry_cache is None else geometry_cache.get(coordinate_identity)
+    if cached is None:
+        order = np.lexsort((lon, lat))
+        lat, lon, data = lat[order], lon[order], data[order]
+        if len(set(zip(lat, lon))) != len(data):
+            raise ValueError("Duplicate source grid point.")
+        if len(np.unique(lat)) * len(np.unique(lon)) != len(data):
+            raise ValueError("Regular grid rectangle has missing source coordinates.")
+        for axis in (np.unique(lat), np.unique(lon)):
+            if len(axis) > 1 and not np.allclose(np.diff(axis), 0.25, rtol=0, atol=1e-8):
+                raise ValueError("Coordinates disagree with declared 0.25 degree grid.")
+        grid_hash = hashlib.sha256(np.column_stack((lat, lon)).astype("<f8").tobytes()).hexdigest()
+        cached = (order, lat, lon, grid_hash)
+        if geometry_cache is not None:
+            geometry_cache.clear()  # stream-local, one source grid retained
+            geometry_cache[coordinate_identity] = cached
+    else:
+        order, lat, lon, grid_hash = cached
+        data = data[order]
     if np.isinf(data).any():
         raise ValueError("Infinite source value; bitmap missingness must decode as NaN.")
     good = data[np.isfinite(data)]
@@ -120,8 +132,6 @@ def normalize_message(metadata: dict, latitude, longitude, values, *, budget=Non
         "[0-9a-f]{64}", metadata["source_sha256"]
     ):
         raise ValueError("Source-file SHA256 receipt is required.")
-    coords = np.column_stack((lat, lon)).astype("<f8").tobytes()
-    grid_hash = hashlib.sha256(coords).hexdigest()
     frame = pd.DataFrame(
         dict(
             SOURCE_GRID_INDEX=np.arange(len(data)),
@@ -196,6 +206,9 @@ def decode_grib(path: str | Path, *, retrieved_at_utc: str, budget=None):
         budget.checkpoint(additional_memory=path.stat().st_size)
     sha = checksum_path(path)
     count = 0
+    geometry_cache = {}
+    coordinates = None
+    grid_identity = None
     with path.open("rb") as handle:
         while (message := ec.codes_grib_new_from_file(handle)) is not None:
             try:
@@ -249,13 +262,21 @@ def decode_grib(path: str | Path, *, retrieved_at_utc: str, budget=None):
                 if get("bitmapPresent"):
                     bitmap = np.asarray(ec.codes_get_array(message, "bitmap"))
                     values = np.where(bitmap == 0, np.nan, values)
+                # ecCodes grid-section digest covers dimensions, scan order,
+                # coordinates and Earth geometry; inspect it on every message.
+                current_grid = get("md5GridSection")
+                if current_grid != grid_identity:
+                    coordinates = (ec.codes_get_array(message, "latitudes"),
+                                   ec.codes_get_array(message, "longitudes"))
+                    grid_identity = current_grid
+                    geometry_cache.clear()
                 count += 1
                 yield normalize_message(
                     meta,
-                    ec.codes_get_array(message, "latitudes"),
-                    ec.codes_get_array(message, "longitudes"),
+                    *coordinates,
                     values,
                     budget=budget,
+                    geometry_cache=geometry_cache,
                 )
             finally:
                 ec.codes_release(message)

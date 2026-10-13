@@ -307,3 +307,12 @@ def test_rebinding_same_budget_preserves_elapsed_without_double_count(tmp_path):
     clock[0] = 8
     b.bind_journal(path)
     assert b.receipt()["elapsed_seconds"] == 8
+
+
+def test_high_historical_peak_does_not_deny_current_memory():
+    from meteorology.era5.resources import Budget, Limits
+    budget = Budget(Limits(memory_bytes=512 * 1024**2), rss=lambda: 10 * 1024**2,
+                    peak_rss=lambda: 900 * 1024**2)
+    budget.checkpoint(additional_memory=100 * 1024**2)
+    assert budget.receipt()['current_rss_bytes'] == 10 * 1024**2
+    assert budget.receipt()['peak_rss_bytes'] == 900 * 1024**2

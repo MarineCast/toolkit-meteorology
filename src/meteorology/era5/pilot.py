@@ -13,7 +13,6 @@ from .execution import process_native_day
 from .jobs import request_identity, run_job
 from .planning import DATASET, VARIABLES
 from .resources import Budget, Limits, atomic_json, memory_estimate
-from .source import decode_grib
 from .transport import CDSHTTPProvider
 
 MIB = 1024**2
@@ -139,11 +138,6 @@ def run_pilot(study_config, plan, output, *, credential_env_file, provider_facto
                 )
                 sources.append((job_root / "source.grib", result["retrieved_at_utc"]))
             expected = {(lat, lon) for lat in [49, 49.25, 49.5] for lon in [-125.5, -125.25, -125]}
-            # Validate exact requested small grid before source processing can allocate larger batches.
-            for source, retrieved in sources:
-                for frame in decode_grib(source, retrieved_at_utc=retrieved, budget=budget):
-                    if set(zip(frame.SOURCE_LAT, frame.SOURCE_LON)) != expected:
-                        raise ValueError("Delivered GRIB grid differs from exact pilot grid.")
             manifest = process_native_day(
                 study_config,
                 sources,
@@ -151,6 +145,7 @@ def run_pilot(study_config, plan, output, *, credential_env_file, provider_facto
                 day=plan["day"],
                 budget=budget,
                 native_source_pilot=True,
+                expected_grid=expected,
             )
             from .pilot_qa import validate_native_pilot
 
