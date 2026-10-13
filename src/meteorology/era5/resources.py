@@ -29,12 +29,17 @@ PARQUET_BATCH = 4096
 
 
 def memory_estimate(
-    points: int, *, point_batch: int = POINT_BATCH, source_bytes: int = 128 * MIB
+    points: int,
+    *,
+    point_batch: int = POINT_BATCH,
+    source_bytes: int = 128 * MIB,
+    records_per_point: int = 2 * (6 * 24 + 25),
 ) -> dict:
     if type(points) is not int or points <= 0:
         raise ValueError("Positive native grid size required.")
     # Two expvers, six instantaneous parameters * 24 hours and 25 tp slots.
-    records_per_point = 2 * (6 * 24 + 25)
+    if type(records_per_point) is not int or records_per_point <= 0:
+        raise ValueError("Positive per-point record allowance required.")
     normalized_day = points * records_per_point * ROW_BYTES
     aggregate = min(points, point_batch) * records_per_point * ROW_BYTES * COPIES
     parquet_read = PARQUET_BATCH * ROW_BYTES * COPIES
@@ -89,11 +94,18 @@ class Budget:
         self.staging_root = None if staging_root is None else Path(staging_root).resolve()
         self.clock = clock or time.monotonic
         self.started = self.clock()
-        self.rss = rss or (lambda: psutil.Process().memory_info().rss)
+        if rss is None:
+            process = psutil.Process()
+            self.rss = lambda: process.memory_info().rss
+        else:
+            self.rss = rss
         # Historical high-water reporting is independent from admission.
-        self.historical_peak = peak_rss or (lambda: int(
-            resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-            * (1 if sys.platform == "darwin" else 1024)))
+        self.historical_peak = peak_rss or (
+            lambda: int(
+                resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+                * (1 if sys.platform == "darwin" else 1024)
+            )
+        )
         self.current_rss = 0
         self.requests = 0
         self.reserved = 0

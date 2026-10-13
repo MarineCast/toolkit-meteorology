@@ -28,7 +28,7 @@ PARAMETERS = {
 NORMALIZATION_METHOD = "era5-cds-regular-latlon-message-v1"
 
 
-def normalize_message(metadata: dict, latitude, longitude, values, *, budget=None, geometry_cache=None) -> pd.DataFrame:
+def normalize_message(metadata: dict, latitude, longitude, values, *, budget=None, geometry_cache=None, include_forecast_metadata=False) -> pd.DataFrame:
     """Validate decoded metadata before conversion; missing values stay missing."""
     if metadata.get("dataset") != DATASET or metadata.get("product_type") != "reanalysis":
         raise ValueError("Expected CDS ERA5 single-level reanalysis, not a substitute source.")
@@ -153,6 +153,10 @@ def normalize_message(metadata: dict, latitude, longitude, values, *, budget=Non
             NORMALIZATION_METHOD=NORMALIZATION_METHOD,
         )
     )
+    if include_forecast_metadata:
+        frame['INIT_TIME_UTC'] = _utc(metadata['init_time_utc']).isoformat()
+        frame['FORECAST_HOUR'] = int(metadata['endStep'])
+        frame['SOURCE_DATA_TYPE'] = metadata['data_type']
     if budget is not None:
         budget.checkpoint()
     return frame
@@ -198,7 +202,7 @@ def consolidate(
     )
 
 
-def decode_grib(path: str | Path, *, retrieved_at_utc: str, budget=None, parameters=None):
+def decode_grib(path: str | Path, *, retrieved_at_utc: str, budget=None, parameters=None, include_forecast_metadata=False):
     """Read one message at a time; ecCodes is an optional isolated acquisition extra."""
     import eccodes as ec
 
@@ -280,6 +284,7 @@ def decode_grib(path: str | Path, *, retrieved_at_utc: str, budget=None, paramet
                     values,
                     budget=budget,
                     geometry_cache=geometry_cache,
+                    include_forecast_metadata=include_forecast_metadata,
                 )
             finally:
                 ec.codes_release(message)
