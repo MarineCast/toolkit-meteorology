@@ -12,6 +12,8 @@
 | `surface_weather` | HRRR acquisition, identity validation, sampling, aggregation and inspection |
 | `astronomy`, `daylight`, `lunar` | Deterministic astronomical calculations and publication |
 | `artifacts` | Product manifests, checksums, schema contracts and source identity |
+| `week_demo`, `hourly_weather.live` | Single-writer, budgeted NOAA week orchestration with resumable source bundles and normal hourly releases |
+| `weather_summary` | Bounded-by-day daily/weekly export of validated hourly atmosphere, with native-H3 and equal-centroid regional statistics |
 | `core.artifacts` | Atomic writes and recoverable family transactions |
 | `core.config`, `core.geo`, `core.data` | Local config helpers, H3 utilities, schemas and dataset registry |
 | `maintenance` | Catalog generation and acquisition benchmark |
@@ -61,6 +63,9 @@ from meteorology import (
 
 Set `METEOROLOGY_WORKSPACE` before invoking these APIs outside the workspace. Loading configuration
 and validation are read-only; build/download/freezing functions perform the same writes as their
-CLI counterparts. Older deep imports remain usable for advanced workflows.
+CLI counterparts. Prefer these public entry points over internal helpers. Unused inherited
+stage/artifact classes, H3 utilities and aliases, weather wrappers, and area-range helpers
+have been removed; their old deep imports are no longer supported. The active dataset registry,
+atomic writers, publication machinery and scientific product contracts are retained.
 Read [workflows](WORKFLOWS.md) before invoking producers and [migration](MIGRATION.md) for the
 remaining OrcaCast integration boundary.

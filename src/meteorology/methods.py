@@ -15,6 +15,7 @@ METHOD_VERSIONS: dict[str, str] = {
     "meteorological.daylight": "daylight_astronomy_v3",
     "meteorological.lunar": "lunar_illumination_v2",
     "meteorological.daily_matrix": "native_resolution_daily_matrix_v2",
+    "meteorological.weather_summary": "hourly_sample_daily_weekly_summary_v1",
 }
 
 # Retained releases remain checksum-readable; current producers never emit these methods.

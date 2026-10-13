@@ -115,3 +115,18 @@ def test_future_forecast_interval_uses_publication_and_asof_not_valid_end() -> N
         [interval, next_cycle], start_utc=interval["interval_start_utc"],
         end_utc=next_cycle["interval_end_utc"],
         as_of_utc="2024-01-02T01:30:00Z")["modeled_precipitation_amount_mm"] == 6.0
+
+
+@pytest.mark.parametrize("changes", [
+    {"step_start_hour": 0, "step_end_hour": 6},
+    {"step_start_hour": 0},
+    {"step_start_hour": False, "step_end_hour": 1},
+    {"step_start_hour": -1, "step_end_hour": 1},
+    {"valid_time_utc": "2024-01-02T20:00:00Z"},
+])
+def test_interval_total_rejects_contradictory_decoded_metadata(changes) -> None:
+    row = _intervals("2024-01-02")[0]
+    with pytest.raises(ValueError, match="step bounds|valid time"):
+        sum_exact_precipitation_intervals([dict(row, **changes)],
+                                         start_utc=row["interval_start_utc"],
+                                         end_utc=row["interval_end_utc"])

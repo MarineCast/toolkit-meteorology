@@ -99,6 +99,15 @@ def export_daily_matrix(manifest_paths: Sequence[str | Path], output: str | Path
     return export([Path(path) for path in manifest_paths], Path(output))
 
 
+def export_weather_summary(manifest_paths: Sequence[str | Path], output_dir: str | Path, *,
+                           spatial_scope: str = "both", as_of_utc: str | None = None) -> Path:
+    """Export compact daily/weekly native-H3 and regional retrospective context."""
+    from .weather_summary import export_weather_summary as implementation
+
+    return implementation(list(manifest_paths), output_dir,
+                          spatial_scope=spatial_scope, as_of_utc=as_of_utc)
+
+
 def validate_product(manifest_path: str | Path) -> dict:
     """Validate a family manifest, checksums, schemas, keys and values."""
 
@@ -119,4 +128,5 @@ __all__ = [
     "__version__", "load_config", "build_spatial_support", "download_surface_weather",
     "build_surface_weather", "build_daylight", "build_lunar", "export_daily_matrix",
     "acquire_hourly_weather", "build_hourly_weather", "validate_product", "freeze_release",
+    "export_weather_summary",
 ]

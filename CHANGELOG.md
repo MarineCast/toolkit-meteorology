@@ -4,6 +4,21 @@ All notable changes to this package are recorded here. Software versions follow 
 
 ## Unreleased
 
+- Added `demo-hourly-week`: bounded, resumable direct NOAA AWS byte-range acquisition,
+  the existing strict decoded-grid and hourly release pipeline, native-H3 and regional
+  summaries, persistent transfer accounting and readable resource/spatial-variation reports.
+  The documentation includes a reproducible one-week example; empirical forecast skill
+  remains a separate acceptance gate.
+
+- Added daily/weekly exports of validated hourly atmosphere with native-H3 and regional
+  statistics, explicit coverage/as-of filtering, streaming day-at-a-time processing, Zstandard
+  compression and checksum-backed publication. These are retrospective context, not forecasts.
+- Decoupled hourly normalized inputs from unused precipitation while keeping legacy bundles readable.
+- Rejected precipitation step/valid-time metadata that contradicts interval timestamps.
+
+- Removed unused inherited stage/artifact classes, H3 utilities and aliases, weather wrappers,
+  and area-range configuration helpers. Direct imports of those removed internals are no longer
+  supported; public producer APIs, schemas, scientific calculations and stored products are unchanged.
 - Added strict release IDs, method-version metadata, read-only product validation and explicit release freezing.
 - Added an installed-wheel, offline synthetic example and bounded HRRR download confirmation.
 - Added vector mean wind components/speed/direction to daily weather; calm direction is null (`hrrr_surface_daily_v2`).

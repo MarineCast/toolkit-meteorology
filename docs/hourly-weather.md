@@ -15,8 +15,8 @@ The required core is 2 m temperature and relative humidity, earth-relative
 10 m U/V and derived speed, surface gust, horizontal visibility, total-cloud
 fraction, and mean sea-level pressure. The source selectors and units are the
 existing `surface_weather.source.HRRR_VARIABLES` / `normalize_flat_grid`
-contract. Although the retained normalized input schema also has f00 PRATE,
-the hourly product omits it; the legacy f01 rate and a verified accumulation
+contract. New retained inputs use `hourly-decoded-atmosphere-v1` without PRATE.
+Legacy raw inputs remain readable, and their unused f00 PRATE is ignored; the legacy f01 rate and a verified accumulation
 amount belong to separate products. Zero wind and zero cloud are valid.
 Every required field, hour and H3 cell must be present and finite. The first
 schema has no optional physical fields; the explicit optional capability list
@@ -48,17 +48,21 @@ hour. Legacy flat filenames use `YYYYmmddTHHZ.parquet` and `.json`.
 directory with `grid.parquet` and `evidence.json`. It validates a private
 candidate before promotion, serializes same-hour writers, and reuses an
 existing committed pair only when the validated bytes match. An interrupted
-candidate is ignored on retry. Parquet must match
-`surface_weather.source.RAW_SCHEMA`, the same normalized grid schema emitted
-by the current HRRR decoder. JSON contains `valid_time_utc`,
+candidate is ignored on retry. New retained Parquet uses `surface_weather.source.HOURLY_RAW_SCHEMA`; legacy
+`RAW_SCHEMA` bundles are still readable. `fetch_cropped_hrrr_grid(...,
+include_precipitation=False)` requests and normalizes the eight atmospheric source
+fields without PRATE. The default decoder behavior for the daily pipeline is unchanged. JSON contains `valid_time_utc`,
 `source_grid_hash`, `source_uri`, `source_object_uri`, `retrieved_at_utc`,
 `source_evidence_kind`, `native_footprint_wkb_hex`, and
 `max_nearest_distance_m`. `source_evidence_kind` is either
 `retained_decoded_hrrr` or `synthetic_fixture`; synthetic URIs use
 `synthetic://`. Python callers with a genuinely decoded grid can use
-`retain_decoded_hourly_grid()` to create the bundle from the existing
-`fetch_cropped_hrrr_grid()` result. No CLI operation fetches provider data for
-this family.
+`retain_decoded_hourly_grid()` to create the bundle from a
+`fetch_cropped_hrrr_grid(..., include_precipitation=False)` result. Newly retained
+bundles omit precipitation even when supplied in legacy input frames. Existing
+committed bundles are never overwritten; a changed representation requires a new
+retention directory. The separate [`demo-hourly-week`](live-week-demo.md) command supplies a bounded
+live NOAA archive downloader and invokes this same offline publication route.
 
 ```bash
 meteorology --workspace ./hourly-demo init
@@ -99,6 +103,9 @@ accepted, with conflicting pairs rejected.
 produces a checksum-backed relocatable copy. The standalone hourly family is
 not included in `export-daily-matrix`, whose native daily contract is stable.
 
+For a real-source week with compact daily/weekly summaries and measured resources,
+use the [live demonstration](live-week-demo.md).
+
 ## Seven-day offline demonstration
 
 From a source checkout with the package installed, run the bounded synthetic
@@ -121,7 +128,10 @@ makes zero provider requests.
 ## Qualification state
 
 The offline synthetic acquisition, build, deep validation, freeze and
-relocation path is tested across 23/24/25-hour days. Actual HRRR decoded
-fixtures across source eras, source publication timing, requested full-region
-coverage, observational accuracy and regional acceptance remain unrun. See
+relocation path is tested across 23/24/25-hour days. The [live January 2024 week](live-week-results.md) also passes real GRIB acquisition,
+decoding, daily publication and summary checks within the example bounds. Other source
+eras, measured source publication timing, the requested area north of 49.70°N,
+observational accuracy and broad regional acceptance remain unrun. See
 the [implementation tracker](IMPLEMENTATION_TRACKER.md).
+
+For daily/weekly modeling with compact outputs, see [weather summaries](weather-summaries.md).

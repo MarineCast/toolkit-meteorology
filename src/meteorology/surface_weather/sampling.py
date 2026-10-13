@@ -18,14 +18,6 @@ AVAILABILITY_POLICY = "assumed_fixed_lag_v1"
 SPATIAL_ACCEPTANCE_POLICY = "decoded-native-footprint-and-spacing-v1"
 
 
-def make_local_dates(start_date: str, end_date: str) -> list[str]:
-    start = pd.Timestamp(start_date).normalize()
-    end = pd.Timestamp(end_date).normalize()
-    if start > end:
-        raise ValueError("start_date must be before or equal to end_date.")
-    return [ts.strftime("%Y-%m-%d") for ts in pd.date_range(start, end, freq="D")]
-
-
 def make_sample_times_for_local_date(
     date: str,
     timezone: str,

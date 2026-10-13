@@ -38,7 +38,7 @@ from ..spatial_support.build import SUPPORT_METHOD, load_meteorological_support
 from ..surface_weather.sampling import (
     AVAILABILITY_POLICY, SPATIAL_ACCEPTANCE_POLICY, build_nearest_grid_crosswalk,
 )
-from ..surface_weather.source import RAW_SCHEMA, _grid_hash, hrrr_logical_object_uri
+from ..surface_weather.source import HOURLY_RAW_SCHEMA, RAW_SCHEMA, _grid_hash, hrrr_logical_object_uri
 from ..surface_weather.storage import acquisition_lock, write_immutable_table
 from ..surface_weather.storage import (
     acquisition_read_locks, snapshot_acquisition_metadata, snapshot_support_inputs,
@@ -85,7 +85,8 @@ def _bundle_paths(decoded_dir: Path, valid: Any) -> tuple[Path, Path]:
 def retain_decoded_hourly_grid(grid: pd.DataFrame, *, valid_time_utc: str,
                                source_uri: str, retrieved_at_utc: str,
                                output_dir: str | Path,
-                               source_evidence_kind: str = "retained_decoded_hrrr") -> tuple[Path, Path]:
+                               source_evidence_kind: str = "retained_decoded_hrrr",
+                               source_receipt: dict | None = None) -> tuple[Path, Path]:
     """Save a result of the existing HRRR decoder with its native-grid evidence.
 
     This function does not fetch GRIB bytes. A budgeted caller may use
@@ -105,11 +106,11 @@ def retain_decoded_hourly_grid(grid: pd.DataFrame, *, valid_time_utc: str,
     stem = valid.strftime("%Y%m%dT%HZ")
     committed = output / stem
     legacy_parquet, legacy_evidence = output / f"{stem}.parquet", output / f"{stem}.json"
-    if set(grid.columns) != set(RAW_SCHEMA.names):
-        raise ValueError("Retained grid must use the existing normalized HRRR raw schema.")
-    values = grid[RAW_SCHEMA.names].copy()
+    if set(grid.columns) not in (set(RAW_SCHEMA.names), set(HOURLY_RAW_SCHEMA.names)):
+        raise ValueError("Retained grid must use a normalized HRRR raw schema.")
+    values = grid[HOURLY_RAW_SCHEMA.names].copy()
     values.attrs.clear()
-    table = pa.Table.from_pandas(values, schema=RAW_SCHEMA,
+    table = pa.Table.from_pandas(values, schema=HOURLY_RAW_SCHEMA,
                                  preserve_index=False, safe=True)
     object_uri = (hrrr_logical_object_uri(valid)
                   if source_evidence_kind == "retained_decoded_hrrr"
@@ -131,9 +132,13 @@ def retain_decoded_hourly_grid(grid: pd.DataFrame, *, valid_time_utc: str,
         candidate.mkdir()
         try:
             parquet_path, evidence_path = candidate / "grid.parquet", candidate / "evidence.json"
-            write_table(parquet_path, table, RAW_SCHEMA)
+            write_table(parquet_path, table, HOURLY_RAW_SCHEMA)
             atomic_write_json(evidence_path, evidence, overwrite=False)
             _load_decoded_grid(parquet_path, evidence_path, valid=valid, lag_hours=lag_hours)
+            if source_receipt is not None:
+                atomic_write_json(candidate / "transfer.json", dict(
+                    source_receipt, grid_sha256=checksum_path(parquet_path),
+                    evidence_sha256=checksum_path(evidence_path)), overwrite=False)
             if committed.exists():
                 existing_parquet, existing_evidence = _bundle_paths(output, valid)
                 _load_decoded_grid(existing_parquet, existing_evidence, valid=valid,
@@ -179,9 +184,10 @@ def _load_decoded_grid(parquet_path: Path, metadata_path: Path, *, valid: Any,
     if not parquet_path.is_file() or not metadata_path.is_file():
         raise FileNotFoundError(f"Missing retained hourly decoded bundle: {parquet_path}")
     parquet = pq.ParquetFile(parquet_path)
-    if not parquet.schema_arrow.equals(RAW_SCHEMA, check_metadata=False):
+    if not any(parquet.schema_arrow.equals(schema, check_metadata=False)
+               for schema in (RAW_SCHEMA, HOURLY_RAW_SCHEMA)):
         raise ValueError("Retained hourly grid differs from the existing normalized HRRR decoder schema.")
-    grid = parquet.read().to_pandas()
+    grid = parquet.read(columns=HOURLY_RAW_SCHEMA.names).to_pandas()
     evidence = json.loads(metadata_path.read_text(encoding="utf-8"))
     expected_valid = valid.isoformat()
     if (grid.empty or grid["SOURCE_GRID_INDEX"].duplicated().any()

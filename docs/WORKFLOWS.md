@@ -48,6 +48,10 @@ inventory recording actual retrieval URLs and times; samples alone are insuffici
 written to a different raw root copies its referenced objects there, so that metadata remains
 deeply valid and independently relocatable; allow for that storage cost.
 
+For a bounded live hourly week with both summary scopes, use the
+[documentation demo](live-week-demo.md). Its persistent transfer limits and
+separate output directory do not change the legacy daily downloader.
+
 ## 3. Build astronomy
 
 For a separate actual-hourly f00 family from retained decoded source grids,
@@ -128,6 +132,12 @@ required setup step. The toolkit does not provide a whole-domain candidate relea
 Migration execution uses an exclusive lock and writes a recovery record on rollback.
 
 ## Combined daily export
+
+For compact daily/weekly weather context from actual hourly releases, use the
+[weather summary exporter](weather-summaries.md). It processes a day at a time,
+emits both native-H3 and regional statistics by default, and retains coverage and
+assumed availability for as-of selection. Freeze each daily source before replacing
+its working family. The export does not acquire data or remove retained sources.
 
 After all three dated families are built over the same interval, use the
 [daily matrix exporter](daily-matrix.md). It preserves date and native resolution,

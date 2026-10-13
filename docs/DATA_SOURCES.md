@@ -4,7 +4,10 @@
 
 ## NOAA/NCEP HRRR
 
-The implemented weather backend uses NOAA/NCEP HRRR surface GRIB data discovered through Herbie.
+The daily weather backend uses NOAA/NCEP HRRR surface GRIB data discovered through Herbie.
+The [live hourly demo](live-week-demo.md) selects exact GRIB byte ranges directly from
+the public NOAA AWS archive under persistent request/payload limits. Both paths share
+the same field identity, unit, time, wind and native-footprint decoder checks.
 Core weather uses forecast-hour-zero analyses; precipitation uses matched forecast-hour-one rates.
 Required attribution is **NOAA/NCEP HRRR**. Inventory and manifest fields preserve source URIs,
 valid times, precipitation issue/lead times, grid identity, checksums and availability information.

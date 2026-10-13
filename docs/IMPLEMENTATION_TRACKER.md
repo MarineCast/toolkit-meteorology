@@ -1,5 +1,69 @@
 # Remaining meteorology implementation tracker
 
+## 2026-10-04 bounded live-week documentation demo
+
+Added `meteorology demo-hourly-week` with a write-free/network-free preview,
+persistent request/payload limits, single-writer locking, exact HTTP ranges,
+strict shared GRIB decoding, atomic retained bundles and receipts, daily frozen
+releases, both summary scopes and readable/JSON resource reports.
+See the [reproduction guide](live-week-demo.md) and [executed results](live-week-results.md).
+
+Implementation: **PASS**, 230 tests passed and one separate opt-in legacy live
+HRRR/f01 test skipped. Ruff, catalog/policy checks, strict MkDocs and diff checks
+passed. Regular wheel checks outside the source checkout passed for one live
+cycle, zero-request cycle resumption, and the complete week's cached rerun.
+Existing dependencies were reused; fresh dependency resolution was not tested.
+
+Source compatibility: **PASS for January 1–7, 2024 within the packaged example box**.
+168 actual f00 analyses produced 75,600 rows across 450 H3 R5 cells. All seven
+frozen daily releases and both summary outputs validated. Main acquisition/build/
+export took 1,173.3 seconds and peaked at 965.5 MiB RSS. Both-scope summary Parquet:
+639,983 bytes / 32,472 rows; region-only: 32,662 bytes / 72 rows. Full retained
+workspace/evidence/summary/metadata storage was approximately 426.5 MiB. The
+measurement record states the development retry and separate wheel-probe accounting.
+
+Empirical scientific acceptance and forecast skill: **NOT_RUN**. No new observation
+comparison, source-era study, precipitation/astronomy integration, north-of-49.70°N
+qualification, retention cleanup, OrcaCast integration, or remote publication was done.
+This closes the bounded real-data demo milestone, not the broader M2–M7 study.
+
+## 2026-10-04 compact daily/weekly summaries
+
+Added `meteorological.weather_summary` / `hourly_sample_daily_weekly_summary_v1`
+with `export-weather-summary` and the public `export_weather_summary()` API.
+The default publishes both native-H3 and whole-region sampled statistics into
+one Zstandard-compressed Parquet, with typed UTC period boundaries, explicit
+coverage/status, full calendar-week denominators and optional as-of filtering.
+The exporter processes one day at a time and retains only current-week numeric
+accumulators; source lineage metadata grows with the number of input days.
+Artifact H3 identity collection now iterates bounded batches instead of reading
+an entire output column. Source grids and old products are not deleted or changed.
+See [the contract and synthetic resource check](weather-summaries.md).
+
+Hourly retained inputs now have a precipitation-free versioned decoder schema;
+legacy raw bundles remain readable and their unused PRATE is ignored. Required
+atmospheric fields still reject missing/non-finite values. The decoder can request
+only atmospheric fields with `include_precipitation=False`; the default daily
+route is unchanged. Precipitation interval helpers reject contradictory supplied
+step bounds or valid times. No new precipitation amounts are published.
+
+Implementation evidence: `PYTHONPATH=src python -m pytest -q -p no:cacheprovider`
+passed **220 tests**, with one opt-in live-provider test skipped. Ruff, catalog and
+feature-policy freshness, generated variable-documentation comparison, strict
+MkDocs, and `git diff --check` passed. A wheel built with `--no-build-isolation`
+was installed using `--no-deps --target` outside the checkout and exercised against
+the frozen synthetic DST fixtures using existing dependencies; this is not a fresh
+dependency-resolution check. Both summary scopes passed installed-wheel validation.
+The source tests also cover summary freezing/relocation after hiding original inputs.
+
+At this summary-only checkpoint, source compatibility was **NOT_RUN** for the new
+precipitation-free real GRIB request; the later live-week evidence above supersedes
+that status for its explicit cycles and bounds.
+Empirical acceptance: **NOT_RUN** for regional accuracy or forecasting skill.
+At that checkpoint, live hourly acquisition and real-data performance measurement
+were still pending; the demo above now covers them for one week. Precipitation/
+astronomy integration and OrcaCast integration remain separate work. The older M2–M7 qualification gates below are not closed by this export.
+
 ## 2026-10-03 seven-day offline demo and review corrections
 
 The local continuation from `88cf2815bcde1bcd8e7764c9272d5ce24b95c908`

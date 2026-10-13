@@ -28,6 +28,7 @@ PRODUCTS: dict[str, tuple[pa.Schema, str, str]] = {
     "hourly_weather": (schemas.HOURLY_WEATHER_SCHEMA, "meteorological.hourly_weather", "R5; H3 cell × UTC f00 valid time"),
     "daylight": (schemas.DAYLIGHT_SCHEMA, "meteorological.daylight", "R4; local date"),
     "daylight_day_of_year": (schemas.DAYLIGHT_DOY_SCHEMA, "meteorological.daylight", "R4; leap-year reference lookup with explicit month/day"),
+    "weather_summary": (schemas.WEATHER_SUMMARY_SCHEMA, "meteorological.weather_summary", "R5 centroid or region; local day or Monday-start week × metric"),
     "lunar": (schemas.LUNAR_SCHEMA, "meteorological.lunar", "R5; local date"),
 }
 
@@ -209,6 +210,46 @@ def _unit(name: str) -> str:
     return "category or calendar value"
 
 
+SUMMARY_FIELDS = {
+    "PERIOD": ("day or week", "category"),
+    "LOCAL_START_DATE": ("first local date of the complete calendar period", "ISO local date"),
+    "TIMEZONE": ("configured civil-day timezone", "IANA timezone"),
+    "PERIOD_START_UTC": ("inclusive local-midnight period boundary", "UTC timestamp"),
+    "PERIOD_END_UTC": ("exclusive local-midnight period boundary", "UTC timestamp"),
+    "SPATIAL_SCOPE": ("h3 or region; equal H3 centroid sample weighting", "category"),
+    "H3_INDEX": ("native cell identity; null for the explicitly identified region", "H3 cell identifier"),
+    "METRIC": ("hourly atmospheric core metric name", "category"),
+    "UNIT": ("physical unit of the metric named in this row", "unit label"),
+    "SAMPLED_MEAN": ("sum of contributing hourly centroid values divided by VALID_CELL_HOURS", "per UNIT and METRIC"),
+    "SAMPLED_MIN": ("minimum contributing hourly centroid value", "per UNIT and METRIC"),
+    "SAMPLED_MAX": ("maximum contributing hourly centroid value", "per UNIT and METRIC"),
+    "VALID_CELL_HOURS": ("count of contributing cell-hour samples after as-of filtering", "cell-hours"),
+    "EXPECTED_CELL_HOURS": ("complete calendar-period UTC hours times target cell count", "cell-hours"),
+    "COVERAGE_FRACTION": ("VALID_CELL_HOURS / EXPECTED_CELL_HOURS", "fraction"),
+    "STATUS": ("COMPLETE, PARTIAL or UNAVAILABLE from coverage", "category"),
+    "AVAILABLE_AT_UTC": ("latest assumed availability of contributing samples; null if unavailable", "UTC timestamp"),
+}
+
+
+def _summary_field(field: pa.Field, support: str) -> dict[str, Any]:
+    interpretation, unit = SUMMARY_FIELDS[field.name]
+    physical = field.name in {"SAMPLED_MEAN", "SAMPLED_MIN", "SAMPLED_MAX"}
+    return {
+        "name": field.name, "human_name": field.name.replace("_", " ").title(),
+        "source": "validated HRRR f00 hourly releases or explicit synthetic fixtures",
+        "source_variable": interpretation, "units": unit,
+        "spatial_temporal_support": support, "processing_and_aggregation": interpretation,
+        "missing_value_policy": "null H3 identifies region; null statistics and availability mean zero contributing samples; observed zero is preserved",
+        "valid_range": "metric-specific physical bounds" if physical else "schema and coverage contract",
+        "interpretation": interpretation,
+        "limitations": "Retrospective sampled context; regional values are not area averages; edge weeks may be partial",
+        "method_version": method_version("meteorological.weather_summary"),
+        "output_schema": "weather_summary", "stage": "derived_daily_weekly",
+        "predictor_candidate": physical, "variable_kind": "continuous" if physical else "metadata",
+        "arrow_type": str(field.type), "nullable": field.nullable,
+    }
+
+
 def catalog() -> dict[str, list[dict[str, Any]]]:
     """Return the complete schema-backed inventory, including identity/QC fields."""
 
@@ -216,6 +257,9 @@ def catalog() -> dict[str, list[dict[str, Any]]]:
     for family, (schema, product, support) in PRODUCTS.items():
         rows = []
         for field in schema:
+            if family == "weather_summary":
+                rows.append(_summary_field(field, support))
+                continue
             details = PHYSICAL.get(family, {}).get(field.name)
             if details is None:
                 if field.name not in METADATA_SOURCE:

@@ -241,6 +241,32 @@ Method: `daylight_astronomy_v3`. Support: R4; leap-year reference lookup with ex
 
 Missingness: not applicable to complete deterministic output. Limitation: Approximate geometry; excludes weather and terrain.
 
+## Weather Summary
+
+Method: `hourly_sample_daily_weekly_summary_v1`. Support: R5 centroid or region; local day or Monday-start week × metric.
+
+| Field | Source field | Unit | Processing | Range | Kind | Predictor? |
+| --- | --- | --- | --- | --- | --- | --- |
+| PERIOD | day or week | category | day or week | schema and coverage contract | metadata | False |
+| LOCAL_START_DATE | first local date of the complete calendar period | ISO local date | first local date of the complete calendar period | schema and coverage contract | metadata | False |
+| TIMEZONE | configured civil-day timezone | IANA timezone | configured civil-day timezone | schema and coverage contract | metadata | False |
+| PERIOD_START_UTC | inclusive local-midnight period boundary | UTC timestamp | inclusive local-midnight period boundary | schema and coverage contract | metadata | False |
+| PERIOD_END_UTC | exclusive local-midnight period boundary | UTC timestamp | exclusive local-midnight period boundary | schema and coverage contract | metadata | False |
+| SPATIAL_SCOPE | h3 or region; equal H3 centroid sample weighting | category | h3 or region; equal H3 centroid sample weighting | schema and coverage contract | metadata | False |
+| H3_INDEX | native cell identity; null for the explicitly identified region | H3 cell identifier | native cell identity; null for the explicitly identified region | schema and coverage contract | metadata | False |
+| METRIC | hourly atmospheric core metric name | category | hourly atmospheric core metric name | schema and coverage contract | metadata | False |
+| UNIT | physical unit of the metric named in this row | unit label | physical unit of the metric named in this row | schema and coverage contract | metadata | False |
+| SAMPLED_MEAN | sum of contributing hourly centroid values divided by VALID_CELL_HOURS | per UNIT and METRIC | sum of contributing hourly centroid values divided by VALID_CELL_HOURS | metric-specific physical bounds | continuous | True |
+| SAMPLED_MIN | minimum contributing hourly centroid value | per UNIT and METRIC | minimum contributing hourly centroid value | metric-specific physical bounds | continuous | True |
+| SAMPLED_MAX | maximum contributing hourly centroid value | per UNIT and METRIC | maximum contributing hourly centroid value | metric-specific physical bounds | continuous | True |
+| VALID_CELL_HOURS | count of contributing cell-hour samples after as-of filtering | cell-hours | count of contributing cell-hour samples after as-of filtering | schema and coverage contract | metadata | False |
+| EXPECTED_CELL_HOURS | complete calendar-period UTC hours times target cell count | cell-hours | complete calendar-period UTC hours times target cell count | schema and coverage contract | metadata | False |
+| COVERAGE_FRACTION | VALID_CELL_HOURS / EXPECTED_CELL_HOURS | fraction | VALID_CELL_HOURS / EXPECTED_CELL_HOURS | schema and coverage contract | metadata | False |
+| STATUS | COMPLETE, PARTIAL or UNAVAILABLE from coverage | category | COMPLETE, PARTIAL or UNAVAILABLE from coverage | schema and coverage contract | metadata | False |
+| AVAILABLE_AT_UTC | latest assumed availability of contributing samples; null if unavailable | UTC timestamp | latest assumed availability of contributing samples; null if unavailable | schema and coverage contract | metadata | False |
+
+Missingness: null H3 identifies region; null statistics and availability mean zero contributing samples; observed zero is preserved. Nullable exceptions: `H3_INDEX`: null H3 identifies region; null statistics and availability mean zero contributing samples; observed zero is preserved; `SAMPLED_MEAN`: null H3 identifies region; null statistics and availability mean zero contributing samples; observed zero is preserved; `SAMPLED_MIN`: null H3 identifies region; null statistics and availability mean zero contributing samples; observed zero is preserved; `SAMPLED_MAX`: null H3 identifies region; null statistics and availability mean zero contributing samples; observed zero is preserved; `AVAILABLE_AT_UTC`: null H3 identifies region; null statistics and availability mean zero contributing samples; observed zero is preserved. Limitation: Retrospective sampled context; regional values are not area averages; edge weeks may be partial.
+
 ## Lunar
 
 Method: `lunar_illumination_v2`. Support: R5; local date.

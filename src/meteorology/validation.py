@@ -111,6 +111,15 @@ def validate_product(manifest_path: str | Path) -> dict[str, Any]:
     # The filename is configurable. A frozen release has its own immutable copy
     # and can be validated without creating a lock file in the archive.
     preview = json.loads(path.read_text(encoding="utf-8"))
+    if preview.get("product") == "meteorological.weather_summary":
+        from .weather_summary import validate_weather_summary
+        from .core.artifacts import TransactionalFamilyPublisher
+
+        parent = family_publication_parent(path.resolve(), preview)
+        if (parent / ".publication.lock").exists():
+            with TransactionalFamilyPublisher.read_locks([parent]):
+                return validate_weather_summary(path)
+        return validate_weather_summary(path)
     if preview.get("product") in {"meteorological.hourly_weather.acquire",
                                   "meteorological.hourly_weather"}:
         from .hourly_weather import validate_hourly_product

@@ -1,0 +1,130 @@
+{
+  "bbox": {
+    "max_lat": 49.7,
+    "max_lon": -121.6,
+    "min_lat": 46.85,
+    "min_lon": -125.8
+  },
+  "daily": [
+    {
+      "date": "2024-01-01",
+      "manifest": "releases/2024-01-01/397cba261948b97302c1c5a297be4e1f47c73f89a2026e08f36bdfee3ffcecd1/MANIFEST.json",
+      "manifest_sha256": "b3498cd45ebf27d17d63d897188a388f9610e74838260bf6136ff5ee3fbcd363",
+      "validation": "PASS"
+    },
+    {
+      "date": "2024-01-02",
+      "manifest": "releases/2024-01-02/e7f193df75cc010257e1051c3b800ea3c7b13b8ff49756efd6e1b65cfb17f419/MANIFEST.json",
+      "manifest_sha256": "bf1321f60a6372cd085b9b861b1dcfac292a8e155c9f9e6be57fd1c2bc8af508",
+      "validation": "PASS"
+    },
+    {
+      "date": "2024-01-03",
+      "manifest": "releases/2024-01-03/5a8186d0dcc701ae3398dca0aee96c2bc242b3e3303f311f2f27d2d936650119/MANIFEST.json",
+      "manifest_sha256": "fcb88d2231a17c5f4abdd9b0e1b7d92b784132bbe1b28e0ef21fc0d615003002",
+      "validation": "PASS"
+    },
+    {
+      "date": "2024-01-04",
+      "manifest": "releases/2024-01-04/d5e8c111425f30a44574898ceb82cd5df6132e50917731d38a49552f3aed0413/MANIFEST.json",
+      "manifest_sha256": "b13b6b8a7633c7eda09e929f6f7de42d7615767f9278a52c711e27a291a27b3e",
+      "validation": "PASS"
+    },
+    {
+      "date": "2024-01-05",
+      "manifest": "releases/2024-01-05/a63a1d6f330eb893cfdfa19b3820ca05b007071675ff6fe38a3c1c778710feff/MANIFEST.json",
+      "manifest_sha256": "f6019f25afdb9669f087c75d39d7c4f68674f887356264e2050e8b4f45111aba",
+      "validation": "PASS"
+    },
+    {
+      "date": "2024-01-06",
+      "manifest": "releases/2024-01-06/9922145c25ea4aeb34c2f6e0a4fa4159dd3006314c0f0fdca6be7b23ae198789/MANIFEST.json",
+      "manifest_sha256": "51340d55cc774eafca448238af048172871f31276e7db1cf91ef2ace22372d4a",
+      "validation": "PASS"
+    },
+    {
+      "date": "2024-01-07",
+      "manifest": "releases/2024-01-07/da6855246d91813246569f76e3bc8172c094f5d998917dfd0758dde148d35ba6/MANIFEST.json",
+      "manifest_sha256": "475ed68309379144668dd7d0ae64992d921d8c6957875eee3cb974ed1664ddc1",
+      "validation": "PASS"
+    }
+  ],
+  "dependency_versions": {
+    "cfgrib": "0.9.15.1",
+    "eccodes": "2.49.0",
+    "numpy": "2.5.3",
+    "pandas": "3.0.6",
+    "pyarrow": "25.0.1",
+    "xarray": "2026.9.0"
+  },
+  "elapsed_seconds_all_invocations": 1186.0255756260012,
+  "elapsed_seconds_this_invocation": 12.099692374991719,
+  "empirical_scientific_acceptance": "NOT_RUN",
+  "end_date": "2024-01-07",
+  "forecast_skill": "NOT_RUN",
+  "h3_cells": 450,
+  "invocations": [
+    {
+      "elapsed_seconds": 12.099692374991719,
+      "peak_rss_mib": 398.28125,
+      "received_bytes": 0,
+      "requests": 0,
+      "status": "COMPLETE"
+    }
+  ],
+  "max_bytes": 4294967296,
+  "max_requests": 1600,
+  "observational_comparison": "NOT_RUN",
+  "peak_rss_mib_all_invocations": 965.46875,
+  "peak_rss_mib_this_process": 398.28125,
+  "python_version": "3.12.14",
+  "real_source_compatibility": "PASS for these cycles and bounds",
+  "received_payload_bytes": 1956397114,
+  "reserved_payload_bytes": 1965960437,
+  "schema": "live-week-demo-v1",
+  "source": "NOAA HRRR AWS sfc/f00",
+  "spatial_scope": "both",
+  "start_date": "2024-01-01",
+  "status": "COMPLETE",
+  "storage_bytes": {
+    "frozen_releases_including_evidence": 152804596,
+    "summary_both": 663592,
+    "summary_region": 56211,
+    "workspace_including_evidence": 293313143
+  },
+  "summaries": {
+    "both": {
+      "manifest": "summary-both/MANIFEST.json",
+      "parquet_bytes": 639983,
+      "rows": 32472,
+      "sha256": "27068f4616c2f3f2fdaecef8a6bd3d542f63250da64fbb9c495578bd7e930aea"
+    },
+    "region": {
+      "manifest": "summary-region/MANIFEST.json",
+      "parquet_bytes": 32662,
+      "rows": 72,
+      "sha256": "2cc99b8b22ca108deb5e4a4e6ff1c22e517fb8f9fa94b3c59a30c1553715bd23"
+    }
+  },
+  "timezone": "America/Los_Angeles",
+  "transfer_requests": 1513,
+  "measurement_date_utc": "2026-10-04",
+  "acquisition_invocation": {
+    "elapsed_seconds": 1173.3375779589987,
+    "peak_rss_mib": 965.46875
+  },
+  "installed_cycle_check": {
+    "requests": 9,
+    "received_bytes": 11418213,
+    "cache_repeat_requests": 0,
+    "normalized_parquet_matches_pilot": true,
+    "receipt_committed_with_bundle": true
+  },
+  "measurement_notes": [
+    "Main run counters exclude the separate installed-wheel one-cycle check and initial connectivity HEAD request.",
+    "One initial index-only development retry is included in reservations. Its 8994 received bytes were not checkpointed in the transfer ledger.",
+    "Timings are observations on this development machine with concurrent validation activity, not an isolated throughput benchmark.",
+    "Large generated products and transfer ledger are retained locally, not included in the source repository. Daily paths are relative to the demo output root.",
+    "The invocations list describes the final installed-wheel reuse check; acquisition timing is recorded separately in acquisition_invocation."
+  ]
+}

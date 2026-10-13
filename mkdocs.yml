@@ -59,6 +59,9 @@ nav:
   - Guides:
       - Acquisition and build: WORKFLOWS.md
       - Hourly weather: hourly-weather.md
+      - Live one-week demo: live-week-demo.md
+      - Measured demo results: live-week-results.md
+      - Compact weather summaries: weather-summaries.md
       - Daily matrix: daily-matrix.md
       - Modeling guidance: guides/downstream-modeling.md
   - Reference:

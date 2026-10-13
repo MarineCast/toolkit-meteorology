@@ -234,3 +234,24 @@ SURFACE_WEATHER_DAILY_SCHEMA = pa.schema(
         pa.field("QC_STATE", pa.string(), nullable=False),
     ]
 )
+
+
+WEATHER_SUMMARY_SCHEMA = pa.schema([
+    pa.field("PERIOD", pa.string(), nullable=False),
+    pa.field("LOCAL_START_DATE", pa.string(), nullable=False),
+    pa.field("TIMEZONE", pa.string(), nullable=False),
+    pa.field("PERIOD_START_UTC", pa.timestamp("us", tz="UTC"), nullable=False),
+    pa.field("PERIOD_END_UTC", pa.timestamp("us", tz="UTC"), nullable=False),
+    pa.field("SPATIAL_SCOPE", pa.string(), nullable=False),
+    pa.field("H3_INDEX", pa.string()),
+    pa.field("METRIC", pa.string(), nullable=False),
+    pa.field("UNIT", pa.string(), nullable=False),
+    pa.field("SAMPLED_MEAN", pa.float64()),
+    pa.field("SAMPLED_MIN", pa.float64()),
+    pa.field("SAMPLED_MAX", pa.float64()),
+    pa.field("VALID_CELL_HOURS", pa.int64(), nullable=False),
+    pa.field("EXPECTED_CELL_HOURS", pa.int64(), nullable=False),
+    pa.field("COVERAGE_FRACTION", pa.float64(), nullable=False),
+    pa.field("STATUS", pa.string(), nullable=False),
+    pa.field("AVAILABLE_AT_UTC", pa.timestamp("us", tz="UTC")),
+], metadata={b"meteorology_schema_version": b"weather-summary-v1"})

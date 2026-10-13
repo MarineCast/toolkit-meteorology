@@ -38,6 +38,13 @@ meteorology --workspace ./demo validate --daily-matrix ./demo/outputs/synthetic-
 
 The offline example creates labeled **synthetic** HRRR-like inputs and builds the normal support, weather, daylight, lunar and daily-matrix products. It requires a fresh workspace and makes no network requests. See the [quickstart](getting-started/quickstart.md) for a wheel-install example and [acquisition guide](WORKFLOWS.md) before running real HRRR downloads.
 
+## One week of real weather
+
+The [live one-week demo](live-week-demo.md) builds hourly H3 releases and compact
+daily/weekly H3 and regional summaries, with explicit transfer budgets, resumption
+and resource accounting. Observational accuracy and future forecast skill remain
+separate acceptance gates.
+
 ## How products flow
 
 ```mermaid
