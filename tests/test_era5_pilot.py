@@ -123,7 +123,7 @@ def generated_pilot_grib(path, *, boundary_only=False):
                     ec.codes_release(m)
 
 
-def test_real_generated_grib_through_concrete_mocked_transport_and_independent_qa(tmp_path):
+def test_real_generated_grib_through_concrete_mocked_transport_and_independent_qa(tmp_path, monkeypatch):
     from meteorology.era5.transport import CDSHTTPProvider, API
     from .test_era5_transport import Opener, Response, HOST, CATALOGUE
 
@@ -161,6 +161,13 @@ def test_real_generated_grib_through_concrete_mocked_transport_and_independent_q
 
     env = tmp_path / "auth.fixture"
     env.write_text("COPERNICUS_API_KEY=SYNTHETIC_NOT_REAL\n")
+    import meteorology.era5.execution as execution
+    original = execution.decode_grib
+    decoded_sources = []
+    def counted(*args,**kwargs):
+        decoded_sources.append(args[0])
+        yield from original(*args,**kwargs)
+    monkeypatch.setattr(execution,'decode_grib',counted)
     manifest = run_pilot(
         STUDY,
         pilot_plan(STUDY),
@@ -168,6 +175,7 @@ def test_real_generated_grib_through_concrete_mocked_transport_and_independent_q
         credential_env_file=env,
         provider_factory=factory,
     )
+    assert len(decoded_sources) == 2  # one stream per delivered file, no pre-decode
     root = manifest.parent.parent
     qa = json.loads((root / "QA_RECEIPT.json").read_text())
     assert qa["checked_metric_rows"] == 81 and qa["complete_metric_rows"] == 81
