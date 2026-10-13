@@ -82,17 +82,11 @@ def pilot_plan(study_config):
 
 
 def _credential(path):
-    # Explicit local alias only. Never write a token to outputs or copy env files.
-    matches = []
-    for line in Path(path).read_text().splitlines():
-        if line.strip().startswith("COPERNICUS_API_KEY="):
-            matches.append(line.split("=", 1)[1].strip().strip("\"'"))
-    if len(matches) != 1:
-        raise ValueError("Exactly one configured token alias required.")
-    return matches[0]
+    from .credentials import resolve_credentials
+    return resolve_credentials(env_file=path, required=True).key
 
 
-def run_pilot(study_config, plan, output, *, credential_env_file, provider_factory=CDSHTTPProvider):
+def run_pilot(study_config, plan, output, *, credential_env_file=None, provider_factory=CDSHTTPProvider):
     if plan != pilot_plan(study_config):
         raise ValueError("Plan differs from exact reviewed study/source/date/region/caps.")
     root = Path(output)

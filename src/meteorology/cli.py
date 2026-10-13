@@ -58,6 +58,9 @@ def main(argv: list[str] | None = None) -> int:
     for action in ("verify", "catalog", "feature-policy", "benchmark", "migrate-legacy", "validate", "variables", "freeze-release", "example-offline", "export-weather-summary", "demo-hourly-week", "era5-plan", "hrrr-plan"):
         sub = commands.add_parser(action, add_help=False)
         sub.add_argument("arguments", nargs=argparse.REMAINDER)
+    commands.add_parser("sources", help="List source capabilities without configuration.")
+    query = commands.add_parser("get", add_help=False, help="Retrieve a bounded source-selective weather request.")
+    query.add_argument("arguments", nargs=argparse.REMAINDER)
     matrix = commands.add_parser("export-daily-matrix", help="Combine native daily weather and astronomy.")
     matrix.add_argument("--manifest", type=Path, action="append", required=True)
     matrix.add_argument("--output", type=Path, required=True)
@@ -66,8 +69,32 @@ def main(argv: list[str] | None = None) -> int:
         # Forward --help and other flags for commands with no family argument.
         if args.command in {"verify", "catalog", "feature-policy", "benchmark", "migrate-legacy", "validate", "variables", "freeze-release", "example-offline", "export-weather-summary", "demo-hourly-week", "era5-plan", "hrrr-plan"}:
             args.arguments = extra + args.arguments
-        else:
+        elif args.command != "get":
             parser.error(f"unrecognized arguments: {' '.join(extra)}")
+    # Request/discovery/help dispatch precedes legacy study/workspace validation.
+    # Python getters never route through this process-global compatibility code.
+    try:
+        if args.command == "sources":
+            import json
+            from .capabilities import SOURCES
+            print(json.dumps(SOURCES, indent=2))
+            return 0
+        if args.command == "get":
+            if args.study_config is not None:
+                parser.error("get is a standalone bbox query; shared-study publication uses existing producers")
+            from .request_cli import main as request_main
+            return request_main(extra + args.arguments)
+        if args.command == "variables" and "--data-source" in args.arguments:
+            from .request_cli import discovery
+            return discovery(args.arguments)
+        if args.command in {"build", "inspect", "download"} and "--help" in args.arguments:
+            return _invoke(f"meteorology.{FAMILIES[args.family]}.{args.command}", args.arguments)
+        if args.command in {"variables", "validate", "catalog", "feature-policy", "era5-plan", "hrrr-plan"} and "--help" in args.arguments:
+            modules = {"variables":"variables", "validate":"validation", "catalog":"maintenance.update_environment_feature_catalog",
+                       "feature-policy":"modeling.feature_policy", "era5-plan":"era5.plan", "hrrr-plan":"hourly_weather.retrospective_plan"}
+            return _invoke(f"meteorology.{modules[args.command]}", args.arguments)
+    except (ValueError, OSError, RuntimeError, ImportError) as exc:
+        parser.exit(2, f"meteorology: {exc}\n")
     old_study = os.environ.get("MARINECAST_STUDY_CONFIG")
     if args.study_config is not None:
         os.environ["MARINECAST_STUDY_CONFIG"] = str(args.study_config.expanduser().resolve())
