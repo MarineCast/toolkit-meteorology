@@ -218,3 +218,17 @@ See [ERA5 and HRRR retrospective contracts](era5-retrospective.md) for the
 bounded network-free planners, source normalization, UTC daily semantics and
 explicit access/support gates. These helpers do not change the existing HRRR
 methods or publish a final marine reporting release.
+
+
+## Standalone weather request contract
+
+[Weather requests](request-api.md) define the independent
+`meteorology-selective-utc-request-v1` method and
+`meteorology-date-support-metric-v1` schema. Date-only endpoints are inclusive;
+normalized UTC boundaries, native or qualified R5 support, units, nulls, complete
+slot counts, exact accumulation intervals and source receipts are durable.
+Variable-selective results never claim a complete legacy family or production
+shared-study release. Existing source/method/schema versions and local-day
+products retain their original meaning. ERA5 snowfall parameter 144 has the same
+validated one-hour accumulation convention as tp and distinct water-equivalent
+units; snow depth and snowpack are not substituted.

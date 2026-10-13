@@ -34,3 +34,13 @@ Run `meteorology COMMAND --help` or `meteorology build FAMILY --help` for the ex
 [--max-requests 1600] [--max-bytes 4294967296] [--dry-run]` runs the
 [bounded live one-week example](../live-week-demo.md). The start must be a Monday;
 dry-run issues no requests and creates no workspace.
+
+
+## Standalone selective requests
+
+`meteorology sources`, `meteorology variables --data-source SOURCE` and
+`meteorology get VARIABLE --start-date DATE --end-date DATE --bbox WEST SOUTH EAST NORTH
+--data-source SOURCE --output FILE` use the shared Python request path.
+Use `--dry-run` to preview dependencies, exact boundaries, support and caps.
+See [request options and availability](../request-api.md). Legacy `variables`
+without `--data-source` retains its family inventory output.

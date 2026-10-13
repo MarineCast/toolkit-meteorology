@@ -47,6 +47,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Get started:
+      - Weather requests: request-api.md
       - Quickstart: getting-started/quickstart.md
       - Installation: SETUP.md
       - Configuration: CONFIGURATION.md
@@ -70,6 +71,8 @@ nav:
       - Sources and rights: DATA_SOURCES.md
   - Development:
       - Implementation tracker: IMPLEMENTATION_TRACKER.md
+      - Request refactor evidence: request-refactor-evidence.md
+      - Cleanup inventory: request-cleanup.md
       - Architecture: ARCHITECTURE.md
       - Development checks: DEVELOPMENT.md
       - Archived validation: archived-validation.md

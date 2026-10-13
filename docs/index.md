@@ -64,3 +64,8 @@ flowchart LR
 Solar and lunar products require H3 support, but no HRRR acquisition. The optional daily matrix retains R4 and R5 rows separately; unsupported component columns remain null.
 
 Weather, daylight and lunar context do not measure species occurrence, observer access, reporting, or detection probability. Read the [scientific methodology](methodology.md) and [limitations](limitations.md) before using these values as predictors.
+
+
+Start with [standalone weather requests](request-api.md) for selective Python/CLI
+retrieval, installation, offline fixtures, source availability and cache reuse.
+Existing family workflows and shared-study publication remain available separately.

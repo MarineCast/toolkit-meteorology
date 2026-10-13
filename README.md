@@ -4,95 +4,135 @@
 
 [![Offline package checks](https://github.com/MarineCast/toolkit-meteorology/actions/workflows/tests.yml/badge.svg)](https://github.com/MarineCast/toolkit-meteorology/actions/workflows/tests.yml) · [Documentation](https://marinecast.github.io/toolkit-meteorology/) · [Scientific methodology](docs/methodology.md) · [Variable inventory](docs/reference/variables.md)
 
-**Reproducible, provenance-aware spatial and temporal meteorological and astronomical products for environmental and ecological modeling.** `toolkit-meteorology` is an independently installable Python distribution. Import `meteorology` or use the `meteorology` command. It does not require an OrcaCast checkout.
+Retrieve source-selective weather through `meteorology` Python functions or the
+matching CLI. This independent toolkit preserves source grids, units, coverage,
+missingness and checksum-backed lineage. Python 3.11–3.13; macOS or Linux.
 
-| Product | Meaning | Native support |
-| --- | --- | --- |
-| Atmospheric H3 support | Cell centroids inside a configured WGS84 box, including land and water | R4, R5, R6 |
-| Surface weather | Six four-hourly HRRR `sfc/f00` analysis samples; matched `sfc/f01` precipitation-rate snapshots | R5 × local date |
-| Hourly atmosphere | Separate actual UTC `sfc/f00` core analyses from retained decoded grids | R5 × UTC hour; 23/24/25 hours per local date |
-| [Compact weather summaries](docs/weather-summaries.md) | Sampled daily and weekly means/extrema with coverage and optional as-of filtering | Native R5 and whole-region × period × metric |
-| Daylight | Approximate geometric day length, solar profile and daylight weights | R4 × local date; day-of-year lookup |
-| Lunar context | Approximate phase, disk illumination and geometrical moon visibility | R5 × local date |
-| Daily matrix | Optional union of native daily families, with unsupported component values null | R4/R5 × local date |
+## Install from a clone
 
-**October 2026 implementation status:** The six-snapshot daily weather/astronomy contract remains unchanged. A [separate hourly family](docs/hourly-weather.md) now publishes complete actual-hour f00 H3 rows from retained decoded inputs. Its offline synthetic workflow is tested; representative real decoded GRIB compatibility and regional scientific accuracy remain unrun. Interval-amount, atmospheric-summary, and RONI modules remain candidate contracts. The [milestone tracker](docs/IMPLEMENTATION_TRACKER.md) separates implementation, source compatibility, and empirical acceptance.
-
-The package is primarily **retrospective**. `PRECIP_MM_DAY_ESTIMATE` sums six forecast-rate snapshots multiplied by nominal four-hour intervals; it is not a measured 24-hour precipitation accumulation. Weather and astronomy do not measure species occurrence, observer effort, reporting or detection probability. Read [limitations](docs/limitations.md) before using the values as model predictors.
-
-## Start in under five minutes, offline
-
-Use Python 3.11–3.13 on macOS or Linux. From a clone:
-
-```bash
+```sh
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install '.[test]'
-meteorology --workspace ./weather-demo init
-meteorology --workspace ./weather-demo example-offline
-meteorology --workspace ./weather-demo validate \
-  --daily-matrix ./weather-demo/outputs/synthetic-daily-matrix.parquet
+python -m pip install '.[native-pilot]'  # selective HRRR
+# For ERA5 instead: python -m pip install '.[era5]'
 ```
 
-`example-offline` creates explicitly synthetic one-day HRRR-like inputs, then runs the normal support, weather, daylight, lunar and matrix builders. It requires a fresh workspace, makes no network requests and refuses to replace existing products. It is a package workflow check, not a live NOAA data certification. The [quickstart](docs/getting-started/quickstart.md) also shows a clean wheel install outside the checkout.
+Core installation is `python -m pip install .`. HTML inspectors use the optional
+`.[visualization]` extra. Legacy Herbie acquisition uses `.[acquisition]`.
+These are local-source installation commands; no PyPI publication is claimed.
 
-For a bounded, resumable real-data example with daily/weekly H3 and regional
-Parquet outputs, follow the [one-week demo](docs/live-week-demo.md). It records
-transfer budgets, runtime, process memory and retained evidence storage.
-
-## Real HRRR workflow
-
-Live acquisition uses optional Herbie, cfgrib and ecCodes support:
-
-```bash
-python -m pip install '.[acquisition]'
-meteorology --workspace ./weather-real init
-meteorology --workspace ./weather-real build spatial-support
-meteorology --workspace ./weather-real download surface-weather \
-  --start-date 2024-01-02 --end-date 2024-01-02 --dry-run
-meteorology --workspace ./weather-real download surface-weather \
-  --start-date 2024-01-02 --end-date 2024-01-02 --workers 4
-meteorology --workspace ./weather-real build surface-weather
-meteorology --workspace ./weather-real validate \
-  --manifest ./weather-real/data/processed/domain/environmental_layer/meteorological/surface_weather/MANIFEST.json
-```
-
-Inspect the initialized bounding box, timezone, date and output paths first. A request spanning more than seven local days requires explicit `--allow-large-download`; `--dry-run` reports the intended time span and cycle count without contacting the provider. Acquisition resumes verified samples. The package never writes runtime products into `site-packages`.
-
-## Python API
+## Retrieve with Python
 
 ```python
-import meteorology
+from meteorology import get_temperature
 
-print(meteorology.__version__)
-config = meteorology.load_config()  # METEOROLOGY_WORKSPACE or current directory
-meteorology.build_spatial_support()
-preview = meteorology.download_surface_weather(
-    start_date="2024-01-02", end_date="2024-01-02", dry_run=True
+result = get_temperature(
+    start_date="2024-01-01", end_date="2024-01-01",
+    bbox=(-124.0, 48.0, -123.0, 48.5), data_source="hrrr",
+    cache_dir="./weather-cache",
 )
-print(preview["expected_times"])
+df = result.to_pandas()
+result.to_parquet("temperature.parquet")
+print(result.metadata)
 ```
 
-The root API also provides `build_surface_weather`, `build_daylight`, `build_lunar`, `export_daily_matrix`, `validate_product` and `freeze_release`. See the [API reference](docs/reference/api.md).
+The four required arguments also work positionally. For several variables, use
+`get_weather(variables=["temperature", "wind", "cloud_cover"], ...)`: their input
+dependencies are acquired once. This bounded real-data example performs provider
+access; the new live path has not been executed during this refactor.
 
-## Scientific and release contracts
+## Retrieve with the CLI
 
-- [Methodology](docs/methodology.md) explains source identity, local dates and DST, nearest-grid sampling, daily reductions, vector wind, precipitation and astronomical approximations.
-- [Product contracts](docs/CONTRACTS.md) and [Arrow-backed variable inventory](docs/reference/variables.md) define keys, units, missingness, schemas and scientific method versions.
-- Every family manifest records software version, method version, run ID, content-derived release ID, configuration, input/output checksums, source attribution and limitations. `meteorology validate` checks a release; `meteorology freeze-release` copies it to a checksum-backed release-ID directory and refuses to replace an existing one.
-- The package's [modeling guidance](docs/guides/downstream-modeling.md) calls out temporal/spatial leakage and availability at prediction time. Its optional feature policy is a downstream selection aid, not a universal ecological recommendation.
+```sh
+meteorology get temperature --start-date 2024-01-01 --end-date 2024-01-01 \
+  --bbox -124.0 48.0 -123.0 48.5 --data-source hrrr \
+  --cache-dir ./weather-cache --output temperature.parquet
+```
 
-## Development and release status
+Append `--dry-run` to preview exact UTC boundaries, dependencies, support, cache
+hits, missing work and resource limits without network access or writes.
+`meteorology sources` and `meteorology variables --data-source era5` show support.
+Help and standalone queries require no initialized workspace or shared study.
 
-```bash
-python -m pip install '.[dev]'
+## Returned data
+
+Daily output is long `DATE × H3_INDEX × METRIC` data for HRRR R5, or
+`DATE × source grid × native point × METRIC` for native output. Rows carry `VALUE`,
+`UNITS`, `SOURCE`, `STATUS`, valid/expected hours and coverage. Temperature is 2 m
+air temperature in Celsius. Dates are inclusive UTC days; partial daily values
+remain null. Hourly output is available with `frequency="hourly"`.
+
+Results remain on disk until `.to_pandas()` is requested. `.to_parquet()` streams
+an export with durable JSON metadata: inputs/checksums, source grids and resolution,
+spatial method, time semantics, reductions and method/schema/producer versions.
+Compatible final-cache hits make zero provider requests; subsets read selected
+date/metric partitions. No legacy releases are rewritten.
+
+## Availability and limits
+
+| Variable | HRRR: R5 or native | ERA5: native |
+| --- | --- | --- |
+| Temperature, wind, cloud cover, sea-level pressure, RH | Supported | Supported; RH derived from temperature/dewpoint |
+| Dewpoint | Unsupported | Supported |
+| Visibility | Supported | Unsupported |
+| Interval precipitation | Unsupported | Supported |
+| Interval snowfall water equivalent | Unsupported | Supported |
+
+ERA5 H3 sampling is unqualified and rejected before acquisition. Its 0.25 degree
+CDS distribution does not add detail to the roughly 31 km model information.
+HRRR exposes the v4 CONUS decoder era from 2020-12-03 and checks actual decoded
+footprint and sampling distances. Requests are limited to seven UTC days and a
+bounded crop, one worker and explicit resource caps. Transfer sizes are unknown
+until measured. ERA5 needs local credentials and manual provider-terms acceptance.
+
+Daily instantaneous quantities use sampled hourly means. Wind speed means the
+mean hourly magnitude. ERA5 precipitation and snowfall sum validated one-hour
+amounts, including next-midnight data. `get_precip` aliases `get_precipitation`.
+Snowfall is **mm water equivalent falling during the interval**, separate from
+ground snow depth and snowpack. No fixed fresh-snow depth conversion is used.
+The existing six-rate `PRECIP_MM_DAY_ESTIMATE` retains its separate legacy meaning.
+
+Generated-GRIB and mocked-HTTP tests establish software behavior. They do not
+establish actual CDS/NOAA compatibility for new queries or regional accuracy.
+See [request semantics, source setup and errors](docs/request-api.md),
+[performance and verification evidence](docs/request-refactor-evidence.md), and
+[scientific limitations](docs/limitations.md).
+
+## Start offline
+
+A small source-fixture request requires no credentials or provider access:
+
+```sh
+python -m pip install '.[era5]'
+python demo/request_offline.py --output ./request-demo
+```
+
+For a core-only offline run through the existing weather and astronomy families:
+
+```sh
+meteorology --workspace ./weather-demo init
+meteorology --workspace ./weather-demo example-offline
+```
+
+Both label their generated inputs synthetic. The request demo uses the actual
+ERA5 normalizer and shared getter; the family demo preserves the existing local-day
+products. See [advanced acquisition/build workflows](docs/WORKFLOWS.md),
+[legacy Python API](docs/reference/api.md), [shared-study publication](docs/shared-study.md),
+and [migration history](docs/MIGRATION.md).
+
+## Development
+
+```sh
+python -m pip install -e '.[dev,native-pilot]'
 python -m pytest -q
-ruff check src tests
+ruff check src tests benchmarks
 mkdocs build --strict
 python -m build
 python -m twine check dist/*
 ```
 
-See [production readiness](PRODUCTION_READINESS.md), the [release checklist](docs/development/release-process.md), and [CHANGELOG.md](CHANGELOG.md) for verified status and remaining owner actions. Creating a tag, publishing to PyPI and running a regional NOAA rebuild are separate reviewed actions.
-
-Apache-2.0 software license. NOAA/source data rights and attribution are described in [sources and rights](docs/DATA_SOURCES.md).
+See [cleanup inventory](docs/request-cleanup.md),
+[production readiness](PRODUCTION_READINESS.md) and [release checklist](docs/development/release-process.md).
+No merge, release publication, protected-branch change or data deletion accompanies
+this feature branch. Apache-2.0 software; [source rights](docs/DATA_SOURCES.md) apply
+separately to provider data.

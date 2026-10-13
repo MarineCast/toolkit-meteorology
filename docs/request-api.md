@@ -1,0 +1,213 @@
+# Weather requests
+
+Install from a clone with Python 3.11–3.13 on macOS/Linux:
+
+```sh
+python -m pip install '.[native-pilot]'  # direct selective HRRR GRIB requests
+python -m pip install '.[era5]'          # ERA5 and its GRIB codec
+```
+
+The core package needs neither Folium, Branca nor GeoPandas. HTML map inspectors
+require `.[visualization]`; legacy Herbie workflows require `.[acquisition]`.
+These commands install local source. This task does not establish PyPI publication.
+
+## Python and CLI
+
+```python
+from meteorology import get_temperature, get_weather
+
+result = get_temperature("2024-01-01", "2024-01-01",
+                         (-124.0, 48.0, -123.0, 48.5), "hrrr",
+                         cache_dir="./weather-cache")
+df = result.to_pandas()
+result.to_parquet("temperature.parquet")
+print(result.metadata)
+
+mixed = get_weather(variables=["temperature", "wind", "cloud_cover"],
+                    start_date="2024-01-01", end_date="2024-01-01",
+                    bbox=(-124.0, 48.0, -123.0, 48.5), data_source="hrrr",
+                    frequency="daily", h3_resolution=5, cache_dir="./weather-cache")
+```
+
+```sh
+meteorology sources
+meteorology variables --data-source era5
+meteorology get temperature --start-date 2024-01-01 --end-date 2024-01-01 \
+  --bbox -124 48 -123 48.5 --data-source hrrr --cache-dir ./weather-cache \
+  --output temperature.parquet
+meteorology get weather --variables temperature wind cloud_cover \
+  --start-date 2024-01-01 --end-date 2024-01-01 --bbox -124 48 -123 48.5 \
+  --data-source hrrr --dry-run
+```
+
+These are bounded **real acquisition examples**, not a claim of live execution in
+this refactor. Preview them first. Dry run creates no directories, reads no secret
+files, and makes no provider requests. It reports exact boundaries, dependencies,
+output support, final-cache hits, missing work, request structure and caps. Transfer
+sizes remain unknown. Resource caps are upper limits, not predicted payload sizes.
+
+## Software support matrix
+
+All supported combinations offer daily and hourly long output. Source compatibility
+is tested with generated GRIB and mocked HTTP; authenticated CDS, new live NOAA
+requests and independent regional accuracy are unverified in this refactor.
+
+| Getter / quantity | HRRR | ERA5 | Units and daily reduction |
+| --- | --- | --- | --- |
+| `get_temperature` / 2 m air temperature | R5 or native | Native | degC, mean |
+| `get_wind` / 10 m U, V and speed | R5 or native | Native | m/s, mean of each hourly quantity |
+| `get_cloud_cover` / total cloud cover | R5 or native | Native | percent, mean |
+| `get_pressure` / mean sea-level pressure | R5 or native, NOAA MSLMA | Native | hPa, mean |
+| `get_relative_humidity` / 2 m RH | R5 or native, direct | Native, Bolton water approximation from T/Td | percent, mean |
+| `get_dewpoint` / 2 m dewpoint | Unsupported | Native | degC, mean |
+| `get_visibility` / surface visibility | R5 or native | Unsupported | km, mean |
+| `get_precipitation`, `get_precip` | Unsupported accumulation | Native | mm, sum |
+| `get_snowfall` / interval snowfall | Unsupported | Native | mm water equivalent, sum |
+
+HRRR defaults to R5 centroid support, including land and water. Choose
+`spatial_output="native"` / `--spatial-output native` to retain original grid
+indices at points inside the bbox. Native point identity includes the source grid
+hash. ERA5 defaults to its native CDS distribution grid and rejects H3 requests
+before acquisition. H3 sampling for ERA5 remains unqualified; duplicating values
+at finer cells would not add physical detail.
+
+## Time, space and missingness
+
+Bbox is WGS84 `(west, south, east, north)`; longitude wraps/dateline rectangles
+are unsupported. Date-only endpoints are inclusive, normalized to a UTC interval
+ending at midnight after `end_date`. Daily requests use actual 00–23 UTC samples
+for instantaneous quantities. Means stay null unless all 24 slots are finite;
+rows carry `STATUS`, `VALID_HOURS`, `EXPECTED_HOURS` and `COVERAGE_FRACTION`.
+Hourly accumulation rows label the interval's **end**; the last interval ends at
+next-day midnight, while `DATE` labels its requested UTC day.
+
+Daily wind speed is the mean of hourly magnitudes; it differs from the magnitude
+of the mean U/V vector. HRRR grid-relative winds use the existing geodesic axis
+rotation and must preserve vector magnitude. U/V flags, every message's grid
+identity, decoded native footprint and nearest-distance allowance are verified.
+ERA5 winds must declare earth-relative orientation. Grid order/crop/rotation and
+crosswalk reuse bind the source grid, target support and spatial method.
+
+HRRR requests are limited to the v4 CONUS decoder era starting 2020-12-03 and a
+conservative CONUS envelope; actual decoded coverage is still checked. Earlier
+HRRR eras remain available only through separate existing workflows where
+qualified. ERA5 begins in 1940, with a conservative five-day recent-data exclusion;
+that calendar bound does not guarantee provider availability. Requests are limited
+to seven days, 4096 native crop points, H3 R5 where supported, and one worker.
+The memory/transfer/staging/time caps can be supplied with `Limits` or CLI flags.
+Memory admission uses current RSS plus planned allocation; historical peak RSS
+is reported separately. Enforcement is cooperative, not OS preemption. Full HRRR
+messages are nationwide even for a small bbox; only selected fields are acquired.
+
+## Precipitation and snow
+
+`get_precip` is exactly `get_precipitation`. ERA5 CDS single-level `tp` and `sf`
+are already one-hour accumulations ending at valid time. Daily totals use 01–23 UTC
+and the following midnight. The adapter requests that boundary, validates forecast
+initialization and one-hour step bounds, and rejects cumulative/overlapping,
+ERA5-Land and zero-length fields. No deaccumulation is performed. A complete dry
+input produces zero; missing input produces a null with explicit coverage.
+
+ERA5 snowfall is official parameter **144 (`sf`)**, delivered in metres of water
+equivalent and converted by 1000 to millimetres of water equivalent. It is falling
+snow accumulated during an interval. It is distinct from ground snow depth and
+snowpack water equivalent; no fixed snow-to-water ratio is applied. See the
+[ECMWF parameter definition](https://codes.ecmwf.int/grib/param-db/?id=144) and
+[ERA5 accumulation documentation](https://confluence.ecmwf.int/pages/viewpage.action?pageId=388500357).
+This is implemented source normalization with fixture qualification; actual CDS
+snowfall payload compatibility and regional scientific acceptance remain unrun.
+
+The legacy `PRECIP_MM_DAY_ESTIMATE` remains six matched f01 **rate snapshots**
+multiplied by four hours. It is not the new interval accumulation. Use the existing
+`download_surface_weather` / `build_surface_weather` for that complete family.
+`get_precipitation_estimate` raises a migration message: a selective rate-estimate
+adapter has not been implemented and is not advertised as supported.
+
+## Results, caching and provenance
+
+`WeatherResult` is disk-backed. `.to_pandas()` explicitly materializes its selected
+rows; construction does not load a historical request. `.to_parquet(path)` streams
+4096-row batches into an atomic export and embeds JSON under the Arrow metadata
+key `meteorology.manifest`. Metadata survives Parquet serialization. Each result
+has an immutable checksum-backed manifest and date/metric partitions.
+
+Daily H3 keys are `DATE × H3_INDEX × METRIC`; native keys include
+`DATE × SOURCE_GRID_HASH × SOURCE_GRID_INDEX × METRIC`. Hourly keys additionally
+include `VALID_TIME_UTC`. Columns retain value, units, source, status/coverage,
+source coordinates/grid, spatial sampling distance, interval, method, checksums,
+retrieval-as-of and consolidation. Durable metadata additionally captures the
+actual source forecast initializations/leads and parameter/valid-time/checksum
+bindings, plus software and scientific dependency versions. Unknown historical publication time stays null;
+retrieval time is not substituted for it.
+
+Compatible repeat requests use the final cache without creating a provider client,
+checking remote terms or making any provider requests. A variable/date subset
+reads only its selected result partitions. Source byte caches are shared across
+getters; HRRR indexes and already selected fields are reused when another variable
+is requested. ERA5 job identities bind exact provider selections and preserve
+resumable job state. Variable order does not change logical identity. Derived IDs
+bind source receipts, grids, variables, bounds, periods, timezone, reductions,
+resolution and method/schema/producer fingerprints. Cache corruption raises an
+error; incomplete results are returned with partial status and never treated as
+successful final hits. `refresh=True` creates a new source generation and preserves
+prior evidence. There is no incidental archive cleanup.
+
+A namespace lease serializes concurrent writers; a waiting compatible caller reads
+the first completed result. Persistent transfer counters charge interrupted
+attempts. Existing limits must be retained for resumption. Raw receipts and final
+artifacts are immutable; failed stages remain inspectable. The 2 GiB staging cap
+includes retained files in the selected cache namespace, so accumulated cache
+storage can stop new acquisition. Choose a fresh cache directory for independent
+runs; deleting retained evidence is an explicit owner decision.
+
+## ERA5 credentials
+
+Both planning and execution use one resolver. Precedence:
+
+1. Explicit `credential_env_file` / `--credential-env-file` containing one
+   `COPERNICUS_API_KEY` alias.
+2. `CDSAPI_KEY`, with optional `CDSAPI_URL`.
+3. `CDSAPI_RC`, otherwise `~/.cdsapirc`, containing `key` and `url`.
+
+Only `https://cds.climate.copernicus.eu/api` is supported. Plans report configuration
+presence separately from authenticated access, which is not checked offline.
+Tokens are not logged or serialized. Accept dataset terms manually using the
+[official CDS setup](https://cds.climate.copernicus.eu/how-to-api) and
+[download form](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels?tab=download).
+The bounded provider verifies accepted terms; it never accepts them automatically.
+No credential is needed for a valid final-result cache hit.
+
+## Offline example and common errors
+
+```sh
+python -m pip install '.[era5]'
+python demo/request_offline.py --output ./request-demo
+```
+
+The clone's demo writes small generated GRIB, invokes the same public getter and
+native adapter, and exports explicitly synthetic temperature and snowfall. It
+requires no credentials or network. Advanced `source_files`/`retrieved_at_utc`
+options always label inputs synthetic and use a separate `fixtures` cache; they
+are not a route for certifying captured provider archives.
+
+| Error | Action |
+| --- | --- |
+| Unsupported source/variable | Check `meteorology variables --data-source SOURCE`; choose an implemented source explicitly |
+| No native points / empty H3 support | Enlarge the bbox; do not invent a representative point |
+| Outside source era/envelope or wrapping bbox | Use a supported date/rectangle; ERA5 is not substituted for HRRR |
+| Conservative working set/crop exceeds limits | Reduce the bbox or interval; check declared caps before acquisition |
+| Transfer/request/time cap exceeded | Inspect retained run state; resume with original caps or start a new bounded run |
+| Credentials absent / terms unaccepted | Configure the official CDS mechanism and manually accept terms |
+| Corrupt result/source receipt | Inspect retained files; use explicit refresh for a new generation |
+| Partial day | Inspect missing/bitmap slots; values remain null and status does not certify completeness |
+
+## Compatibility and publication
+
+Existing family builders, CLI commands, local-day/DST calculations, immutable
+releases and study/marine-mask publication gates are preserved. No process-global
+environment variable is modified by a getter, and getters do not invoke the CLI.
+A generic bbox query ignores legacy workspace/study environment selection and
+never claims a production shared-study release. Use the existing shared-study
+workflow for that publication; its approval/registry prerequisites remain intact.
+The new request method/schema are independent v1 contracts; old releases are not
+migrated or rewritten. Existing fixed pilots remain regression/qualification cases.

@@ -1,6 +1,8 @@
 # Python API
 
-The root package exposes the supported high-level workflow. Existing deeper imports remain available for advanced usage, but internal module names are not a stable compatibility promise.
+The [request API](../request-api.md) provides `get_weather`, all supported variable
+getters, `WeatherResult` and source-specific availability without workspace
+or study configuration. The following APIs retain the legacy family workflows. Existing deeper imports remain available for advanced usage, but internal module names are not a stable compatibility promise.
 
 ```python
 import meteorology
