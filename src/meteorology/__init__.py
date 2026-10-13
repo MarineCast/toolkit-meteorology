@@ -130,3 +130,81 @@ __all__ = [
     "acquire_hourly_weather", "build_hourly_weather", "validate_product", "freeze_release",
     "export_weather_summary",
 ]
+
+
+def get_weather(variables, start_date, end_date, bbox, data_source, **options):
+    """Shared selective request; advanced options are keyword-only."""
+    from .request import get_weather as implementation
+    return implementation(variables,start_date,end_date,bbox,data_source,**options)
+
+
+def get_temperature(start_date, end_date, bbox, data_source, **options):
+    """Retrieve temperature through the shared source-selective request."""
+    return get_weather(['temperature'],start_date,end_date,bbox,data_source,**options)
+
+
+def get_wind(start_date, end_date, bbox, data_source, **options):
+    """Retrieve wind through the shared source-selective request."""
+    return get_weather(['wind'],start_date,end_date,bbox,data_source,**options)
+
+
+def get_cloud_cover(start_date, end_date, bbox, data_source, **options):
+    """Retrieve cloud cover through the shared source-selective request."""
+    return get_weather(['cloud_cover'],start_date,end_date,bbox,data_source,**options)
+
+
+def get_pressure(start_date, end_date, bbox, data_source, **options):
+    """Retrieve pressure through the shared source-selective request."""
+    return get_weather(['pressure'],start_date,end_date,bbox,data_source,**options)
+
+
+def get_relative_humidity(start_date, end_date, bbox, data_source, **options):
+    """Retrieve relative humidity through the shared source-selective request."""
+    return get_weather(['relative_humidity'],start_date,end_date,bbox,data_source,**options)
+
+
+def get_dewpoint(start_date, end_date, bbox, data_source, **options):
+    """Retrieve dewpoint through the shared source-selective request."""
+    return get_weather(['dewpoint'],start_date,end_date,bbox,data_source,**options)
+
+
+def get_visibility(start_date, end_date, bbox, data_source, **options):
+    """Retrieve visibility through the shared source-selective request."""
+    return get_weather(['visibility'],start_date,end_date,bbox,data_source,**options)
+
+
+def get_precipitation(start_date, end_date, bbox, data_source, **options):
+    """Retrieve precipitation through the shared source-selective request."""
+    return get_weather(['precipitation'],start_date,end_date,bbox,data_source,**options)
+
+
+def get_snowfall(start_date, end_date, bbox, data_source, **options):
+    """Retrieve snowfall through the shared source-selective request."""
+    return get_weather(['snowfall'],start_date,end_date,bbox,data_source,**options)
+
+
+get_precip = get_precipitation
+
+
+def get_precipitation_estimate(start_date, end_date, bbox, data_source, **options):
+    """The legacy six-rate estimate is distinct from interval precipitation.
+
+    Legacy estimates remain available through download_surface_weather and
+    build_surface_weather. No qualified selective rate-estimate adapter exists.
+    """
+    from .capabilities import UnsupportedVariableError
+    raise UnsupportedVariableError('Selective precipitation_estimate is unsupported; use the legacy '
+                                   'download_surface_weather/build_surface_weather workflow. '
+                                   'PRECIP_MM_DAY_ESTIMATE is not a qualified daily accumulation.')
+
+
+def __getattr__(name):
+    if name == 'WeatherResult':
+        from .request_cache import WeatherResult
+        return WeatherResult
+    raise AttributeError(name)
+
+
+__all__ += ['get_weather','get_temperature','get_wind','get_cloud_cover','get_pressure',
+            'get_relative_humidity','get_dewpoint','get_visibility','get_precipitation',
+            'get_precip','get_snowfall','get_precipitation_estimate','WeatherResult']
