@@ -110,6 +110,17 @@ def _header(ec, m, name, valid, expected_shape):
     return header, n, str(g("units"))
 
 
+def _geometry_identity(ec, message):
+    # Wind orientation is in GRIB section 3 but does not change coordinates.
+    # Normalize only that bit on a temporary handle, retaining original flags.
+    clone = ec.codes_clone(message)
+    try:
+        ec.codes_set(clone, "uvRelativeToGrid", 0)
+        return ec.codes_get(clone, "md5GridSection")
+    finally:
+        ec.codes_release(clone)
+
+
 def _rotation(lat, lon, indices, nx, ny):
     # Compute bearings only at cropped points, without full-size rotation arrays.
     x = indices % nx
@@ -126,8 +137,11 @@ def _rotation(lat, lon, indices, nx, ny):
     return i, np.sign(np.sin(jr - ir))
 
 
-def validate_hour(frame, evidence, valid):
-    expected = {metric for metric in METRIC_INPUTS} | {"WIND_SPEED_10M_MS"}
+def validate_hour(frame, evidence, valid, *, selected_fields=None):
+    fields = set(FIELD_HEADERS) if selected_fields is None else set(selected_fields)
+    expected = {metric for metric, (name, _) in METRIC_INPUTS.items() if name in fields}
+    if {"u_wind_10m_ms", "v_wind_10m_ms"} <= fields:
+        expected.add("WIND_SPEED_10M_MS")
     if (
         frame.empty
         or len(frame) > 4096
@@ -171,16 +185,17 @@ def validate_hour(frame, evidence, valid):
         }[metric]
         if ((finite < bounds[0]) | (finite > bounds[1])).any():
             raise ValueError("Native metric violates physical acceptance limits.")
-    if not np.allclose(
-        frame.WIND_SPEED_10M_MS, np.hypot(frame.U_WIND_10M_MS, frame.V_WIND_10M_MS), equal_nan=True
-    ):
-        raise ValueError("Hourly wind speed must be the Earth-relative component magnitude.")
-    if not np.allclose(
-        frame.WIND_SPEED_10M_MS,
-        np.hypot(frame.RAW_U_WIND_10M_MS, frame.RAW_V_WIND_10M_MS),
-        equal_nan=True,
-    ):
-        raise ValueError("Wind rotation changed the source vector magnitude.")
+    if "WIND_SPEED_10M_MS" in expected:
+        if not np.allclose(
+            frame.WIND_SPEED_10M_MS, np.hypot(frame.U_WIND_10M_MS, frame.V_WIND_10M_MS), equal_nan=True
+        ):
+            raise ValueError("Hourly wind speed must be the Earth-relative component magnitude.")
+        if not np.allclose(
+            frame.WIND_SPEED_10M_MS,
+            np.hypot(frame.RAW_U_WIND_10M_MS, frame.RAW_V_WIND_10M_MS),
+            equal_nan=True,
+        ):
+            raise ValueError("Wind rotation changed the source vector magnitude.")
 
 
 def decode_hour(
@@ -191,11 +206,17 @@ def decode_hour(
     halo: float,
     budget: Budget,
     expected_shape=(1799, 1059),
+    selected_fields=None,
+    geometry_cache=None,
 ):
     import eccodes as ec
 
-    if set(files) != set(FIELD_HEADERS):
-        raise ValueError("Exactly the eight separate f00 fields required.")
+    expected = set(FIELD_HEADERS) if selected_fields is None else set(selected_fields)
+    if not expected or not expected <= set(FIELD_HEADERS) or set(files) != expected:
+        raise ValueError("Exactly the requested qualified f00 fields required.")
+    wind = {"u_wind_10m_ms", "v_wind_10m_ms"}
+    if wind & expected and not wind <= expected:
+        raise ValueError("Wind requests require both U/V components.")
     values = {}
     raw_source = {}
     units = {}
@@ -203,6 +224,8 @@ def decode_hour(
     lat = lon = indices = None
     coverage = None
     wind_flags = []
+    bearing = hand = None
+    source_hash = None
     for name, path in files.items():
         budget.checkpoint(additional_memory=2 * Path(path).stat().st_size)
         with Path(path).open("rb") as source:
@@ -214,29 +237,45 @@ def decode_hour(
                 budget.checkpoint(additional_memory=n * 256 + 2 * Path(path).stat().st_size)
                 if grid is None:
                     grid = header
-                    lat = np.asarray(ec.codes_get_array(m, "latitudes"), dtype=float)
-                    lon = np.asarray(ec.codes_get_array(m, "longitudes"), dtype=float)
-                    lon = np.where(lon > 180, lon - 360, lon)
-                    west, south, east, north = bbox
-                    mask = (
-                        (lat >= south - halo)
-                        & (lat <= north + halo)
-                        & (lon >= west - halo)
-                        & (lon <= east + halo)
-                    )
-                    indices = np.flatnonzero(mask)
-                    if not 0 < len(indices) <= 4096:
-                        raise LimitExceeded(
-                            "Native crop size exceeds the reviewed 4096-point allowance."
+                    geometry_key = (_geometry_identity(ec, m),
+                                    json.dumps(header, sort_keys=True), tuple(bbox), halo,
+                                    "decoded-native-footprint-and-spacing-v1")
+                    cached = None if geometry_cache is None else geometry_cache.get(geometry_key)
+                    if cached is None:
+                        lat = np.asarray(ec.codes_get_array(m, "latitudes"), dtype=float)
+                        lon = np.asarray(ec.codes_get_array(m, "longitudes"), dtype=float)
+                        lon = np.where(lon > 180, lon - 360, lon)
+                        west, south, east, north = bbox
+                        mask = (
+                            (lat >= south - halo)
+                            & (lat <= north + halo)
+                            & (lon >= west - halo)
+                            & (lon <= east + halo)
                         )
-                    crop = pd.DataFrame({"hrrr_lat": lat[indices], "hrrr_lon": lon[indices]})
-                    coverage = validate_grid_coverage(
-                        lat.reshape(header["Ny"], header["Nx"]),
-                        lon.reshape(header["Ny"], header["Nx"]),
-                        crop,
-                        BoundingBox(min_lat=south, max_lat=north, min_lon=west, max_lon=east),
-                    )
-                elif header != grid:
+                        indices = np.flatnonzero(mask)
+                        if not 0 < len(indices) <= 4096:
+                            raise LimitExceeded(
+                                "Native crop size exceeds the reviewed 4096-point allowance."
+                            )
+                        crop = pd.DataFrame({"hrrr_lat": lat[indices], "hrrr_lon": lon[indices]})
+                        coverage = validate_grid_coverage(
+                            lat.reshape(header["Ny"], header["Nx"]),
+                            lon.reshape(header["Ny"], header["Nx"]),
+                            crop,
+                            BoundingBox(min_lat=south, max_lat=north, min_lon=west, max_lon=east),
+                        )
+                        bearing, hand = _rotation(lat, lon, indices, grid["Nx"], grid["Ny"])
+                        digest = hashlib.sha256()
+                        digest.update(json.dumps(grid, sort_keys=True, separators=(",", ":")).encode())
+                        digest.update(np.asarray(lat, dtype="<f8").tobytes())
+                        digest.update(np.asarray(lon, dtype="<f8").tobytes())
+                        source_hash = digest.hexdigest()
+                        if geometry_cache is not None:
+                            geometry_cache.clear()
+                            geometry_cache[geometry_key] = (lat, lon, indices, coverage, bearing, hand, source_hash)
+                    else:
+                        lat, lon, indices, coverage, bearing, hand, source_hash = cached
+                elif header != grid or _geometry_identity(ec, m) != geometry_key[0]:
                     raise ValueError("Native source grid changed across fields.")
                 raw = np.asarray(ec.codes_get_values(m), dtype=float)
                 if len(raw) != n:
@@ -261,20 +300,16 @@ def decode_hour(
             if extra is not None:
                 ec.codes_release(extra)
                 raise ValueError("A selected range contains multiple GRIB messages.")
-    if len(wind_flags) != 2 or wind_flags[0] != wind_flags[1]:
-        raise ValueError("U/V source wind-reference flags disagree.")
-    raw_u = values["u_wind_10m_ms"].copy()
-    raw_v = values["v_wind_10m_ms"].copy()
-    bearing, hand = _rotation(lat, lon, indices, grid["Nx"], grid["Ny"])
-    if wind_flags[0]:
-        rad = np.deg2rad(bearing)
-        values["u_wind_10m_ms"] = raw_u * np.sin(rad) + hand * raw_v * np.cos(rad)
-        values["v_wind_10m_ms"] = raw_u * np.cos(rad) - hand * raw_v * np.sin(rad)
-    digest = hashlib.sha256()
-    digest.update(json.dumps(grid, sort_keys=True, separators=(",", ":")).encode())
-    digest.update(np.asarray(lat, dtype="<f8").tobytes())
-    digest.update(np.asarray(lon, dtype="<f8").tobytes())
-    source_hash = digest.hexdigest()
+    raw_u = raw_v = None
+    if wind <= expected:
+        if len(wind_flags) != 2 or wind_flags[0] != wind_flags[1]:
+            raise ValueError("U/V source wind-reference flags disagree.")
+        raw_u = values["u_wind_10m_ms"].copy()
+        raw_v = values["v_wind_10m_ms"].copy()
+        if wind_flags[0]:
+            rad = np.deg2rad(bearing)
+            values["u_wind_10m_ms"] = raw_u * np.sin(rad) + hand * raw_v * np.cos(rad)
+            values["v_wind_10m_ms"] = raw_u * np.cos(rad) - hand * raw_v * np.sin(rad)
     frame = pd.DataFrame(
         dict(
             SOURCE_GRID_INDEX=indices.astype("int32"),
@@ -294,8 +329,10 @@ def decode_hour(
     for name, raw in raw_source.items():
         frame["RAW_SOURCE_" + name] = raw
     for metric, (name, convert) in METRIC_INPUTS.items():
-        frame[metric] = convert(values[name])
-    frame["WIND_SPEED_10M_MS"] = np.hypot(frame.U_WIND_10M_MS, frame.V_WIND_10M_MS)
+        if name in values:
+            frame[metric] = convert(values[name])
+    if wind <= expected:
+        frame["WIND_SPEED_10M_MS"] = np.hypot(frame.U_WIND_10M_MS, frame.V_WIND_10M_MS)
     evidence = dict(
         source_grid_hash=source_hash,
         header=grid,
@@ -304,10 +341,10 @@ def decode_hour(
         units=units,
         native_footprint_wkb_hex=coverage.native_footprint.wkb_hex,
         max_nearest_distance_m=coverage.max_nearest_distance_m,
-        source_wind_basis="grid_relative" if wind_flags[0] else "earth_relative",
+        source_wind_basis=("grid_relative" if wind_flags[0] else "earth_relative") if wind_flags else "not_requested",
         source_evidence_kind="retained_decoded_hrrr",
         historical_publication_time="unknown",
     )
-    validate_hour(frame, evidence, valid)
+    validate_hour(frame, evidence, valid, selected_fields=expected)
     budget.checkpoint()
     return frame, evidence

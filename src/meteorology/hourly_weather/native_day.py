@@ -470,6 +470,9 @@ def run_day(study_config, plan, output, *, opener=None, decoder=decode_hour, bud
             raise ValueError("Output is bound to a different immutable plan.")
         atomic_json(root / "PLAN.json", plan)
         http = NativeHTTP(budget, plan, opener=opener)
+        if decoder is decode_hour:
+            from functools import partial
+            decoder = partial(decode_hour, geometry_cache={})
         frames = []
         hours = []
         missing = []
