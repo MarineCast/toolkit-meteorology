@@ -23,6 +23,7 @@ PARAMETERS = {
     151: ("msl", "Pa"),
     164: ("tcc", "(0 - 1)"),
     228: ("tp", "m"),
+    144: ("sf", "m of water equivalent"),
 }
 NORMALIZATION_METHOD = "era5-cds-regular-latlon-message-v1"
 
@@ -63,9 +64,9 @@ def normalize_message(metadata: dict, latitude, longitude, values, *, budget=Non
         raise ValueError(f"{name}: unexpected source units; expected {units}.")
     if name in ("u10", "v10") and metadata.get("uvRelativeToGrid") != 0:
         raise ValueError("ERA5 wind must be verified earth-relative.")
-    if metadata.get("data_type") != ("fc" if name == "tp" else "an"):
+    if metadata.get("data_type") != ("fc" if name in ("tp", "sf") else "an"):
         raise ValueError("Unexpected ERA5 analysis/forecast parameter provenance.")
-    if name == "tp":
+    if name in ("tp", "sf"):
         if (
             metadata.get("stepType") != "accum"
             or metadata.get("step_units") != "hours"
@@ -75,7 +76,7 @@ def normalize_message(metadata: dict, latitude, longitude, values, *, budget=Non
             or metadata["endStep"] - metadata["startStep"] != 1
         ):
             raise ValueError(
-                "CDS tp must be one-hour accumulation, not cumulative ERA5-Land/MARS or f00 zero."
+                "CDS tp/sf must be one-hour accumulation, not cumulative ERA5-Land/MARS or f00 zero."
             )
         init = _utc(metadata["init_time_utc"])
         if init + timedelta(hours=metadata["endStep"]) != valid:
@@ -125,7 +126,7 @@ def normalize_message(metadata: dict, latitude, longitude, values, *, budget=Non
         (name in ("t2m", "d2m") and np.any((good < 150) | (good > 350)))
         or (name == "msl" and np.any((good < 70000) | (good > 120000)))
         or (name == "tcc" and np.any((good < 0) | (good > 1)))
-        or (name == "tp" and np.any(good < 0))
+        or (name in ("tp", "sf") and np.any(good < 0))
     ):
         raise ValueError(f"{name}: decoded value outside physical contract.")
     if not isinstance(metadata.get("source_sha256"), str) or not re.fullmatch(
@@ -197,7 +198,7 @@ def consolidate(
     )
 
 
-def decode_grib(path: str | Path, *, retrieved_at_utc: str, budget=None):
+def decode_grib(path: str | Path, *, retrieved_at_utc: str, budget=None, parameters=None):
     """Read one message at a time; ecCodes is an optional isolated acquisition extra."""
     import eccodes as ec
 
@@ -250,6 +251,8 @@ def decode_grib(path: str | Path, *, retrieved_at_utc: str, budget=None):
                     source_sha256=sha,
                     step_units="hours" if get("stepUnits") == 1 else "unsupported",
                 )
+                if parameters is not None and PARAMETERS.get(meta["paramId"], (None,))[0] not in parameters:
+                    continue
                 if meta["paramId"] in (165, 166):
                     meta["uvRelativeToGrid"] = get("uvRelativeToGrid")
                 if budget is not None:
