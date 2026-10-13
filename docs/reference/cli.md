@@ -1,6 +1,51 @@
 # Command reference
 
-All commands accept `--workspace PATH` **before** the subcommand. `METEOROLOGY_WORKSPACE` is an alternative; otherwise paths resolve from the current directory. `init` copies packaged configuration without replacing existing files.
+## Selective weather requests
+
+These commands use the shared Python request path and need no initialized
+workspace or study configuration:
+
+```sh
+meteorology sources
+meteorology variables --data-source era5
+meteorology get temperature --start-date 2024-01-01 --end-date 2024-01-01 \
+  --bbox -124 48 -123 48.5 --data-source hrrr --dry-run
+meteorology get weather --variables temperature wind cloud_cover \
+  --start-date 2024-01-01 --end-date 2024-01-01 --bbox -124 48 -123 48.5 \
+  --data-source hrrr --cache-dir ./weather-cache --output weather.parquet
+```
+
+The last command performs provider access unless a complete compatible result
+is cached. `--dry-run` previews exact UTC boundaries, dependencies, support, cache
+status and caps without network access or writes. Execution requires `--output`.
+
+| Option | Meaning / default |
+| --- | --- |
+| `--data-source hrrr\|era5` | Required explicit source; no fallback or blending |
+| `--start-date`, `--end-date` | Required inclusive date-only UTC days; at most seven days |
+| `--bbox WEST SOUTH EAST NORTH` | Required WGS84 rectangle; no wrapping/dateline bbox |
+| `--variables NAME ...` | Required only with `get weather`; single-variable commands select their own dependencies |
+| `--frequency daily\|hourly` | Daily by default |
+| `--spatial-output h3\|native` | HRRR defaults to H3 R5; ERA5 defaults to native and rejects H3 |
+| `--h3-resolution 5` | Qualified HRRR R5 support only |
+| `--cache-dir PATH` | Explicit retained source/result cache location |
+| `--output FILE` | Stream a Parquet export with embedded provenance |
+| `--refresh` | Start a new source generation, preserving previous cache evidence |
+| `--credential-env-file PATH` | Explicit ERA5 credential alias file; see resolver precedence in the request guide |
+| `--memory-mib`, `--staging-mib`, `--transfer-mib` | Caps default to 1024, 2048 and 512 MiB respectively |
+| `--max-requests`, `--max-seconds` | Caps default to 1024 operations and 3600 active seconds |
+
+Caps are cooperative upper bounds, not payload-size predictions. The
+[weather request guide](../request-api.md) specifies supported quantities,
+credentials, time/space semantics, fixture options and errors.
+`meteorology get --help` shows the complete parser options. Legacy `variables`
+without `--data-source` retains its family inventory output.
+
+## Configured family commands
+
+Use `--workspace PATH` **before** the subcommand. `METEOROLOGY_WORKSPACE` is an
+alternative; otherwise paths resolve from the current directory. `init` copies
+packaged configuration without replacing existing files.
 
 | Command | Purpose | Network/write effect |
 | --- | --- | --- |
@@ -34,13 +79,3 @@ Run `meteorology COMMAND --help` or `meteorology build FAMILY --help` for the ex
 [--max-requests 1600] [--max-bytes 4294967296] [--dry-run]` runs the
 [bounded live one-week example](../live-week-demo.md). The start must be a Monday;
 dry-run issues no requests and creates no workspace.
-
-
-## Standalone selective requests
-
-`meteorology sources`, `meteorology variables --data-source SOURCE` and
-`meteorology get VARIABLE --start-date DATE --end-date DATE --bbox WEST SOUTH EAST NORTH
---data-source SOURCE --output FILE` use the shared Python request path.
-Use `--dry-run` to preview dependencies, exact boundaries, support and caps.
-See [request options and availability](../request-api.md). Legacy `variables`
-without `--data-source` retains its family inventory output.

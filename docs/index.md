@@ -2,19 +2,24 @@
 
 # Reproducible context for environmental modeling
 
-`toolkit-meteorology` creates provenance-aware spatial and temporal meteorological and astronomical data products. It is an independently installable Python package with a `meteorology` command, a small [Python API](reference/api.md), explicit Arrow schemas, and inspectable manifests.
+`toolkit-meteorology` retrieves selected weather variables through Python getters
+and the `meteorology get` command. Choose HRRR or ERA5 explicitly, preview a bounded
+request, then retain daily or hourly data with units, coverage, nulls and
+checksum-backed source lineage. The package also builds independently versioned
+weather, daylight and lunar families.
 
-The current weather producer is **retrospective**: six local-day HRRR `sfc/f00` analyses, paired with one-hour-lead `sfc/f01` precipitation-rate forecasts. The precipitation result is an estimate from six snapshots. It is not a measured 24-hour accumulation or a future-weather forecast.
-
-The October 2026 [implementation tracker](IMPLEMENTATION_TRACKER.md) records the corrective patch, separate [hourly H3 family](hourly-weather.md), frozen-reference results, and remaining provider/accuracy gates. Hourly offline product checks do not establish real HRRR compatibility or regional accuracy.
+Start with the [quickstart](getting-started/quickstart.md) and
+[weather request guide](request-api.md). Python 3.11–3.13 on macOS/Linux is supported.
+The [Python API](reference/api.md) and [CLI reference](reference/cli.md) document
+both selective requests and existing family workflows.
 
 <div class="grid cards" markdown>
 
-- :material-weather-partly-cloudy: **Surface weather**<br>
-  Temperature, humidity, vector wind, gusts, visibility, cloud, pressure, and a carefully labeled precipitation estimate at H3 R5.
+- :material-weather-partly-cloudy: **Selective weather**<br>
+  Request only supported quantities. HRRR offers R5 or native support; ERA5 retains its native distribution grid.
 
-- :material-clock-outline: **Hourly atmosphere**<br>
-  Distinct f00 values at every actual UTC hour and H3 R5 cell from retained decoded source inputs.
+- :material-clock-outline: **Daily and hourly results**<br>
+  Actual UTC samples, complete-day reductions, explicit missingness and disk-backed exports with reusable caches.
 
 - :material-weather-sunny: **Daylight**<br>
   Deterministic solar context at R4, including a compact 365/366-day lookup and explicit polar missingness.
@@ -27,16 +32,58 @@ The October 2026 [implementation tracker](IMPLEMENTATION_TRACKER.md) records the
 
 </div>
 
-## First run
+## Preview a request
 
 ```bash
-python -m pip install '.[test]'
-meteorology --workspace ./demo init
-meteorology --workspace ./demo example-offline
-meteorology --workspace ./demo validate --daily-matrix ./demo/outputs/synthetic-daily-matrix.parquet
+python -m pip install '.[native-pilot]'  # from a clone, for selective HRRR
+meteorology sources
+meteorology variables --data-source hrrr
+meteorology get temperature --start-date 2024-01-01 --end-date 2024-01-01 \
+  --bbox -124 48 -123 48.5 --data-source hrrr --dry-run
 ```
 
-The offline example creates labeled **synthetic** HRRR-like inputs and builds the normal support, weather, daylight, lunar and daily-matrix products. It requires a fresh workspace and makes no network requests. See the [quickstart](getting-started/quickstart.md) for a wheel-install example and [acquisition guide](WORKFLOWS.md) before running real HRRR downloads.
+The preview makes no provider requests or writes and requires no initialized
+workspace. It reports dependencies, UTC boundaries, support, cache status and
+resource caps. Replace `--dry-run` with `--cache-dir ./weather-cache --output
+temperature.parquet` to acquire the selected fields and export the result.
+
+```python
+from meteorology import get_temperature
+
+preview = get_temperature(
+    "2024-01-01", "2024-01-01", (-124.0, 48.0, -123.0, 48.5), "hrrr",
+    dry_run=True,
+)
+```
+
+Without `dry_run=True`, a getter returns `WeatherResult`: `.to_pandas()` loads the
+selected rows and `.to_parquet(path)` streams an export with durable metadata.
+Dates are inclusive UTC days. Source support and accumulation rules are detailed
+in the [request guide](request-api.md).
+
+## Try the software offline
+
+From a clone, the request demo uses generated ERA5 GRIB through the public getter:
+
+```bash
+python -m pip install '.[era5]'
+python demo/request_offline.py --output ./request-demo
+```
+
+For a core-only installed-package example, use a fresh workspace:
+
+```bash
+meteorology --workspace ./weather-demo init
+meteorology --workspace ./weather-demo example-offline
+meteorology --workspace ./weather-demo validate \
+  --daily-matrix ./weather-demo/outputs/synthetic-daily-matrix.parquet
+```
+
+Both examples label their inputs **synthetic** and make no provider requests.
+Generated-GRIB and mocked-HTTP checks establish software behavior; new live
+NOAA/CDS query compatibility and independent regional accuracy remain unverified
+in this refactor. See the [implementation tracker](IMPLEMENTATION_TRACKER.md) and
+[measured refactor evidence](request-refactor-evidence.md).
 
 ## One week of real weather
 
@@ -45,7 +92,14 @@ daily/weekly H3 and regional summaries, with explicit transfer budgets, resumpti
 and resource accounting. Observational accuracy and future forecast skill remain
 separate acceptance gates.
 
-## How products flow
+## Existing family products
+
+The original daily weather family uses six local-day HRRR `sfc/f00` analyses and
+matched `sfc/f01` precipitation-rate forecasts. `PRECIP_MM_DAY_ESTIMATE` remains an
+estimate from six snapshots, separate from the selective ERA5 hourly accumulation
+totals. The [hourly H3 family](hourly-weather.md) retains distinct f00 values at
+each actual UTC hour. These family workflows preserve their original local-day,
+DST, method and release contracts.
 
 ```mermaid
 flowchart LR
@@ -65,7 +119,6 @@ Solar and lunar products require H3 support, but no HRRR acquisition. The option
 
 Weather, daylight and lunar context do not measure species occurrence, observer access, reporting, or detection probability. Read the [scientific methodology](methodology.md) and [limitations](limitations.md) before using these values as predictors.
 
-
-Start with [standalone weather requests](request-api.md) for selective Python/CLI
-retrieval, installation, offline fixtures, source availability and cache reuse.
-Existing family workflows and shared-study publication remain available separately.
+Use [shared-study configuration](shared-study.md) and
+[marine reporting integration](marine-reporting.md) for production study outputs;
+their geometry, registry and publication gates remain separate from a bbox query.

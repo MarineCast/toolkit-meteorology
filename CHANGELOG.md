@@ -4,6 +4,19 @@ All notable changes to this package are recorded here. Software versions follow 
 
 ## Unreleased
 
+- Added source-selective `get_weather` and variable getters with matching
+  `meteorology get`, `sources` and source-specific `variables` commands. Requests
+  retain UTC boundaries, native or qualified HRRR R5 support, explicit missingness,
+  checksum-backed caches and disk-backed exports. ERA5 precipitation and snowfall
+  use one-hour water-equivalent amounts; legacy rate estimates remain distinct.
+- Reduced repeated native processing with selective ERA5 point-block reads and
+  verified HRRR geometry reuse; bounded legacy download submission and separated
+  current RSS admission from peak reporting. The benchmark records read savings
+  and increased row-group storage without claiming a wall-time speedup.
+- Made HTML inspection libraries optional and updated MkDocs onboarding, getter
+  API reference, source-pilot/shared-study navigation and implementation evidence.
+  New live-source compatibility and independent scientific acceptance remain unrun.
+
 - Added `demo-hourly-week`: bounded, resumable direct NOAA AWS byte-range acquisition,
   the existing strict decoded-grid and hourly release pipeline, native-H3 and regional
   summaries, persistent transfer accounting and readable resource/spatial-variation reports.

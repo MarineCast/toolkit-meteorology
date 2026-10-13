@@ -1,12 +1,32 @@
 # Development
 
-Install `.[dev]`, then run `python -m pytest -q`, `ruff check src tests`,
+Install `.[dev,native-pilot]`, then run `python -m pytest -q`,
+`ruff check src tests benchmarks demo`,
 `meteorology catalog --check`, `meteorology feature-policy --check`,
 `mkdocs build --strict` and `git diff --check`. Build with `python -m build`
 and check both distributions with `python -m twine check dist/*`. Install the
 wheel into a fresh environment outside the checkout, run `meteorology --help`,
 `meteorology --workspace /tmp/weather-smoke init`, `example-offline`, `validate`,
-and `python -m pip check` there. See the [release checklist](development/release-process.md).
+and `python -m pip check` there. Also exercise `meteorology sources`,
+`meteorology variables --data-source era5` and a `meteorology get ... --dry-run`
+outside the checkout; the core install must not require Folium, Branca or
+GeoPandas. See the [release checklist](development/release-process.md).
+
+Generated native GRIB fixtures require ecCodes from `.[native-pilot]` or `.[era5]`.
+Without that extra the codec-dependent checks skip; normal tests never contact
+NOAA/CDS. For focused request checks, run:
+
+```sh
+python -m pytest -q tests/test_request_api.py tests/test_request_transport.py \
+  tests/test_processing_scaling.py tests/test_concurrency.py
+python demo/request_offline.py --output /tmp/request-demo
+python benchmarks/native_processing.py /tmp/request-native-processing.json
+```
+
+The request demo requires `.[era5]` and a fresh output directory. Benchmarks use
+synthetic inputs and record deterministic read/decode counts separately from
+environment-dependent runtime and memory. See the
+[measured evidence and tradeoffs](request-refactor-evidence.md).
 
 `src/meteorology` owns producers, astronomy, inspections, manifests, schemas, and a local dataset
 registry. `core` contains the minimal shared helpers extracted from OrcaCast; it has no application

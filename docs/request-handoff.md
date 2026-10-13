@@ -1,9 +1,11 @@
 # Request refactor handoff
 
-Work is on local branch `codex/meteorology-request-api`, based on fetched
+The implementation checkpoint used branch `codex/meteorology-request-api`, based on fetched
 `origin/main` at `fef8fcf`. The clean original `feat-demo` branch at `256df38` is
-preserved. Main and published datasets were not changed; no remote push or release
-was performed. Only this repository is affected.
+preserved. Main and published datasets were not changed at that checkpoint;
+remote push and release publication were not part of its execution. A subsequent
+documentation/PR handoff updates the MkDocs entry pages, API reference, navigation
+and tracker for review. Only this repository is affected.
 
 ## Implemented changes
 
