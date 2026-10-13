@@ -14,6 +14,7 @@ from ..artifacts import checksum_path
 from ..study import load_study_config
 from .source import decode_grib
 from .daily import utc_daily
+from .blocks import write_point_blocks
 from .resources import (
     Budget,
     LimitExceeded,
@@ -125,14 +126,7 @@ def process_native_day(
                     writer = pq.ParquetWriter(
                         normalized, table.schema, compression="zstd", use_dictionary=True
                     )
-                # Each row group physically contains only one native-point block.
-                # Record its address while writing; predicates alone would still scan
-                # every time-major group in the former layout.
-                for offset in range(0, n, POINT_BATCH):
-                    block = table.slice(offset, min(POINT_BATCH, n - offset))
-                    writer.write_table(block, row_group_size=POINT_BATCH)
-                    point_groups.setdefault(offset, []).append(row_group)
-                    row_group += 1
+                row_group = write_point_blocks(writer,table,point_groups,row_group)
                 budget.checkpoint()
         if writer is not None:
             writer.close()
@@ -142,13 +136,13 @@ def process_native_day(
         atomic_json(
             state, dict(status="AGGREGATING", day=day, grid_points=grid_size, messages=messages)
         )
+        file = pq.ParquetFile(normalized)
         for offset in range(0, grid_size, POINT_BATCH):
             indices = set(range(offset, min(offset + POINT_BATCH, grid_size)))
             budget.checkpoint(
                 additional_memory=len(indices) * 338 * ROW_BYTES * COPIES
                 + PARQUET_BATCH * ROW_BYTES * COPIES
             )
-            file = pq.ParquetFile(normalized)
             groups = point_groups.get(offset, [])
             rows = sum(file.metadata.row_group(i).num_rows for i in groups)
             if not groups or rows > len(indices) * 338:

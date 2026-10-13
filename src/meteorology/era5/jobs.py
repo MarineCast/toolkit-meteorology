@@ -1,4 +1,4 @@
-"""Bounded, provider-injected CDS lifecycle. No concrete network adapter is enabled.
+"""Bounded, provider-injected CDS lifecycle; CDSHTTPProvider supplies bounded HTTPS.
 
 A provider MUST bound every underlying HTTP call/response, disable hidden retries,
 redirects and logging, and never forward credentials to result storage. Method

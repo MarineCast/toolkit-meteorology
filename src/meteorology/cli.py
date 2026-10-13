@@ -17,6 +17,23 @@ FAMILIES = {
 }
 
 
+CLI_MODULES = {
+    "verify": "surface_weather.verify",
+    "catalog": "maintenance.update_environment_feature_catalog",
+    "feature-policy": "modeling.feature_policy",
+    "benchmark": "maintenance.benchmark_hrrr_r5_acquisition",
+    "migrate-legacy": "migration",
+    "validate": "validation",
+    "variables": "variables",
+    "freeze-release": "releases",
+    "example-offline": "offline_example",
+    "export-weather-summary": "weather_summary",
+    "demo-hourly-week": "week_demo",
+    "era5-plan": "era5.plan",
+    "hrrr-plan": "hourly_weather.retrospective_plan",
+}
+
+
 def initialize_workspace(root: Path) -> list[Path]:
     """Copy packaged defaults without replacing existing user configuration."""
     created = []
@@ -55,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
         sub = commands.add_parser(action, help=f"{action.title()} one product; use FAMILY --help for options.")
         sub.add_argument("family", choices=("surface-weather", "hourly-weather") if action == "download" else FAMILIES)
         sub.add_argument("arguments", nargs=argparse.REMAINDER)
-    for action in ("verify", "catalog", "feature-policy", "benchmark", "migrate-legacy", "validate", "variables", "freeze-release", "example-offline", "export-weather-summary", "demo-hourly-week", "era5-plan", "hrrr-plan"):
+    for action in CLI_MODULES:
         sub = commands.add_parser(action, add_help=False)
         sub.add_argument("arguments", nargs=argparse.REMAINDER)
     commands.add_parser("sources", help="List source capabilities without configuration.")
@@ -67,7 +84,7 @@ def main(argv: list[str] | None = None) -> int:
     args, extra = parser.parse_known_args(argv)
     if extra:
         # Forward --help and other flags for commands with no family argument.
-        if args.command in {"verify", "catalog", "feature-policy", "benchmark", "migrate-legacy", "validate", "variables", "freeze-release", "example-offline", "export-weather-summary", "demo-hourly-week", "era5-plan", "hrrr-plan"}:
+        if args.command in CLI_MODULES:
             args.arguments = extra + args.arguments
         elif args.command != "get":
             parser.error(f"unrecognized arguments: {' '.join(extra)}")
@@ -80,8 +97,10 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(SOURCES, indent=2))
             return 0
         if args.command == "get":
-            if args.study_config is not None:
+            if args.study_config is not None and "--help" not in args.arguments + extra:
                 parser.error("get is a standalone bbox query; shared-study publication uses existing producers")
+            if args.workspace is not None and "--help" not in args.arguments + extra:
+                parser.error("get uses --cache-dir; --workspace selects legacy family configuration")
             from .request_cli import main as request_main
             return request_main(extra + args.arguments)
         if args.command == "variables" and "--data-source" in args.arguments:
@@ -89,10 +108,8 @@ def main(argv: list[str] | None = None) -> int:
             return discovery(args.arguments)
         if args.command in {"build", "inspect", "download"} and "--help" in args.arguments:
             return _invoke(f"meteorology.{FAMILIES[args.family]}.{args.command}", args.arguments)
-        if args.command in {"variables", "validate", "catalog", "feature-policy", "era5-plan", "hrrr-plan"} and "--help" in args.arguments:
-            modules = {"variables":"variables", "validate":"validation", "catalog":"maintenance.update_environment_feature_catalog",
-                       "feature-policy":"modeling.feature_policy", "era5-plan":"era5.plan", "hrrr-plan":"hourly_weather.retrospective_plan"}
-            return _invoke(f"meteorology.{modules[args.command]}", args.arguments)
+        if args.command in CLI_MODULES and "--help" in args.arguments:
+            return _invoke(f"meteorology.{CLI_MODULES[args.command]}", args.arguments)
     except (ValueError, OSError, RuntimeError, ImportError) as exc:
         parser.exit(2, f"meteorology: {exc}\n")
     old_study = os.environ.get("MARINECAST_STUDY_CONFIG")
@@ -128,22 +145,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command in {"build", "inspect", "download"}:
             return _invoke(f"meteorology.{FAMILIES[args.family]}.{args.command}", args.arguments)
-        modules = {
-            "verify": "surface_weather.verify",
-            "catalog": "maintenance.update_environment_feature_catalog",
-            "feature-policy": "modeling.feature_policy",
-            "benchmark": "maintenance.benchmark_hrrr_r5_acquisition",
-            "migrate-legacy": "migration",
-            "validate": "validation",
-            "variables": "variables",
-            "freeze-release": "releases",
-            "example-offline": "offline_example",
-            "export-weather-summary": "weather_summary",
-            "demo-hourly-week": "week_demo",
-            "era5-plan": "era5.plan",
-            "hrrr-plan": "hourly_weather.retrospective_plan",
-        }
-        return _invoke(f"meteorology.{modules[args.command]}", args.arguments)
+        return _invoke(f"meteorology.{CLI_MODULES[args.command]}", args.arguments)
     except (ValueError, FileNotFoundError, FileExistsError, RuntimeError, ImportError) as exc:
         parser.exit(2, f"meteorology: {exc}\n")
     finally:

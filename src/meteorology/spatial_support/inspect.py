@@ -5,8 +5,6 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import folium
-import geopandas as gpd
 
 from meteorology.core.config.presentation import (
     DEFAULT_PRESENTATION_CONFIG_PATH,
@@ -26,6 +24,11 @@ def inspect_meteorological_spatial_support(
     presentation_config_path: str | Path = DEFAULT_PRESENTATION_CONFIG_PATH,
     output_path: str | Path | None = None,
 ) -> Path:
+    try:
+        import folium
+        import geopandas as gpd
+    except ImportError:
+        raise ImportError("Install toolkit-meteorology[visualization] to render HTML maps.") from None
     config = load_meteorological_config(config_path)
     manifest = load_manifest(config.support_manifest_path, verify_artifacts=True)
     settings = load_presentation_settings(presentation_config_path)

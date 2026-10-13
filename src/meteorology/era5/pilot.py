@@ -81,11 +81,6 @@ def pilot_plan(study_config):
     return plan
 
 
-def _credential(path):
-    from .credentials import resolve_credentials
-    return resolve_credentials(env_file=path, required=True).key
-
-
 def run_pilot(study_config, plan, output, *, credential_env_file=None, provider_factory=CDSHTTPProvider):
     if plan != pilot_plan(study_config):
         raise ValueError("Plan differs from exact reviewed study/source/date/region/caps.")
@@ -104,8 +99,9 @@ def run_pilot(study_config, plan, output, *, credential_env_file=None, provider_
         budget.bind_journal(journal)
         budget.check_disk(root, additional_bytes=65536)
         atomic_json(plan_path, plan)
+        from .credentials import resolve_credentials
         provider = provider_factory(
-            key=_credential(credential_env_file),
+            key=resolve_credentials(env_file=credential_env_file, required=True).key,
             budget=budget,
             storage_hosts=tuple(plan["storage_hosts"]),
             download_cap=plan["download_reservation_per_job"],

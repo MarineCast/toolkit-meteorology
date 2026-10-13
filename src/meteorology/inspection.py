@@ -7,8 +7,6 @@ from html import escape
 from pathlib import Path
 from typing import Sequence
 
-import branca.colormap as cm
-import folium
 import numpy as np
 import pandas as pd
 import pyarrow.dataset as ds
@@ -94,6 +92,11 @@ def inspect_daily_product(
 ) -> Path:
     """Validate a product manifest and render selected columns as H3 layers."""
 
+    try:
+        import branca.colormap as cm
+        import folium
+    except ImportError:
+        raise ImportError("Install toolkit-meteorology[visualization] to render HTML maps.") from None
     manifest = load_manifest(manifest_path, verify_artifacts=True)
     frame = read_product_date(dataset_path, date)
     missing = sorted(set(metrics).difference(frame.columns))
