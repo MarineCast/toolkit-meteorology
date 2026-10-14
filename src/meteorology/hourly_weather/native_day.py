@@ -212,7 +212,7 @@ class NativeHTTP(NativeCache):
         metadata = dict(binding, status="PLANNED")
         meta_path = path.with_suffix(path.suffix + ".source.json")
         self.budget.check_disk(folder, additional_bytes=8192)
-        atomic_json(meta_path, metadata)
+        self.budget.write_json(meta_path, metadata)
 
         def open_response():
             headers = {
@@ -272,7 +272,7 @@ class NativeHTTP(NativeCache):
                     etag=etag,
                     retrieved_at_utc=datetime.now(timezone.utc).isoformat(),
                 )
-                atomic_json(meta_path, metadata)
+                self.budget.write_json(meta_path, metadata)
                 return response
             except BaseException:
                 response.close()
@@ -282,6 +282,7 @@ class NativeHTTP(NativeCache):
             open_response, path, budget=self.budget, reservation_bytes=reservation
         )
         self.budget.persist()
+        self.budget.retain_directory(folder)
         return path, metadata
 
 

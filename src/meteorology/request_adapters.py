@@ -104,6 +104,7 @@ def hrrr_day(
             except ArchiveMissing:
                 continue
             from .request_sources import hrrr_spans
+
             selections = []
             for name, span in hrrr_spans(index, valid, fields):
                 cached, _, _ = http.cached_transfer(
@@ -172,20 +173,38 @@ def hrrr_day(
                 "Request bbox contains no native HRRR points; enlarge bbox or choose H3."
             )
         from .hourly_weather.native_source import METRIC_INPUTS
+
         inverse = {name: metric for metric, (name, _) in METRIC_INPUTS.items()}
         for name, path in files.items():
             receipt = next(r for r in hour_receipts if r["path"] == str(path.resolve()))
-            raw = frame["RAW_U_WIND_10M_MS"] if name == "u_wind_10m_ms" else frame["RAW_V_WIND_10M_MS"] if name == "v_wind_10m_ms" else frame[inverse[name]]
-            frame[name + '__LINEAGE'] = [json.dumps(dict(
-                parameter=name, valid_time_utc=valid.isoformat(), source_generation=generation,
-                selected_revision=generation, source_grid_index=int(index),
-                source_grid_hash=evidence["source_grid_hash"],
-                source_sha256=receipt['sha256'], retrieved_at_utc=receipt['retrieved_at_utc'],
-                consolidation_status='operational_analysis',
-                value_status='VALID' if np.isfinite(value) else 'BITMAP_NULL',
-                init_time_utc=valid.isoformat(), forecast_hour=0,
-                interval_start_utc=valid.isoformat()), sort_keys=True)
-                for index, value in zip(frame.SOURCE_GRID_INDEX, raw)]
+            raw = (
+                frame["RAW_U_WIND_10M_MS"]
+                if name == "u_wind_10m_ms"
+                else frame["RAW_V_WIND_10M_MS"]
+                if name == "v_wind_10m_ms"
+                else frame[inverse[name]]
+            )
+            frame[name + "__LINEAGE"] = [
+                json.dumps(
+                    dict(
+                        parameter=name,
+                        valid_time_utc=valid.isoformat(),
+                        source_generation=generation,
+                        selected_revision=generation,
+                        source_grid_index=int(index),
+                        source_grid_hash=evidence["source_grid_hash"],
+                        source_sha256=receipt["sha256"],
+                        retrieved_at_utc=receipt["retrieved_at_utc"],
+                        consolidation_status="operational_analysis",
+                        value_status="VALID" if np.isfinite(value) else "BITMAP_NULL",
+                        init_time_utc=valid.isoformat(),
+                        forecast_hour=0,
+                        interval_start_utc=valid.isoformat(),
+                    ),
+                    sort_keys=True,
+                )
+                for index, value in zip(frame.SOURCE_GRID_INDEX, raw)
+            ]
         frames.append(frame)
         receipts.extend(hour_receipts)
     if not frames:
@@ -284,9 +303,12 @@ def era5_day(
         for lat in np.arange(area[2], area[0] + 0.01, 0.25)
         for lon in np.arange(area[1], area[3] + 0.01, 0.25)
     }
-    normalized = run_root / f"{day}-normalized.parquet"
+    import uuid
+
+    normalized = run_root / f"{day}-normalized-{uuid.uuid4().hex}.parquet"
     groups, group_index = {}, 0
     writer = None
+    budget.begin_write(normalized, 65536)
     grid = None
     count = 0
     forecast_support = []
@@ -326,13 +348,12 @@ def era5_day(
                     table,
                     groups,
                     group_index,
-                    before_write=lambda rows: budget.check_disk(
-                        root, additional_bytes=rows * ROW_BYTES
-                    ),
+                    before_write=lambda rows: budget.reserve_more(normalized, rows * ROW_BYTES),
                 )
     finally:
         if writer is not None:
             writer.close()
+        budget.finish_write(normalized)
     if grid is None:
         raise ValueError("ERA5 source contains no requested records.")
     pieces = []
@@ -343,14 +364,31 @@ def era5_day(
         budget.checkpoint(additional_memory=rows * ROW_BYTES * COPIES)
         records = file.read_row_groups(addresses).to_pandas()
         records = consolidate(records, expected_native_indices=set(records.SOURCE_GRID_INDEX))
-        support_columns = ['PARAMETER', 'VALID_TIME_UTC', 'INIT_TIME_UTC', 'FORECAST_HOUR',
-                           'INTERVAL_START_UTC', 'EXPVER', 'SOURCE_SHA256', 'SOURCE_GRID_HASH', 'SOURCE_DATA_TYPE']
+        support_columns = [
+            "PARAMETER",
+            "VALID_TIME_UTC",
+            "INIT_TIME_UTC",
+            "FORECAST_HOUR",
+            "INTERVAL_START_UTC",
+            "EXPVER",
+            "SOURCE_SHA256",
+            "SOURCE_GRID_HASH",
+            "SOURCE_DATA_TYPE",
+        ]
         for row in records[support_columns].drop_duplicates().itertuples():
-            forecast_support.append(dict(parameter=row.PARAMETER, valid_time_utc=row.VALID_TIME_UTC,
-                init_time_utc=row.INIT_TIME_UTC, forecast_hour=int(row.FORECAST_HOUR),
-                interval_start_utc=row.INTERVAL_START_UTC, expver=int(row.EXPVER),
-                source_sha256=row.SOURCE_SHA256, source_grid_hash=row.SOURCE_GRID_HASH,
-                source_data_type=row.SOURCE_DATA_TYPE))
+            forecast_support.append(
+                dict(
+                    parameter=row.PARAMETER,
+                    valid_time_utc=row.VALID_TIME_UTC,
+                    init_time_utc=row.INIT_TIME_UTC,
+                    forecast_hour=int(row.FORECAST_HOUR),
+                    interval_start_utc=row.INTERVAL_START_UTC,
+                    expver=int(row.EXPVER),
+                    source_sha256=row.SOURCE_SHA256,
+                    source_grid_hash=row.SOURCE_GRID_HASH,
+                    source_data_type=row.SOURCE_DATA_TYPE,
+                )
+            )
         coords = records[
             ["SOURCE_GRID_INDEX", "SOURCE_LAT", "SOURCE_LON", "SOURCE_GRID_HASH"]
         ].drop_duplicates()
@@ -382,11 +420,20 @@ def era5_day(
             if (rh.dropna() > 100.01).any():
                 raise ValueError("ERA5 RH exceeds the Bolton water-RH contract; no clipping.")
             output["RELATIVE_HUMIDITY_2M_PCT"] = rh
-        records['PARAMETER_LINEAGE'] = [era5_evidence(row, generation) for row in records.itertuples()]
-        lineage = records.pivot(index=['SOURCE_GRID_INDEX', 'VALID_TIME_UTC'],
-                                columns='PARAMETER', values='PARAMETER_LINEAGE')
-        lineage.columns = [p + '__LINEAGE' for p in lineage.columns]
-        output = output.join(lineage).reset_index().merge(coords, on='SOURCE_GRID_INDEX', validate='many_to_one')
+        records["PARAMETER_LINEAGE"] = [
+            era5_evidence(row, generation) for row in records.itertuples()
+        ]
+        lineage = records.pivot(
+            index=["SOURCE_GRID_INDEX", "VALID_TIME_UTC"],
+            columns="PARAMETER",
+            values="PARAMETER_LINEAGE",
+        )
+        lineage.columns = [p + "__LINEAGE" for p in lineage.columns]
+        output = (
+            output.join(lineage)
+            .reset_index()
+            .merge(coords, on="SOURCE_GRID_INDEX", validate="many_to_one")
+        )
         output = output[
             (output.SOURCE_LAT >= s)
             & (output.SOURCE_LAT <= n)
@@ -466,7 +513,15 @@ def reduce_day(hourly, plan, day):
                 output.append(
                     dict(
                         lineage,
-                        **summarize([d for stamp in slots for d in slot_evidence(indexed, stamp, metric, plan["request"]["source"])]),
+                        **summarize(
+                            [
+                                d
+                                for stamp in slots
+                                for d in slot_evidence(
+                                    indexed, stamp, metric, plan["request"]["source"]
+                                )
+                            ]
+                        ),
                         VALUE=float(
                             values.sum() if definition["reduction"] == "sum" else values.mean()
                         )
@@ -485,7 +540,9 @@ def reduce_day(hourly, plan, day):
                     output.append(
                         dict(
                             lineage,
-                            **summarize(slot_evidence(indexed, stamp, metric, plan["request"]["source"])),
+                            **summarize(
+                                slot_evidence(indexed, stamp, metric, plan["request"]["source"])
+                            ),
                             VALID_TIME_UTC=stamp.isoformat(),
                             VALUE=float(value) if good else None,
                             STATUS="COMPLETE" if good else "UNAVAILABLE",

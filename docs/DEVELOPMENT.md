@@ -54,3 +54,10 @@ tags and Python dependency compatibility during each software release; the
 release job accepts only an exact `vX.Y.Z` tag matching the canonical version.
 PyPI publishing additionally requires the explicit repository variable and
 protected `pypi` environment described in the release checklist.
+
+Request review regressions: `python -m pytest -q tests/test_request_review.py
+tests/test_request_lineage.py tests/test_request_preflight.py
+tests/test_request_storage.py`. These exercise real immutable caches, generated
+GRIB and mocked provider revisions; they make no provider requests.
+`python benchmarks/request_review.py after` reports deterministic operation
+counts and descriptive wall time/memory. There are no timing thresholds.

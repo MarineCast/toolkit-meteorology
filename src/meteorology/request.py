@@ -24,6 +24,7 @@ def fingerprint():
         "request_vintage.py",
         "request_lineage.py",
         "request_sources.py",
+        "request_storage.py",
         "capabilities.py",
         "era5/source.py",
         "era5/daily.py",
@@ -61,6 +62,7 @@ def plan_weather(
     source_files=None,
     retrieved_at_utc=None,
     credential_env_file=None,
+    retained_cache_bytes=None,
 ):
     """Validate everything before acquisition; date-only endpoints are inclusive."""
     names, inputs = dependencies(variables, data_source)
@@ -116,6 +118,12 @@ def plan_weather(
             raise ValueError("Request bbox has no native ERA5 grid points; enlarge bbox.")
         estimated_points = (round((area[0] - area[2]) * 4) + 1) * (
             round((area[3] - area[1]) * 4) + 1
+        )
+    if retained_cache_bytes is not None and (
+        type(retained_cache_bytes) is not int or retained_cache_bytes <= 0
+    ):
+        raise ValueError(
+            "retained_cache_bytes must be a positive quota or None for unbounded retention."
         )
     limits = limits or Limits(
         memory_bytes=1024**3, staging_bytes=2 * 1024**3, transfer_bytes=512 * 1024**2, requests=1024
@@ -257,6 +265,7 @@ def plan_weather(
         nominal_provider_requests=nominal_requests,
         transfer_size="unknown; transfer cap is a reservation limit, not a prediction",
         credential_env_file=credential_env_file,
+        retained_cache_bytes=retained_cache_bytes,
     )
 
 
@@ -278,6 +287,7 @@ def get_weather(
     source_files=None,
     retrieved_at_utc=None,
     credential_env_file=None,
+    retained_cache_bytes=None,
 ):
     """Acquire dependencies once, return disk-backed UTC date/support/metric data.
 
@@ -302,9 +312,29 @@ def get_weather(
         source_files=source_files,
         retrieved_at_utc=retrieved_at_utc,
         credential_env_file=credential_env_file,
+        retained_cache_bytes=retained_cache_bytes,
     )
+    if result_id is not None and source_files is None:
+        from .request_cache import _manifest
+        from .request_vintage import CacheError
+
+        if len(result_id) != 64 or any(c not in "0123456789abcdef" for c in result_id):
+            raise CacheError("result_id must be a SHA256 identity.")
+        locations = [
+            plan["cache_dir"] / name
+            for name in ("real", "fixtures")
+            if (plan["cache_dir"] / name / "results" / result_id).is_dir()
+        ]
+        if len(locations) != 1:
+            raise CacheError("Pinned result must exist unambiguously in the selected cache.")
+        _, pinned = _manifest(locations[0], result_id)
+        plan["request"]["evidence_kind"] = pinned["request"]["evidence_kind"]
     if dry_run:
         return preview_request(plan, refresh=refresh, result_id=result_id)
     return execute_request(
-        plan, refresh=refresh, result_id=result_id, source_files=source_files, retrieved_at_utc=retrieved_at_utc
+        plan,
+        refresh=refresh,
+        result_id=result_id,
+        source_files=source_files,
+        retrieved_at_utc=retrieved_at_utc,
     )

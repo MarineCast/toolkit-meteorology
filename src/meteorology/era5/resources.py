@@ -162,6 +162,12 @@ class Budget:
         if size + additional_bytes > self.limits.staging_bytes:
             raise LimitExceeded("Owned staging byte cap exceeded.")
 
+    def write_json(self, path, value):
+        atomic_json(Path(path), value)
+
+    def retain_directory(self, path):
+        pass  # Legacy aggregate pilot accounting deliberately keeps all siblings.
+
     def reserve_transfer(self, size):
         self.checkpoint()
         if (
@@ -218,9 +224,12 @@ def _bounded_transfer_locked(
     if partial.exists() or receipt.exists():
         raise FileExistsError("Transfer run already exists; use a new immutable destination.")
     budget.reserve_transfer(reservation_bytes)
+    incremental = getattr(budget, "incremental_storage", False)
+    if incremental:
+        budget.begin_write(partial, reservation_bytes)
     budget.check_disk(destination.parent, additional_bytes=4096)
     state = dict(status="RESERVED", reserved_bytes=reservation_bytes, received_bytes=0)
-    atomic_json(receipt, state)
+    budget.write_json(receipt, state)
     try:
         with open_response() as response, partial.open("xb") as f:
             length = response.headers.get("Content-Length")
@@ -235,7 +244,8 @@ def _bounded_transfer_locked(
                         )
                     break
                 budget.checkpoint(additional_memory=min(65536, remaining))
-                budget.check_disk(destination.parent, additional_bytes=min(65536, remaining) + 4096)
+                if not incremental:
+                    budget.check_disk(destination.parent, additional_bytes=min(65536, remaining) + 4096)
                 chunk = response.read(min(65536, remaining))
                 if not chunk:
                     break
@@ -246,6 +256,8 @@ def _bounded_transfer_locked(
                         "Opener returned more bytes than requested; partial not promoted."
                     )
                 f.write(chunk)
+                if incremental:
+                    budget.progress(partial, state["received_bytes"])
             if length is not None and state["received_bytes"] != int(length):
                 raise ValueError(
                     "Response ended before declared Content-Length; partial not promoted."
@@ -261,11 +273,17 @@ def _bounded_transfer_locked(
                     break
                 digest.update(chunk)
         state.update(status="COMPLETE", sha256=digest.hexdigest())
+        if incremental:
+            budget.finish_write(partial)
         os.replace(partial, destination)
-        atomic_json(receipt, state)
+        if incremental:
+            budget.move_storage(partial, destination, retained=True)
+        budget.write_json(receipt, state)
     except BaseException:
+        if incremental and str(partial.relative_to(budget.namespace)) in json.loads(budget.ledger.read_text())["allocations"]:
+            budget.finish_write(partial)
         state["status"] = "INCOMPLETE_NOT_PROMOTED"
-        atomic_json(receipt, state)
+        budget.write_json(receipt, state)
         raise
     return receipt
 

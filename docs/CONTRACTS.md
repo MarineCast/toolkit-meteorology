@@ -223,8 +223,10 @@ methods or publish a final marine reporting release.
 ## Standalone weather request contract
 
 [Weather requests](request-api.md) define the independent
-`meteorology-selective-utc-request-v1` method and
-`meteorology-date-support-metric-v1` schema. Date-only endpoints are inclusive;
+`meteorology-selective-utc-request-v2` method and
+`meteorology-date-support-metric-v2` schema. v2 preserves metric/slot-specific
+parameter and revision evidence; immutable v1 results are readable through
+explicit compatible pins and cannot satisfy a v2 cache hit. Date-only endpoints are inclusive;
 normalized UTC boundaries, native or qualified R5 support, units, nulls, complete
 slot counts, exact accumulation intervals and source receipts are durable.
 Variable-selective results never claim a complete legacy family or production

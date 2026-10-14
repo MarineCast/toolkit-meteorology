@@ -30,7 +30,9 @@ status and caps without network access or writes. Execution requires `--output`.
 | `--h3-resolution 5` | Qualified HRRR R5 support only |
 | `--cache-dir PATH` | Explicit retained source/result cache location |
 | `--output FILE` | Stream a Parquet export with embedded provenance |
-| `--refresh` | Start a new source generation, preserving previous cache evidence |
+| `--refresh` | Promote a validated complete source generation, preserving history |
+| `--result-id` | Pin a compatible historical result; mutually exclusive with refresh |
+| `--retained-cache-mib` | Persistent retained-cache namespace quota; default unbounded, no eviction |
 | `--credential-env-file PATH` | Explicit ERA5 credential alias file; see resolver precedence in the request guide |
 | `--memory-mib`, `--staging-mib`, `--transfer-mib` | Caps default to 1024, 2048 and 512 MiB respectively |
 | `--max-requests`, `--max-seconds` | Caps default to 1024 operations and 3600 active seconds |

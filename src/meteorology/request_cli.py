@@ -34,6 +34,8 @@ def main(arguments=None):
     parser.add_argument("--output", type=Path)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--refresh", action="store_true")
+    parser.add_argument("--result-id", help="Explicit historical result pin.")
+    parser.add_argument("--retained-cache-mib", type=int, help="Persistent namespace quota; default unbounded retention.")
     parser.add_argument("--credential-env-file", type=Path)
     parser.add_argument(
         "--source-files",
@@ -77,6 +79,8 @@ def main(arguments=None):
         limits=limits,
         dry_run=args.dry_run,
         refresh=args.refresh,
+        result_id=args.result_id,
+        retained_cache_bytes=args.retained_cache_mib * 1024**2 if args.retained_cache_mib is not None else None,
         source_files=args.source_files,
         retrieved_at_utc=args.retrieved_at_utc,
         credential_env_file=args.credential_env_file,

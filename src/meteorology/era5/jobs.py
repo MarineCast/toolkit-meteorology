@@ -16,7 +16,7 @@ import re
 import time
 
 from .planning import DATASET
-from .resources import Budget, atomic_json, _bounded_transfer_locked
+from .resources import Budget, _bounded_transfer_locked
 
 REQUEST_KEYS = {
     "product_type",
@@ -130,7 +130,7 @@ def run_job(
 
         def save():
             budget.check_disk(directory, additional_bytes=8192)
-            atomic_json(path, state)
+            budget.write_json(path, state)
 
         def call(method, *args):
             if not getattr(provider, "handles_http_budget", False):
@@ -192,7 +192,7 @@ def run_job(
                 )
             except BaseException:
                 state["status"] = "DOWNLOAD_INCOMPLETE"
-                atomic_json(path, state)
+                budget.write_json(path, state)
                 raise
             transfer = json.loads(receipt.read_text())
             with (directory / "source.grib").open("rb") as source:
@@ -212,6 +212,7 @@ def run_job(
                 .isoformat(),
             )
             save()
+            budget.retain_directory(directory)
             return state
         finally:
             budget.persist()

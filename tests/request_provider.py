@@ -1,4 +1,5 @@
 """Generated GRIB provider; exercises real job, source and result caches offline."""
+
 from io import BytesIO
 from .request_fixtures import era5_grib
 from meteorology.capabilities import ERA5_NAMES
@@ -34,10 +35,15 @@ class Provider:
         identity = str(len(self.jobs))
         reverse = {v: k for k, v in ERA5_NAMES.items()}
         path = self.tmp_path / f"provider-{identity}.grib"
-        era5_grib(path, day="-".join(selection[k][0] for k in ("year", "month", "day")),
-                  parameters=tuple(reverse[v] for v in selection["variable"]),
-                  area=selection["area"], hours=[int(t[:2]) for t in selection["time"]],
-                  samples_override={"t2m": self.temperature}, missing_hour=self.missing_hour)
+        era5_grib(
+            path,
+            day="-".join(selection[k][0] for k in ("year", "month", "day")),
+            parameters=tuple(reverse[v] for v in selection["variable"]),
+            area=selection["area"],
+            hours=[int(t[:2]) for t in selection["time"]],
+            samples_override={"t2m": self.temperature},
+            missing_hour=self.missing_hour,
+        )
         self.jobs[identity] = path
         return identity
 
@@ -47,9 +53,11 @@ class Provider:
 
     def result_opener(self, identity):
         self.calls.append("result")
+
         def open_result():
             self.calls.append("download")
             return Response(self.jobs[identity].read_bytes())
+
         return open_result
 
 

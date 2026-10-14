@@ -67,5 +67,5 @@ jobs:
           python-version: '3.12'
           cache: pip
       - run: python -m pip install '.[test,native-pilot]'
-      - run: python -m pytest -q tests/test_request_api.py tests/test_request_transport.py tests/test_hrrr_native_source.py tests/test_era5_resources.py tests/test_processing_scaling.py tests/test_concurrency.py
+      - run: python -m pytest -q tests/test_request_api.py tests/test_request_transport.py tests/test_hrrr_native_source.py tests/test_era5_resources.py tests/test_processing_scaling.py tests/test_concurrency.py tests/test_request_review.py tests/test_request_lineage.py tests/test_request_preflight.py tests/test_request_storage.py
       - run: meteorology get temperature --start-date 2024-01-01 --end-date 2024-01-01 --bbox -124 48 -123 48.5 --data-source hrrr --dry-run

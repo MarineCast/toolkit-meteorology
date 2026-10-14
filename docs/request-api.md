@@ -155,10 +155,9 @@ prior evidence. There is no incidental archive cleanup.
 A namespace lease serializes concurrent writers; a waiting compatible caller reads
 the first completed result. Persistent transfer counters charge interrupted
 attempts. Existing limits must be retained for resumption. Raw receipts and final
-artifacts are immutable; failed stages remain inspectable. The 2 GiB staging cap
-includes retained files in the selected cache namespace, so accumulated cache
-storage can stop new acquisition. Choose a fresh cache directory for independent
-runs; deleting retained evidence is an explicit owner decision.
+artifacts are immutable; failed stages remain inspectable. The 2 GiB staging cap applies to each run
+and its in-progress writes. Retained evidence has a separate optional namespace
+quota and an independent physical-disk safeguard; there is no automatic eviction.
 
 ## ERA5 credentials
 
@@ -209,7 +208,7 @@ environment variable is modified by a getter, and getters do not invoke the CLI.
 A generic bbox query ignores legacy workspace/study environment selection and
 never claims a production shared-study release. Use the existing shared-study
 workflow for that publication; its approval/registry prerequisites remain intact.
-The new request method/schema are independent v1 contracts; old releases are not
+The request method/schema are independent v2 contracts; old releases are not
 migrated or rewritten. Existing fixed pilots remain regression/qualification cases.
 
 ## Source vintage and explicit pins
@@ -225,7 +224,9 @@ and old results remain retained.
 A request spanning different active generations (including refreshed and previously
 unrefreshed dependencies/dates) requires explicit resolution: refresh the entire
 requested coverage or pin a coherent historical result. There is no automatic
-composition or downgrade to an older superset. Failed and partial refreshes retain
+composition or downgrade to an older superset. An active refreshed ERA5 vintage
+that lacks a new exact provider selection also requires explicit resolution;
+acquiring a new subset job cannot masquerade as reprocessing that vintage. Failed and partial refreshes retain
 the prior active generation. Readers and writers share a namespace lease. Corrupt
 active evidence raises an error; a successful refresh creates a healthy generation
 without deleting the corrupt evidence.
@@ -233,7 +234,9 @@ without deleting the corrupt evidence.
 Use `result_id=previous.metadata["result_id"]` with the same source, bbox, frequency
 and compatible date/variable subset to read a historical result explicitly. Pins
 validate all source receipts and selected artifacts and retain the historical
-method/schema. `refresh` and pinning are mutually exclusive. Legacy manifests have
+method/schema. A pin can locate retained synthetic results without re-supplying
+fixture files and still labels them synthetic. `refresh` and pinning are mutually
+exclusive. Legacy manifests have
 no inferred chronology: ambiguous eligible unindexed results require a pin or
 refresh, and their contents are never rewritten.
 
@@ -271,3 +274,45 @@ Warm-source processing requires neither credentials nor a provider client; final
 hits also skip decoding. Interrupted reservations cannot be reset by rerunning the
 same logical request with different caps. A cold estimate is never treated as an
 exact required count. Corrupt retained objects fail before reuse.
+
+## Run staging, retention and physical disk
+
+Request budgets reconcile the namespace once at run start/resume, then maintain
+atomic per-write reservations and byte deltas. Per-run staging includes active
+normalization, result stages, failed partials for that run, control allowance and
+in-progress source downloads even when written under shared source-cache paths.
+Committed objects become retained without double counting. Successful historical
+cache entries do not consume a new run's staging allowance. Failed attempts remain
+inspectable and interrupted transfer reservations stay charged.
+
+Retention defaults to **unbounded, with no eviction**. Set `retained_cache_bytes`
+in Python or `--retained-cache-mib` in the CLI to establish a persistent namespace
+quota, covering retained evidence, in-progress growth and accounting metadata.
+Subsequent requests inherit that quota; a different explicit quota is rejected.
+Physical disk admission reserves writes plus a 16 MiB safety margin independently
+of both caps. CDS source writes conservatively reserve their 32 MiB download cap
+until the actual received size is committed; small quotas may reject even a small
+fixture-sized response. Resource checks remain cooperative and do not promise OS
+preemption inside native allocations. Existing fixed-pilot budgets retain their
+original aggregate sibling-input/staging semantics.
+
+```python
+from meteorology import get_temperature
+from meteorology.era5.resources import Limits
+
+common = dict(cache_dir="weather-cache", spatial_output="native")
+old = get_temperature("2024-01-01", "2024-01-01", bbox, "era5",
+                      frequency="hourly", **common)
+new = get_temperature("2024-01-01", "2024-01-01", bbox, "era5",
+                      frequency="hourly", refresh=True, **common)
+pinned = get_temperature("2024-01-01", "2024-01-01", bbox, "era5",
+                         frequency="hourly", result_id=old.metadata["result_id"], **common)
+# The exact selected source job is already retained: no credentials/provider I/O.
+daily = get_temperature("2024-01-01", "2024-01-01", bbox, "era5",
+                        limits=Limits(memory_bytes=1024**3, requests=1), **common)
+assert daily.metadata["budget"]["requests"] == 0
+```
+
+Refresh performs acquisition; the generated-GRIB regression fixtures demonstrate
+these paths offline. Neither the example nor passing software checks certify
+regional accuracy, new geographic support or production backfill readiness.

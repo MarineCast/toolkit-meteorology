@@ -19,7 +19,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from .artifacts import checksum_path
-from .era5.resources import Budget, atomic_json, ROW_BYTES
+from .era5.resources import ROW_BYTES
+from .request_storage import RequestBudget
 from .request import digest
 from .request_vintage import CacheError, selected as selected_vintage, promote
 from .request_sources import inspect_sources
@@ -103,7 +104,17 @@ def _validate(directory, manifest, *, selected=None):
         ):
             raise CacheError("Result checksum is corrupt; retained evidence was not replaced.")
         file = pq.ParquetFile(path)
-        expected_schema = RESULT_SCHEMA if manifest["request"]["schema"].endswith("v2") else pa.schema([f for f in RESULT_SCHEMA if f.name not in {"SOURCE_VALUE_STATUS", "SOURCE_DEPENDENCIES"}])
+        expected_schema = (
+            RESULT_SCHEMA
+            if manifest["request"]["schema"].endswith("v2")
+            else pa.schema(
+                [
+                    f
+                    for f in RESULT_SCHEMA
+                    if f.name not in {"SOURCE_VALUE_STATUS", "SOURCE_DEPENDENCIES"}
+                ]
+            )
+        )
         if file.metadata.num_rows != entry["rows"] or not file.schema_arrow.equals(
             expected_schema, check_metadata=False
         ):
@@ -141,7 +152,9 @@ def _manifest(root, result_id):
     try:
         manifest = json.loads(path.read_text())
     except (OSError, ValueError):
-        raise CacheError("Selected result manifest is absent/corrupt; request refresh or inspect evidence.") from None
+        raise CacheError(
+            "Selected result manifest is absent/corrupt; request refresh or inspect evidence."
+        ) from None
     if manifest.get("result_id") != result_id:
         raise CacheError("Selected manifest has a different result identity.")
     return path, manifest
@@ -157,12 +170,19 @@ def _find(plan, *, result_id=None, locked=False):
         with (root / ".request.lock").open("a+b") as lease:
             fcntl.flock(lease, fcntl.LOCK_SH)
             return _find(plan, result_id=result_id, locked=True)
+    validated = set()
     if result_id:
         path, manifest = _manifest(root, result_id)
         existing, requested = manifest["request"].copy(), plan["request"].copy()
         # Pins explicitly retain the historical method/schema. Coverage, source,
         # frequency, support and requested quantities still must match.
-        for k in ("method", "schema", "producer_fingerprint", "fixture_checksums", "fixture_retrieved_at_utc"):
+        for k in (
+            "method",
+            "schema",
+            "producer_fingerprint",
+            "fixture_checksums",
+            "fixture_retrieved_at_utc",
+        ):
             existing.pop(k, None)
             requested.pop(k, None)
         if not _compatible(existing, requested):
@@ -173,36 +193,69 @@ def _find(plan, *, result_id=None, locked=False):
         for identity in witnesses:
             path, manifest = _manifest(root, identity)
             _validate(path.parent, manifest)
+            validated.add(identity)
             if manifest["status"] != "COMPLETE":
                 raise CacheError("Active generation witness is not complete.")
         candidates = []
-        paths = [root / "results" / i / "MANIFEST.json" for i in registered]
+        if registered and isinstance(registered[0], dict):
+            eligible = [
+                r
+                for r in registered
+                if r["source_generation"] == generation
+                and _compatible(r["request"], plan["request"])
+            ]
+            eligible.sort(key=lambda r: (r["rows"], r["result_id"]))
+            paths = [root / "results" / r["result_id"] / "MANIFEST.json" for r in eligible[:1]]
+        else:
+            paths = [root / "results" / i / "MANIFEST.json" for i in registered]
         if not registered:
             paths = list((root / "results").glob("*/MANIFEST.json"))
         for path in paths:
             try:
                 manifest = json.loads(path.read_text())
             except (OSError, ValueError):
-                raise CacheError("Unreadable result manifest; explicit reconciliation required.") from None
-            if manifest.get("status") == "COMPLETE" and _compatible(manifest.get("request", {}), plan["request"]):
+                raise CacheError(
+                    "Unreadable result manifest; explicit reconciliation required."
+                ) from None
+            if manifest.get("status") == "COMPLETE" and _compatible(
+                manifest.get("request", {}), plan["request"]
+            ):
                 if manifest.get("source_generation", "retained") == generation:
                     candidates.append((path, manifest))
         unindexed = [pair for pair in candidates if "source_generation" not in pair[1]]
         if len(unindexed) > 1:
             raise CacheError("Legacy results have no revision ordering; pin result_id or refresh.")
         # Only after choosing source vintage may representation size break ties.
-        candidates.sort(key=lambda pair: (sum(a["rows"] for a in pair[1]["artifacts"]), pair[1]["result_id"]))
+        candidates.sort(
+            key=lambda pair: (sum(a["rows"] for a in pair[1]["artifacts"]), pair[1]["result_id"])
+        )
     if not candidates:
         return None
     path, manifest = candidates[0]
-    wanted = [a for a in manifest["artifacts"] if a["metric"] in plan["metrics"]
-              and plan["request"]["start"] <= a["day"] < plan["request"]["end_exclusive"]]
-    _validate(path.parent, manifest, selected=wanted)
+    wanted = [
+        a
+        for a in manifest["artifacts"]
+        if a["metric"] in plan["metrics"]
+        and plan["request"]["start"] <= a["day"] < plan["request"]["end_exclusive"]
+    ]
+    expected = {
+        (stamp.date().isoformat(), metric)
+        for stamp in pd.date_range(
+            plan["request"]["start"], plan["request"]["end_exclusive"], freq="D", inclusive="left"
+        )
+        for metric in plan["metrics"]
+    }
+    if {(a["day"], a["metric"]) for a in wanted} != expected or any(a["rows"] <= 0 for a in wanted):
+        raise CacheError("Selected result artifacts do not cover the requested dates/metrics.")
+    if manifest["result_id"] not in validated:
+        _validate(path.parent, manifest, selected=wanted)
     view_request = deepcopy(plan["request"])
     if result_id:
         for key in ("method", "schema", "producer_fingerprint"):
             view_request[key] = manifest["request"][key]
-    return WeatherResult(path.parent, manifest, request=view_request, selected=wanted, cache_hit=True)
+    return WeatherResult(
+        path.parent, manifest, request=view_request, selected=wanted, cache_hit=True
+    )
 
 
 class WeatherResult:
@@ -231,15 +284,26 @@ class WeatherResult:
             if m in {a["metric"] for a in self._selected}
         }
         from .request_lineage import parameters
-        allowed = {(a["day"], p, self._manifest["metrics"][a["metric"]]["reduction"] == "sum")
-                   for a in self._selected for p in parameters(self._request["source"], a["metric"])}
+
+        allowed = {
+            (a["day"], p, self._manifest["metrics"][a["metric"]]["reduction"] == "sum")
+            for a in self._selected
+            for p in parameters(self._request["source"], a["metric"])
+        }
+
         def relevant(item):
             stamp = pd.Timestamp(item["valid_time_utc"])
-            return any(p == item["parameter"] and
-                       pd.Timestamp(day, tz="UTC") + pd.Timedelta(hours=1 if accumulation else 0)
-                       <= stamp < pd.Timestamp(day, tz="UTC") + pd.Timedelta(hours=25 if accumulation else 24)
-                       for day, p, accumulation in allowed)
-        metadata["source_forecast_support"] = [s for s in metadata.get("source_forecast_support", []) if relevant(s)]
+            return any(
+                p == item["parameter"]
+                and pd.Timestamp(day, tz="UTC") + pd.Timedelta(hours=1 if accumulation else 0)
+                <= stamp
+                < pd.Timestamp(day, tz="UTC") + pd.Timedelta(hours=25 if accumulation else 24)
+                for day, p, accumulation in allowed
+            )
+
+        metadata["source_forecast_support"] = [
+            s for s in metadata.get("source_forecast_support", []) if relevant(s)
+        ]
         metadata.pop("manifest_sha256", None)  # the view has its own durable identity
         metadata["view_sha256"] = digest(metadata)
         return metadata
@@ -296,14 +360,36 @@ class WeatherResult:
 
 def preview_request(plan, *, refresh=False, result_id=None):
     hit = None if refresh else _find(plan, result_id=result_id)
-    generation = "preview-refresh" if refresh else selected_vintage(plan, _namespace(plan))[0]
-    work = inspect_sources(plan, _namespace(plan), generation, fixtures=plan["request"]["evidence_kind"] == "synthetic_fixture") if hit is None else dict(
-        reusable_source_objects=[], missing_source_work=[], remaining_provider_requests_lower_bound=0,
-        remaining_transfer_reservation_bytes=0, exact_provider_requests=True, uncertainties=[])
+    generation = (
+        "preview-refresh"
+        if refresh
+        else (
+            selected_vintage(plan, _namespace(plan))[0]
+            if hit is None
+            else hit._manifest.get("source_generation", "legacy_unindexed")
+        )
+    )
+    work = (
+        inspect_sources(
+            plan,
+            _namespace(plan),
+            generation,
+            fixtures=plan["request"]["evidence_kind"] == "synthetic_fixture",
+        )
+        if hit is None
+        else dict(
+            reusable_source_objects=[],
+            missing_source_work=[],
+            remaining_provider_requests_lower_bound=0,
+            remaining_transfer_reservation_bytes=0,
+            exact_provider_requests=True,
+            uncertainties=[],
+        )
+    )
     from .era5.credentials import resolve_credentials
 
     return dict(
-        request=plan["request"],
+        request=hit._request if hit is not None else plan["request"],
         required_inputs=plan["required_inputs"],
         metrics=plan["metrics"],
         time_boundaries=plan["time_boundaries"],
@@ -316,6 +402,11 @@ def preview_request(plan, *, refresh=False, result_id=None):
         ),
         cache=dict(
             final_result_hit=hit is not None,
+            result_id=hit._manifest["result_id"] if hit is not None else None,
+            source_generation=generation,
+            resolution_required="refresh_whole_request_or_pin_result"
+            if not refresh and generation != "retained" and work["missing_source_work"]
+            else None,
             **work,
             provider_requests_if_hit=0,
             missing_work=[]
@@ -339,18 +430,25 @@ def preview_request(plan, *, refresh=False, result_id=None):
         ),
         nominal_cold_cache_provider_requests=plan["nominal_provider_requests"],
         nominal_provider_requests=0 if hit else plan["nominal_provider_requests"],
+        retention_policy=dict(
+            quota_bytes=plan["retained_cache_bytes"],
+            default="unbounded_no_eviction",
+            physical_disk_safeguard=True,
+        ),
         transfer_size=plan["transfer_size"],
         limits=vars(plan["limits"]),
         memory_preflight=plan["memory_preflight"],
         access=resolve_credentials(env_file=plan["credential_env_file"], inspect_only=True).public()
-        if plan["request"]["source"] == "era5"
+        if plan["request"]["source"] == "era5" and work["missing_source_work"]
         else {"credential_required": False},
         production_shared_study_release=False,
         network_requests_made=0,
     )
 
 
-def execute_request(plan, *, refresh=False, result_id=None, source_files=None, retrieved_at_utc=None):
+def execute_request(
+    plan, *, refresh=False, result_id=None, source_files=None, retrieved_at_utc=None
+):
     root = _namespace(plan)
     root.mkdir(parents=True, exist_ok=True)
     # Namespace lease serializes source writers too. Concurrent compatible callers
@@ -369,12 +467,39 @@ def execute_request(plan, *, refresh=False, result_id=None, source_files=None, r
         generation = token if refresh else selected_vintage(plan, root)[0]
         run_root = root / "runs" / (plan["request_id"] if not refresh else token)
         run_root.mkdir(parents=True, exist_ok=True)
-        budget = Budget(plan["limits"], staging_root=root)
+        budget = RequestBudget(
+            plan["limits"],
+            namespace=root,
+            run_root=run_root,
+            retained_cache_bytes=plan["retained_cache_bytes"],
+        )
         budget.bind_journal(run_root / "TRANSFER_BUDGET.json")
         work = inspect_sources(plan, root, generation, fixtures=source_files is not None)
-        if budget.requests + work["remaining_provider_requests_lower_bound"] > plan["limits"].requests:
+        if not refresh and generation != "retained":
+            if work["missing_source_work"]:
+                raise CacheError(
+                    "Active vintage lacks this exact source selection; refresh the whole request or pin a result_id."
+                )
+            if source_files is not None:
+                witnesses = selected_vintage(plan, root)[1]
+                known = {
+                    receipt["sha256"]
+                    for identity in witnesses
+                    for receipt in _manifest(root, identity)[1]["inputs"]
+                }
+                if not set(plan["request"]["fixture_checksums"]) <= known:
+                    raise CacheError(
+                        "Supplied fixture bytes differ from active source vintage; refresh or pin a result_id."
+                    )
+        if (
+            budget.requests + work["remaining_provider_requests_lower_bound"]
+            > plan["limits"].requests
+        ):
             raise ValueError("Verified remaining acquisition work exceeds request cap.")
-        if budget.reserved + work["remaining_transfer_reservation_bytes"] > plan["limits"].transfer_bytes:
+        if (
+            budget.reserved + work["remaining_transfer_reservation_bytes"]
+            > plan["limits"].transfer_bytes
+        ):
             raise ValueError("Verified remaining transfer reservations exceed transfer cap.")
         from .request_adapters import hrrr_day, era5_day, reduce_day
 
@@ -386,8 +511,9 @@ def execute_request(plan, *, refresh=False, result_id=None, source_files=None, r
         last = date.fromisoformat(plan["request"]["end_exclusive"])
         geometry, mappings = {}, {}
         complete = True
+        terminal = False
         try:
-            atomic_json(
+            budget.write_json(
                 run_root / "RUN_STATE.json", dict(status="ACQUIRING", request=plan["request"])
             )
             while day < last:
@@ -411,7 +537,9 @@ def execute_request(plan, *, refresh=False, result_id=None, source_files=None, r
                     complete &= bool((frame.STATUS == "COMPLETE").all())
                     path = stage / f"{day_text}.{metric}.parquet"
                     budget.check_disk(root, additional_bytes=len(frame) * ROW_BYTES)
-                    pq.write_table(result_table(frame), path, compression="zstd")
+                    table = result_table(frame)
+                    with budget.write_file(path, table.nbytes + 65536):
+                        pq.write_table(table, path, compression="zstd")
                     artifacts.append(
                         dict(
                             path=path.name,
@@ -428,7 +556,12 @@ def execute_request(plan, *, refresh=False, result_id=None, source_files=None, r
             unique_inputs = sorted({json.dumps(r, sort_keys=True) for r in inputs})
             inputs = [json.loads(r) for r in unique_inputs]
             identity = digest(
-                dict(request=plan["request"], inputs=inputs, source_grids=sorted(grids), source_generation=generation)
+                dict(
+                    request=plan["request"],
+                    inputs=inputs,
+                    source_grids=sorted(grids),
+                    source_generation=generation,
+                )
             )
             runtime = {}
             for name in ("numpy", "pandas", "pyarrow", "h3", "pyproj", "shapely", "eccodes"):
@@ -470,7 +603,7 @@ def execute_request(plan, *, refresh=False, result_id=None, source_files=None, r
             for entry in artifacts:
                 with (stage / entry["path"]).open("rb") as stream:
                     os.fsync(stream.fileno())
-            atomic_json(stage / "MANIFEST.json", manifest)
+            budget.write_json(stage / "MANIFEST.json", manifest)
             destination = root / "results" / identity
             destination.parent.mkdir(exist_ok=True)
             if destination.exists():
@@ -480,24 +613,31 @@ def execute_request(plan, *, refresh=False, result_id=None, source_files=None, r
                 result = WeatherResult(destination, previous)
             else:
                 os.rename(stage, destination)
+                budget.move_storage(stage, destination)
                 descriptor = os.open(destination.parent, os.O_RDONLY)
                 try:
                     os.fsync(descriptor)
                 finally:
                     os.close(descriptor)
                 result = WeatherResult(destination, manifest)
-            if complete:
-                promote(plan, root, result._manifest, refresh=refresh)
-            atomic_json(
+            budget.write_json(
                 run_root / "RUN_STATE.json",
                 dict(status="COMMITTED_" + manifest["status"], result_id=identity),
             )
+            # All fallible accounting/control writes precede active promotion.
+            # The atomic index replacement is the last publication operation.
+            budget.persist()
+            budget.retain_directory(run_root)
+            if complete:
+                promote(plan, root, result._manifest, refresh=refresh, budget=budget)
+            terminal = True
             return result
         except BaseException:
-            atomic_json(
+            budget.write_json(
                 run_root / "RUN_STATE.json",
                 dict(status="INCOMPLETE_NOT_PUBLISHED", budget=budget.receipt()),
             )
             raise
         finally:
-            budget.persist()
+            if not terminal:
+                budget.persist()

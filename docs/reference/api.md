@@ -43,7 +43,9 @@ combinations fail before acquisition.
 ### Shared keyword options
 
 The root getters forward their `**options` to this shared implementation. Options
-include frequency, support, cache location, limits, dry run and explicit refresh.
+include frequency, support, cache location, limits, dry run, explicit refresh,
+`result_id` pinning and `retained_cache_bytes` namespace quota. The v2 lineage and
+source-vintage policies are described in [request API](../request-api.md).
 The generated-GRIB fixture options always label their inputs synthetic.
 
 ::: meteorology.request.get_weather
