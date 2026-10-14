@@ -11,8 +11,8 @@ from pathlib import Path
 from .capabilities import SOURCES, VARIABLES, dependencies
 from .era5.resources import Budget, Limits, memory_estimate
 
-METHOD = "meteorology-selective-utc-request-v1"
-SCHEMA = "meteorology-date-support-metric-v1"
+METHOD = "meteorology-selective-utc-request-v2"
+SCHEMA = "meteorology-date-support-metric-v2"
 
 
 def fingerprint():
@@ -22,6 +22,7 @@ def fingerprint():
         "request_adapters.py",
         "request_cache.py",
         "request_vintage.py",
+        "request_lineage.py",
         "capabilities.py",
         "era5/source.py",
         "era5/daily.py",

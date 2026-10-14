@@ -236,3 +236,21 @@ validate all source receipts and selected artifacts and retain the historical
 method/schema. `refresh` and pinning are mutually exclusive. Legacy manifests have
 no inferred chronology: ambiguous eligible unindexed results require a pin or
 refresh, and their contents are never rewritten.
+
+## v2 metric and slot evidence
+
+The v2 request method/schema adds `SOURCE_DEPENDENCIES` and `SOURCE_VALUE_STATUS`.
+Dependencies retain point, valid time, parameter, selected expver/generation,
+retrieval timestamp, source checksum, initialization, lead and accumulation start.
+Each hourly metric uses only its own slot and dependencies. Wind speed uses U/V;
+ERA5 derived RH uses temperature/dewpoint. Rotated HRRR components use both raw
+components. Daily evidence aggregates only the 24 contributing slots; sums use
+01:00 through the next midnight, excluding the preceding midnight interval.
+
+A preliminary contributor is visible in the corresponding hour and daily status.
+An absent message has no observation receipt or retrieval timestamp; a bitmap-null
+value retains its actual source receipt with `BITMAP_NULL`. Both stay null with
+explicit coverage. Final missing values never borrow preliminary values. Parquet
+exports retain this evidence. Cache subset metadata filters forecast support to
+selected metrics and slots. v1 artifacts cannot satisfy a v2 cache lookup; explicit
+v1 pins remain readable with their historical identity and null v2 evidence fields.

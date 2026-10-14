@@ -52,6 +52,8 @@ COLUMNS = [
     "WIND_VECTOR_BASIS",
     "RETRIEVED_AT_UTC",
     "SOURCE_SHA256_RECEIPTS",
+    "SOURCE_VALUE_STATUS",
+    "SOURCE_DEPENDENCIES",
     "CONSOLIDATION_STATUS",
     "AVAILABLE_AT_UTC",
     "AVAILABILITY_POLICY",
@@ -100,8 +102,9 @@ def _validate(directory, manifest, *, selected=None):
         ):
             raise CacheError("Result checksum is corrupt; retained evidence was not replaced.")
         file = pq.ParquetFile(path)
+        expected_schema = RESULT_SCHEMA if manifest["request"]["schema"].endswith("v2") else pa.schema([f for f in RESULT_SCHEMA if f.name not in {"SOURCE_VALUE_STATUS", "SOURCE_DEPENDENCIES"}])
         if file.metadata.num_rows != entry["rows"] or not file.schema_arrow.equals(
-            RESULT_SCHEMA, check_metadata=False
+            expected_schema, check_metadata=False
         ):
             raise CacheError("Result row count/schema differs from committed manifest.")
     for entry in manifest["inputs"]:
@@ -194,7 +197,11 @@ def _find(plan, *, result_id=None, locked=False):
     wanted = [a for a in manifest["artifacts"] if a["metric"] in plan["metrics"]
               and plan["request"]["start"] <= a["day"] < plan["request"]["end_exclusive"]]
     _validate(path.parent, manifest, selected=wanted)
-    return WeatherResult(path.parent, manifest, request=plan["request"], selected=wanted, cache_hit=True)
+    view_request = deepcopy(plan["request"])
+    if result_id:
+        for key in ("method", "schema", "producer_fingerprint"):
+            view_request[key] = manifest["request"][key]
+    return WeatherResult(path.parent, manifest, request=view_request, selected=wanted, cache_hit=True)
 
 
 class WeatherResult:
@@ -222,6 +229,16 @@ class WeatherResult:
             for m, v in metadata["metrics"].items()
             if m in {a["metric"] for a in self._selected}
         }
+        from .request_lineage import parameters
+        allowed = {(a["day"], p, self._manifest["metrics"][a["metric"]]["reduction"] == "sum")
+                   for a in self._selected for p in parameters(self._request["source"], a["metric"])}
+        def relevant(item):
+            stamp = pd.Timestamp(item["valid_time_utc"])
+            return any(p == item["parameter"] and
+                       pd.Timestamp(day, tz="UTC") + pd.Timedelta(hours=1 if accumulation else 0)
+                       <= stamp < pd.Timestamp(day, tz="UTC") + pd.Timedelta(hours=25 if accumulation else 24)
+                       for day, p, accumulation in allowed)
+        metadata["source_forecast_support"] = [s for s in metadata.get("source_forecast_support", []) if relevant(s)]
         metadata.pop("manifest_sha256", None)  # the view has its own durable identity
         metadata["view_sha256"] = digest(metadata)
         return metadata
@@ -231,7 +248,11 @@ class WeatherResult:
         for entry in self._selected:
             file = pq.ParquetFile(_safe_path(self.directory, entry["path"]))
             for batch in file.iter_batches(batch_size=4096):
-                yield pa.Table.from_batches([batch]).cast(RESULT_SCHEMA)
+                table = pa.Table.from_batches([batch])
+                for field in RESULT_SCHEMA:
+                    if field.name not in table.column_names:
+                        table = table.append_column(field, pa.nulls(len(table), type=field.type))
+                yield table.select(COLUMNS).cast(RESULT_SCHEMA)
 
     def to_pandas(self):
         frames = [table.to_pandas() for table in self._tables()]
