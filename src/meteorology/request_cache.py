@@ -341,6 +341,8 @@ class WeatherResult:
         with (root / ".request.lock").open("a+b") as lease:
             fcntl.flock(lease, fcntl.LOCK_EX)
             self.operational_warnings = reconcile_pending(root)
+            if not self.operational_warnings and self.publication_status.startswith("COMMITTED"):
+                self.publication_status = "COMMITTED"
         return self
 
     def _tables(self):
@@ -495,7 +497,13 @@ def execute_request(
             hit = _find(plan, result_id=result_id, locked=True)
             if hit is not None:
                 hit.operational_warnings = notices
+                if notices:
+                    hit.publication_status = "COMMITTED_WITH_OPERATIONAL_WARNING"
                 return hit
+        if notices:
+            raise CacheError(
+                "Committed accounting requires reconciliation before starting another execution."
+            )
         if find_spec("eccodes") is None:
             raise ImportError(
                 "Install toolkit-meteorology[native-pilot] for HRRR or [era5] for ERA5 GRIB decoding."

@@ -390,3 +390,37 @@ def test_before_pointer_failure_retries_without_resetting_acquisition(tmp_path, 
     assert result.metadata["budget"]["requests"] == 5
     assert result.metadata["result_id"] != old.metadata["result_id"]
     assert_complete_active(cache, result)
+
+
+def test_unresolved_committed_accounting_cannot_be_overwritten_by_new_execution(
+    tmp_path, monkeypatch
+):
+    from meteorology.request_vintage import CacheError
+    from meteorology.request_lifecycle import read_record
+
+    provider = install_provider(tmp_path, monkeypatch)
+    cache = tmp_path / "cache"
+    temperature(cache)
+    provider.temperature = 293.15
+    original = RequestBudget.finish_write
+
+    def fail(self, path):
+        if path.name == "ACTIVE_GENERATIONS.json":
+            raise OSError("persistent committed-accounting failure")
+        return original(self, path)
+
+    monkeypatch.setattr(RequestBudget, "finish_write", fail)
+    committed = temperature(cache, refresh=True)
+    record = read_record(cache / "real/REQUEST_PUBLICATION.json")
+    calls = len(provider.calls)
+    with pytest.raises(CacheError, match="reconciliation before starting"):
+        temperature(cache, refresh=True)
+    assert read_record(cache / "real/REQUEST_PUBLICATION.json")["result_id"] == record["result_id"]
+    assert len(provider.calls) == calls
+    hit = temperature(cache)
+    assert hit.metadata["result_id"] == committed.metadata["result_id"]
+    assert hit.metadata["publication_status"] == "COMMITTED_WITH_OPERATIONAL_WARNING"
+    monkeypatch.setattr(RequestBudget, "finish_write", original)
+    committed.reconcile()
+    assert not committed.metadata["operational_warnings"]
+    assert committed.metadata["publication_status"] == "COMMITTED"
