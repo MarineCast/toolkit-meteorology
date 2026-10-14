@@ -25,6 +25,7 @@ def fingerprint():
         "request_lineage.py",
         "request_sources.py",
         "request_storage.py",
+        "request_lifecycle.py",
         "capabilities.py",
         "era5/source.py",
         "era5/daily.py",

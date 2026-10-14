@@ -59,7 +59,7 @@ def selected(plan, root):
     )
 
 
-def promote(plan, root, manifest, *, refresh, budget=None):
+def promote(plan, root, manifest, *, refresh, budget=None, publication=None):
     """Caller holds namespace lease and has validated all immutable evidence."""
     state = read_index(root)
     entry = state["scopes"].setdefault(scope(plan["request"]), dict(coverage={}, results=[]))
@@ -89,6 +89,8 @@ def promote(plan, root, manifest, *, refresh, budget=None):
     write_json = budget.write_json if budget is not None else atomic_json
     if not snapshot.exists():
         write_json(snapshot, state)
+    if publication is not None:
+        publication.prepare(state, manifest["result_id"])
     write_json(root / "ACTIVE_GENERATIONS.json", state)
     if budget is not None:
         budget.retain_directory(history)

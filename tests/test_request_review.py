@@ -99,7 +99,9 @@ def test_failed_and_partial_refresh_preserve_active(tmp_path, monkeypatch):
         temperature(cache, refresh=True)
     provider.fail = False
     provider.missing_hour = 3
-    partial = temperature(cache, refresh=True)
+    # A distinct explicit hourly request tests partial promotion independently
+    # of the failed daily execution, whose charged/ambiguous job must be resumed.
+    partial = temperature(cache, refresh=True, frequency="hourly")
     assert partial.metadata["status"] == "PARTIAL"
     assert temperature(cache).metadata["result_id"] == old.metadata["result_id"]
 

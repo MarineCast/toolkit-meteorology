@@ -192,7 +192,7 @@ class Budget:
         )
 
 
-def atomic_json(path: Path, value):
+def atomic_json(path: Path, value, *, on_replace=None, on_durable=None):
     tmp = path.with_suffix(path.suffix + ".tmp")
     with tmp.open("w") as f:
         json.dump(value, f, indent=2)
@@ -200,9 +200,13 @@ def atomic_json(path: Path, value):
         f.flush()
         os.fsync(f.fileno())
     os.replace(tmp, path)
+    if on_replace is not None:
+        on_replace()
     parent = os.open(path.parent, os.O_RDONLY)
     try:
         os.fsync(parent)
+        if on_durable is not None:
+            on_durable()
     finally:
         os.close(parent)
 
@@ -245,7 +249,9 @@ def _bounded_transfer_locked(
                     break
                 budget.checkpoint(additional_memory=min(65536, remaining))
                 if not incremental:
-                    budget.check_disk(destination.parent, additional_bytes=min(65536, remaining) + 4096)
+                    budget.check_disk(
+                        destination.parent, additional_bytes=min(65536, remaining) + 4096
+                    )
                 chunk = response.read(min(65536, remaining))
                 if not chunk:
                     break
@@ -280,7 +286,11 @@ def _bounded_transfer_locked(
             budget.move_storage(partial, destination, retained=True)
         budget.write_json(receipt, state)
     except BaseException:
-        if incremental and str(partial.relative_to(budget.namespace)) in json.loads(budget.ledger.read_text())["allocations"]:
+        if (
+            incremental
+            and str(partial.relative_to(budget.namespace))
+            in json.loads(budget.ledger.read_text())["allocations"]
+        ):
             budget.finish_write(partial)
         state["status"] = "INCOMPLETE_NOT_PROMOTED"
         budget.write_json(receipt, state)

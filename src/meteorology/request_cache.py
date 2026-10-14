@@ -22,8 +22,21 @@ from .artifacts import checksum_path
 from .era5.resources import ROW_BYTES
 from .request_storage import RequestBudget
 from .request import digest
-from .request_vintage import CacheError, selected as selected_vintage, promote
+from .request_vintage import CacheError, selected as selected_vintage, promote, read_index
 from .request_sources import inspect_sources
+
+from .request_lifecycle import (
+    Publication,
+    PublicationUncertainError,
+    execution,
+    maintain,
+    reconcile_pending,
+    read_record,
+    run_state,
+    secondary,
+    warning,
+    write_record,
+)
 
 
 FLOATS = {"VALUE", "SOURCE_LAT", "SOURCE_LON", "SOURCE_GRID_DISTANCE_M", "COVERAGE_FRACTION"}
@@ -170,6 +183,16 @@ def _find(plan, *, result_id=None, locked=False):
         with (root / ".request.lock").open("a+b") as lease:
             fcntl.flock(lease, fcntl.LOCK_SH)
             return _find(plan, result_id=result_id, locked=True)
+    pending = root / "REQUEST_PUBLICATION.json"
+    if result_id is None and pending.exists():
+        record = read_record(pending)
+        if (
+            record["status"] in {"PREPARED", "UNCERTAIN"}
+            and read_index(root).get("sha256") == record["index_sha256"]
+        ):
+            raise PublicationUncertainError(
+                "Active pointer durability is uncertain; execute a getter or reconcile the namespace first."
+            )
     validated = set()
     if result_id:
         path, manifest = _manifest(root, result_id)
@@ -267,6 +290,8 @@ class WeatherResult:
         self._selected = deepcopy(manifest["artifacts"] if selected is None else selected)
         self._request = deepcopy(request or manifest["request"])
         self.cache_hit = cache_hit
+        self.operational_warnings = []
+        self.publication_status = "VALIDATED_RESULT"
 
     @property
     def metadata(self):
@@ -276,6 +301,8 @@ class WeatherResult:
             artifacts=self._selected,
             row_count=sum(a["rows"] for a in self._selected),
             cache_hit=self.cache_hit,
+            operational_warnings=deepcopy(self.operational_warnings),
+            publication_status=self.publication_status,
             selection_from_result_id=self._manifest["result_id"],
         )
         metadata["metrics"] = {
@@ -307,6 +334,14 @@ class WeatherResult:
         metadata.pop("manifest_sha256", None)  # the view has its own durable identity
         metadata["view_sha256"] = digest(metadata)
         return metadata
+
+    def reconcile(self):
+        """Validate and repair this namespace's pending operational commit state."""
+        root = self.directory.parents[1]
+        with (root / ".request.lock").open("a+b") as lease:
+            fcntl.flock(lease, fcntl.LOCK_EX)
+            self.operational_warnings = reconcile_pending(root)
+        return self
 
     def _tables(self):
         _validate(self.directory, self._manifest, selected=self._selected)
@@ -455,21 +490,20 @@ def execute_request(
     # wait for the first terminal commit, then read it with zero provider requests.
     with (root / ".request.lock").open("a+b") as lease:
         fcntl.flock(lease, fcntl.LOCK_EX)
+        notices = reconcile_pending(root) if result_id is None else []
         if not refresh:
             hit = _find(plan, result_id=result_id, locked=True)
             if hit is not None:
+                hit.operational_warnings = notices
                 return hit
         if find_spec("eccodes") is None:
             raise ImportError(
                 "Install toolkit-meteorology[native-pilot] for HRRR or [era5] for ERA5 GRIB decoding."
             )
         token = uuid.uuid4().hex
-        generation = token if refresh else selected_vintage(plan, root)[0]
+        generation = None if refresh else selected_vintage(plan, root)[0]
         # A logical request and selected source vintage identify an execution.
         # Same-vintage retries reuse its journal; a new vintage has fresh counters.
-        execution_id = digest(
-            dict(version=2, request_id=plan["request_id"], source_generation=generation)
-        )
         for legacy_path in (root / "runs").glob("*/RUN_STATE.json"):
             legacy = json.loads(legacy_path.read_text())
             if legacy.get("version") is None and legacy.get("status") in {
@@ -479,7 +513,7 @@ def execute_request(
                 raise CacheError(
                     f"Legacy unfinished execution requires explicit reconciliation: {legacy_path.parent}"
                 )
-        run_root = root / "runs" / execution_id
+        execution_id, generation, run_root = execution(plan, root, refresh, generation)
         run_root.mkdir(parents=True, exist_ok=True)
         budget = RequestBudget(
             plan["limits"],
@@ -488,6 +522,18 @@ def execute_request(
             retained_cache_bytes=plan["retained_cache_bytes"],
         )
         budget.bind_journal(run_root / "TRANSFER_BUDGET.json")
+        if refresh:
+            profile = root / "refresh-executions" / f"{plan['request_id']}.json"
+            profile.parent.mkdir(exist_ok=True)
+            write_record(
+                profile,
+                dict(
+                    execution_id=execution_id,
+                    request_id=plan["request_id"],
+                    source_generation=generation,
+                ),
+                budget,
+            )
         work = inspect_sources(plan, root, generation, fixtures=source_files is not None)
         if not refresh and generation != "retained":
             if work["missing_source_work"]:
@@ -525,19 +571,12 @@ def execute_request(
         last = date.fromisoformat(plan["request"]["end_exclusive"])
         geometry, mappings = {}, {}
         complete = True
-        terminal = False
+        binding = dict(
+            execution_id=execution_id, request_id=plan["request_id"], source_generation=generation
+        )
+        publication = Publication(root, budget, binding)
         try:
-            budget.write_json(
-                run_root / "RUN_STATE.json",
-                dict(
-                    version=2,
-                    execution_id=execution_id,
-                    request_id=plan["request_id"],
-                    source_generation=generation,
-                    status="ACQUIRING",
-                    request=plan["request"],
-                ),
-            )
+            run_state(budget, binding, "ACQUIRING", request=plan["request"])
             while day < last:
                 day_text = day.isoformat()
                 common = dict(
@@ -642,38 +681,75 @@ def execute_request(
                 finally:
                     os.close(descriptor)
                 result = WeatherResult(destination, manifest)
-            budget.write_json(
-                run_root / "RUN_STATE.json",
-                dict(
-                    version=2,
-                    execution_id=execution_id,
-                    request_id=plan["request_id"],
-                    source_generation=generation,
-                    status="COMMITTED_" + manifest["status"],
-                    result_id=identity,
-                ),
-            )
-            # All fallible accounting/control writes precede active promotion.
-            # The atomic index replacement is the last publication operation.
+            run_state(budget, binding, "RESULT_READY_" + manifest["status"], result_id=identity)
             budget.persist()
             budget.retain_directory(run_root)
             if complete:
-                promote(plan, root, result._manifest, refresh=refresh, budget=budget)
-            terminal = True
+                promote(
+                    plan,
+                    root,
+                    result._manifest,
+                    refresh=refresh,
+                    budget=budget,
+                    publication=publication,
+                )
+                maintain(publication)
+                result.publication_status = "COMMITTED"
+            else:
+                run_state(budget, binding, "COMMITTED_PARTIAL", result_id=identity)
+                budget.retain_directory(run_root)
+                if refresh:
+                    budget.retain_directory(profile)
             return result
-        except BaseException:
-            budget.write_json(
-                run_root / "RUN_STATE.json",
-                dict(
-                    version=2,
-                    execution_id=execution_id,
-                    request_id=plan["request_id"],
-                    source_generation=generation,
-                    status="INCOMPLETE_NOT_PUBLISHED",
-                    budget=budget.receipt(),
+        except (KeyboardInterrupt, SystemExit) as error:
+            outcome = publication.outcome()
+            secondary(
+                error,
+                lambda: run_state(
+                    budget,
+                    binding,
+                    "INTERRUPTED_" + outcome,
+                    result_id=publication.record.get("result_id") if publication.record else None,
                 ),
             )
+            secondary(error, budget.persist)
             raise
-        finally:
-            if not terminal:
-                budget.persist()
+        except Exception as error:
+            outcome = publication.outcome()
+            if outcome == "COMMITTED":
+                _validate(result.directory, result._manifest)
+                result.publication_status = "COMMITTED_WITH_OPERATIONAL_WARNING"
+                result.operational_warnings = [warning("post_commit_accounting", error)]
+                secondary(
+                    error,
+                    lambda: publication.save_outcome("COMMITTED", result.operational_warnings),
+                )
+                secondary(
+                    error,
+                    lambda: run_state(
+                        budget,
+                        binding,
+                        "COMMITTED_WITH_OPERATIONAL_WARNING",
+                        result_id=result._manifest["result_id"],
+                        operational_warnings=result.operational_warnings,
+                    ),
+                )
+                return result
+            status = (
+                "PUBLICATION_UNCERTAIN" if outcome == "UNCERTAIN" else "INCOMPLETE_NOT_PUBLISHED"
+            )
+            secondary(
+                error,
+                lambda: publication.save_outcome(
+                    "UNCERTAIN" if outcome == "UNCERTAIN" else "NOT_ACTIVE", []
+                ),
+            )
+            secondary(
+                error, lambda: run_state(budget, binding, status, budget_receipt=budget.receipt())
+            )
+            secondary(error, budget.persist)
+            if outcome == "UNCERTAIN":
+                raise PublicationUncertainError(
+                    f"Active pointer replacement/durability is uncertain; reconcile {publication.path}."
+                ) from error
+            raise

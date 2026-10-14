@@ -255,7 +255,16 @@ class RequestBudget(Budget):
         # shadow is reserved too; final reconciliation charges only committed bytes.
         encoded = len(json.dumps(value, indent=2).encode()) + 1
         with self.write_file(path, encoded):
-            atomic_json(Path(path), value)
+            publication = getattr(self, "publication", None)
+            active = (
+                publication is not None and Path(path) == self.namespace / "ACTIVE_GENERATIONS.json"
+            )
+            atomic_json(
+                Path(path),
+                value,
+                on_replace=publication.replaced if active else None,
+                on_durable=publication.durable if active else None,
+            )
 
     def persist(self):
         if self.journal is not None:
