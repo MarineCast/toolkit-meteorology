@@ -15,6 +15,10 @@ def era5_grib(
     snow=0.001,
     rain=0.0,
     expver=1,
+    samples_override=None,
+    hours=None,
+    missing_messages=(),
+    preliminary_hours=(),
 ):
     import pytest
 
@@ -32,11 +36,14 @@ def era5_grib(
         "tp": rain,
         "sf": snow,
     }
+    samples.update(samples_override or {})
     ny = round((area[0] - area[2]) * 4) + 1
     nx = round((area[3] - area[1]) * 4) + 1
     with Path(path).open("wb") as output:
-        for hour in range(25 if set(parameters) & {"tp", "sf"} else 24):
+        for hour in (hours if hours is not None else range(25 if set(parameters) & {"tp", "sf"} else 24)):
             for parameter in parameters:
+                if (hour, parameter) in missing_messages:
+                    continue
                 if hour == 24 and parameter not in {"tp", "sf"}:
                     continue
                 valid = pd.Timestamp(day, tz="UTC") + pd.Timedelta(hours=hour)
@@ -61,7 +68,7 @@ def era5_grib(
                         "stepType": "accum" if accum else "instant",
                         "startStep": 0,
                         "endStep": 1 if accum else 0,
-                        "experimentVersionNumber": f"{expver:04}",
+                        "experimentVersionNumber": f"{5 if hour in preliminary_hours else expver:04}",
                     }.items():
                         ec.codes_set(message, key, value)
                     if parameter in {"u10", "v10"}:

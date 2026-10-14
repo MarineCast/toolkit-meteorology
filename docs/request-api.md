@@ -211,3 +211,28 @@ never claims a production shared-study release. Use the existing shared-study
 workflow for that publication; its approval/registry prerequisites remain intact.
 The new request method/schema are independent v1 contracts; old releases are not
 migrated or rewritten. Existing fixed pilots remain regression/qualification cases.
+
+## Source vintage and explicit pins
+
+A complete refresh commits an atomic active-generation index after validating its
+manifest, artifacts and source receipts. The index binds each source parameter and
+UTC date within a source/bbox/evidence namespace. Overlapping refreshes replace
+only their covered parameter/date keys. Hourly and daily representations share the
+same source vintage; reprocessing retained bytes never advances it. Representation
+size is considered only after selecting that vintage. Immutable index snapshots
+and old results remain retained.
+
+A request spanning different active generations (including refreshed and previously
+unrefreshed dependencies/dates) requires explicit resolution: refresh the entire
+requested coverage or pin a coherent historical result. There is no automatic
+composition or downgrade to an older superset. Failed and partial refreshes retain
+the prior active generation. Readers and writers share a namespace lease. Corrupt
+active evidence raises an error; a successful refresh creates a healthy generation
+without deleting the corrupt evidence.
+
+Use `result_id=previous.metadata["result_id"]` with the same source, bbox, frequency
+and compatible date/variable subset to read a historical result explicitly. Pins
+validate all source receipts and selected artifacts and retain the historical
+method/schema. `refresh` and pinning are mutually exclusive. Legacy manifests have
+no inferred chronology: ambiguous eligible unindexed results require a pin or
+refresh, and their contents are never rewritten.

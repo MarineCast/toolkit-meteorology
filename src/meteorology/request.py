@@ -21,6 +21,7 @@ def fingerprint():
         "request.py",
         "request_adapters.py",
         "request_cache.py",
+        "request_vintage.py",
         "capabilities.py",
         "era5/source.py",
         "era5/daily.py",
@@ -271,6 +272,7 @@ def get_weather(
     limits=None,
     dry_run=False,
     refresh=False,
+    result_id=None,
     source_files=None,
     retrieved_at_utc=None,
     credential_env_file=None,
@@ -282,6 +284,8 @@ def get_weather(
     """
     from .request_cache import execute_request, preview_request
 
+    if refresh and result_id is not None:
+        raise ValueError("refresh and result_id pinning are mutually exclusive.")
     plan = plan_weather(
         variables,
         start_date,
@@ -298,7 +302,7 @@ def get_weather(
         credential_env_file=credential_env_file,
     )
     if dry_run:
-        return preview_request(plan, refresh=refresh)
+        return preview_request(plan, refresh=refresh, result_id=result_id)
     return execute_request(
-        plan, refresh=refresh, source_files=source_files, retrieved_at_utc=retrieved_at_utc
+        plan, refresh=refresh, result_id=result_id, source_files=source_files, retrieved_at_utc=retrieved_at_utc
     )

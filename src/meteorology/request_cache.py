@@ -21,10 +21,7 @@ import pyarrow.parquet as pq
 from .artifacts import checksum_path
 from .era5.resources import Budget, atomic_json, ROW_BYTES
 from .request import digest
-
-
-class CacheError(ValueError):
-    pass
+from .request_vintage import CacheError, selected as selected_vintage, promote
 
 
 FLOATS = {"VALUE", "SOURCE_LAT", "SOURCE_LON", "SOURCE_GRID_DISTANCE_M", "COVERAGE_FRACTION"}
@@ -133,34 +130,71 @@ def _compatible(existing, requested):
     )
 
 
-def _find(plan):
+def _manifest(root, result_id):
+    if len(result_id) != 64 or any(c not in "0123456789abcdef" for c in result_id):
+        raise CacheError("result_id must be a SHA256 identity.")
+    path = root / "results" / result_id / "MANIFEST.json"
+    try:
+        manifest = json.loads(path.read_text())
+    except (OSError, ValueError):
+        raise CacheError("Selected result manifest is absent/corrupt; request refresh or inspect evidence.") from None
+    if manifest.get("result_id") != result_id:
+        raise CacheError("Selected manifest has a different result identity.")
+    return path, manifest
+
+
+def _find(plan, *, result_id=None, locked=False):
     root = _namespace(plan)
-    candidates = []
-    for path in (root / "results").glob("*/MANIFEST.json"):
-        try:
-            manifest = json.loads(path.read_text())
-        except (OSError, ValueError):
-            raise CacheError(
-                "Unreadable final-result manifest; inspect cache or request refresh."
-            ) from None
-        if manifest.get("status") == "COMPLETE" and _compatible(
-            manifest.get("request", {}), plan["request"]
-        ):
-            candidates.append((path, manifest))
-    candidates.sort(key=lambda pair: sum(a["rows"] for a in pair[1]["artifacts"]))
+    if not root.exists():
+        if result_id:
+            raise CacheError("Pinned result does not exist in the selected cache namespace.")
+        return None
+    if not locked:
+        with (root / ".request.lock").open("a+b") as lease:
+            fcntl.flock(lease, fcntl.LOCK_SH)
+            return _find(plan, result_id=result_id, locked=True)
+    if result_id:
+        path, manifest = _manifest(root, result_id)
+        existing, requested = manifest["request"].copy(), plan["request"].copy()
+        # Pins explicitly retain the historical method/schema. Coverage, source,
+        # frequency, support and requested quantities still must match.
+        for k in ("method", "schema", "producer_fingerprint", "fixture_checksums", "fixture_retrieved_at_utc"):
+            existing.pop(k, None)
+            requested.pop(k, None)
+        if not _compatible(existing, requested):
+            raise CacheError("Pinned result is incompatible with requested coverage/support.")
+        candidates = [(path, manifest)]
+    else:
+        generation, witnesses, registered = selected_vintage(plan, root)
+        for identity in witnesses:
+            path, manifest = _manifest(root, identity)
+            _validate(path.parent, manifest)
+            if manifest["status"] != "COMPLETE":
+                raise CacheError("Active generation witness is not complete.")
+        candidates = []
+        paths = [root / "results" / i / "MANIFEST.json" for i in registered]
+        if not registered:
+            paths = list((root / "results").glob("*/MANIFEST.json"))
+        for path in paths:
+            try:
+                manifest = json.loads(path.read_text())
+            except (OSError, ValueError):
+                raise CacheError("Unreadable result manifest; explicit reconciliation required.") from None
+            if manifest.get("status") == "COMPLETE" and _compatible(manifest.get("request", {}), plan["request"]):
+                if manifest.get("source_generation", "retained") == generation:
+                    candidates.append((path, manifest))
+        unindexed = [pair for pair in candidates if "source_generation" not in pair[1]]
+        if len(unindexed) > 1:
+            raise CacheError("Legacy results have no revision ordering; pin result_id or refresh.")
+        # Only after choosing source vintage may representation size break ties.
+        candidates.sort(key=lambda pair: (sum(a["rows"] for a in pair[1]["artifacts"]), pair[1]["result_id"]))
     if not candidates:
         return None
     path, manifest = candidates[0]
-    wanted = [
-        a
-        for a in manifest["artifacts"]
-        if a["metric"] in plan["metrics"]
-        and plan["request"]["start"] <= a["day"] < plan["request"]["end_exclusive"]
-    ]
+    wanted = [a for a in manifest["artifacts"] if a["metric"] in plan["metrics"]
+              and plan["request"]["start"] <= a["day"] < plan["request"]["end_exclusive"]]
     _validate(path.parent, manifest, selected=wanted)
-    return WeatherResult(
-        path.parent, manifest, request=plan["request"], selected=wanted, cache_hit=True
-    )
+    return WeatherResult(path.parent, manifest, request=plan["request"], selected=wanted, cache_hit=True)
 
 
 class WeatherResult:
@@ -238,8 +272,8 @@ class WeatherResult:
         return path
 
 
-def preview_request(plan, *, refresh=False):
-    hit = None if refresh else _find(plan)
+def preview_request(plan, *, refresh=False, result_id=None):
+    hit = None if refresh else _find(plan, result_id=result_id)
     from .era5.credentials import resolve_credentials
 
     return dict(
@@ -288,7 +322,7 @@ def preview_request(plan, *, refresh=False):
     )
 
 
-def execute_request(plan, *, refresh=False, source_files=None, retrieved_at_utc=None):
+def execute_request(plan, *, refresh=False, result_id=None, source_files=None, retrieved_at_utc=None):
     root = _namespace(plan)
     root.mkdir(parents=True, exist_ok=True)
     # Namespace lease serializes source writers too. Concurrent compatible callers
@@ -296,7 +330,7 @@ def execute_request(plan, *, refresh=False, source_files=None, retrieved_at_utc=
     with (root / ".request.lock").open("a+b") as lease:
         fcntl.flock(lease, fcntl.LOCK_EX)
         if not refresh:
-            hit = _find(plan)
+            hit = _find(plan, result_id=result_id, locked=True)
             if hit is not None:
                 return hit
         if find_spec("eccodes") is None:
@@ -306,6 +340,7 @@ def execute_request(plan, *, refresh=False, source_files=None, retrieved_at_utc=
         if source_files is None and plan["nominal_provider_requests"] > plan["limits"].requests:
             raise ValueError("Missing acquisition work exceeds request cap; use a shorter request.")
         token = uuid.uuid4().hex
+        generation = token if refresh else selected_vintage(plan, root)[0]
         run_root = root / "runs" / (plan["request_id"] if not refresh else token)
         run_root.mkdir(parents=True, exist_ok=True)
         budget = Budget(plan["limits"], staging_root=root)
@@ -329,7 +364,7 @@ def execute_request(plan, *, refresh=False, source_files=None, retrieved_at_utc=
                 common = dict(
                     source_files=source_files,
                     retrieved_at_utc=retrieved_at_utc,
-                    generation=token if refresh else "retained",
+                    generation=generation,
                 )
                 if plan["request"]["source"] == "hrrr":
                     hourly, receipts = hrrr_day(
@@ -362,7 +397,7 @@ def execute_request(plan, *, refresh=False, source_files=None, retrieved_at_utc=
             unique_inputs = sorted({json.dumps(r, sort_keys=True) for r in inputs})
             inputs = [json.loads(r) for r in unique_inputs]
             identity = digest(
-                dict(request=plan["request"], inputs=inputs, source_grids=sorted(grids))
+                dict(request=plan["request"], inputs=inputs, source_grids=sorted(grids), source_generation=generation)
             )
             runtime = {}
             for name in ("numpy", "pandas", "pyarrow", "h3", "pyproj", "shapely", "eccodes"):
@@ -375,6 +410,7 @@ def execute_request(plan, *, refresh=False, source_files=None, retrieved_at_utc=
                 scientific_runtime=runtime,
                 source_forecast_support=forecast_support,
                 result_id=identity,
+                source_generation=generation,
                 request=plan["request"],
                 metrics=plan["metrics"],
                 status="COMPLETE" if complete else "PARTIAL",
@@ -419,6 +455,8 @@ def execute_request(plan, *, refresh=False, source_files=None, retrieved_at_utc=
                 finally:
                     os.close(descriptor)
                 result = WeatherResult(destination, manifest)
+            if complete:
+                promote(plan, root, result._manifest, refresh=refresh)
             atomic_json(
                 run_root / "RUN_STATE.json",
                 dict(status="COMMITTED_" + manifest["status"], result_id=identity),
