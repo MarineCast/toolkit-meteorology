@@ -146,13 +146,11 @@ def _sha(path, budget):
     return digest.hexdigest()
 
 
-class NativeHTTP:
-    def __init__(self, budget, plan, *, opener=None):
-        self.budget = budget
-        self.plan = plan
-        self.opener = opener or build_opener(
-            ProxyHandler({}), HTTPSHandler(context=ssl.create_default_context()), NoRedirect()
-        )
+class NativeCache:
+    """Qualified receipt reader with no HTTP transport or provider access."""
+
+    def __init__(self, budget, plan):
+        self.budget, self.plan = budget, plan
 
     def cached_transfer(self, uri, folder, prefix, *, valid, reservation, byte_range=None):
         allowed = {cycle["uri"] for cycle in self.plan["cycles"]}
@@ -190,7 +188,16 @@ class NativeHTTP:
                 ):
                     raise ArchiveError("Cached source bytes differ from their qualified receipt.")
                 return (path, metadata), attempts, binding
+            if receipt_path.exists() and json.loads(receipt_path.read_text()).get("status") == "COMPLETE":
+                raise ArchiveError("Completed cached source bytes are absent.")
         return None, attempts, binding
+
+class NativeHTTP(NativeCache):
+    def __init__(self, budget, plan, *, opener=None):
+        super().__init__(budget, plan)
+        self.opener = opener or build_opener(
+            ProxyHandler({}), HTTPSHandler(context=ssl.create_default_context()), NoRedirect()
+        )
 
     def transfer(self, uri, folder, prefix, *, valid, reservation, byte_range=None):
         cached, attempts, binding = self.cached_transfer(

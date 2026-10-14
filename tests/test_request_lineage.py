@@ -102,12 +102,21 @@ def test_legacy_lineage_is_pin_only_and_retains_contract_identity(tmp_path):
     artifact.update(bytes=path.stat().st_size,sha256=checksum_path(path))
     manifest['request']['method']='meteorology-selective-utc-request-v1'
     manifest['request']['schema']='meteorology-date-support-metric-v1'
+    original_id=manifest['result_id']
+    manifest['result_id']=digest({'legacy_result':original_id})
+    legacy_dir=result.directory.with_name(manifest['result_id'])
+    result.directory.rename(legacy_dir)
+    (opts['cache_dir']/'fixtures/ACTIVE_GENERATIONS.json').unlink()
+    manifest.pop('source_generation')
     manifest.pop('manifest_sha256')
     manifest['manifest_sha256']=digest(manifest)
-    atomic_json(result.directory/'MANIFEST.json',manifest)
+    atomic_json(legacy_dir/'MANIFEST.json',manifest)
     pinned=get_temperature('2024-01-01','2024-01-01',BBOX,'era5',frequency='hourly',result_id=manifest['result_id'],**opts)
     assert pinned.metadata['request']['schema'].endswith('v1')
     assert pinned.to_pandas().SOURCE_DEPENDENCIES.isna().all()
+    offline_pin=get_temperature('2024-01-01','2024-01-01',BBOX,'era5',frequency='hourly',
+                                cache_dir=opts['cache_dir'],result_id=manifest['result_id'])
+    assert offline_pin.metadata['request']['evidence_kind']=='synthetic_fixture'
     current=get_temperature('2024-01-01','2024-01-01',BBOX,'era5',frequency='hourly',**opts)
     assert not current.cache_hit
     assert current.metadata['request']['schema'].endswith('v2')

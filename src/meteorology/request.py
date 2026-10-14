@@ -23,6 +23,7 @@ def fingerprint():
         "request_cache.py",
         "request_vintage.py",
         "request_lineage.py",
+        "request_sources.py",
         "capabilities.py",
         "era5/source.py",
         "era5/daily.py",

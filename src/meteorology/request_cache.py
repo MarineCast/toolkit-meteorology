@@ -22,6 +22,7 @@ from .artifacts import checksum_path
 from .era5.resources import Budget, atomic_json, ROW_BYTES
 from .request import digest
 from .request_vintage import CacheError, selected as selected_vintage, promote
+from .request_sources import inspect_sources
 
 
 FLOATS = {"VALUE", "SOURCE_LAT", "SOURCE_LON", "SOURCE_GRID_DISTANCE_M", "COVERAGE_FRACTION"}
@@ -295,6 +296,10 @@ class WeatherResult:
 
 def preview_request(plan, *, refresh=False, result_id=None):
     hit = None if refresh else _find(plan, result_id=result_id)
+    generation = "preview-refresh" if refresh else selected_vintage(plan, _namespace(plan))[0]
+    work = inspect_sources(plan, _namespace(plan), generation, fixtures=plan["request"]["evidence_kind"] == "synthetic_fixture") if hit is None else dict(
+        reusable_source_objects=[], missing_source_work=[], remaining_provider_requests_lower_bound=0,
+        remaining_transfer_reservation_bytes=0, exact_provider_requests=True, uncertainties=[])
     from .era5.credentials import resolve_credentials
 
     return dict(
@@ -311,6 +316,7 @@ def preview_request(plan, *, refresh=False, result_id=None):
         ),
         cache=dict(
             final_result_hit=hit is not None,
+            **work,
             provider_requests_if_hit=0,
             missing_work=[]
             if hit
@@ -331,6 +337,7 @@ def preview_request(plan, *, refresh=False, result_id=None):
             f00_fields=plan["required_inputs"],
             index_then_exact_field_ranges=True,
         ),
+        nominal_cold_cache_provider_requests=plan["nominal_provider_requests"],
         nominal_provider_requests=0 if hit else plan["nominal_provider_requests"],
         transfer_size=plan["transfer_size"],
         limits=vars(plan["limits"]),
@@ -358,14 +365,17 @@ def execute_request(plan, *, refresh=False, result_id=None, source_files=None, r
             raise ImportError(
                 "Install toolkit-meteorology[native-pilot] for HRRR or [era5] for ERA5 GRIB decoding."
             )
-        if source_files is None and plan["nominal_provider_requests"] > plan["limits"].requests:
-            raise ValueError("Missing acquisition work exceeds request cap; use a shorter request.")
         token = uuid.uuid4().hex
         generation = token if refresh else selected_vintage(plan, root)[0]
         run_root = root / "runs" / (plan["request_id"] if not refresh else token)
         run_root.mkdir(parents=True, exist_ok=True)
         budget = Budget(plan["limits"], staging_root=root)
         budget.bind_journal(run_root / "TRANSFER_BUDGET.json")
+        work = inspect_sources(plan, root, generation, fixtures=source_files is not None)
+        if budget.requests + work["remaining_provider_requests_lower_bound"] > plan["limits"].requests:
+            raise ValueError("Verified remaining acquisition work exceeds request cap.")
+        if budget.reserved + work["remaining_transfer_reservation_bytes"] > plan["limits"].transfer_bytes:
+            raise ValueError("Verified remaining transfer reservations exceed transfer cap.")
         from .request_adapters import hrrr_day, era5_day, reduce_day
 
         artifacts, inputs, grids = [], [], set()

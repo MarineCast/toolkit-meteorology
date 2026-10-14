@@ -254,3 +254,20 @@ explicit coverage. Final missing values never borrow preliminary values. Parquet
 exports retain this evidence. Cache subset metadata filters forecast support to
 selected metrics and slots. v1 artifacts cannot satisfy a v2 cache lookup; explicit
 v1 pins remain readable with their historical identity and null v2 evidence fields.
+
+## Source-cache-aware preflight
+
+Dry runs distinguish the nominal cold-cache acquisition estimate, validated reusable
+source objects, missing source work, remaining request lower bounds and transfer
+reservations. A missing final representation can still require zero acquisition.
+Exact HRRR ranges are planned from qualified retained indexes; absent indexes leave
+field sizes unknown until the index is fetched and validated. CDS jobs remain keyed
+by their exact provider selection and source-generation context. Terms/catalogue,
+submission, polling, discovery, retries and downloads consume persistent request
+and transfer reservations before network calls. Polling counts are unknown in advance.
+
+Limits apply to remaining acquisition plus previously consumed run reservations.
+Warm-source processing requires neither credentials nor a provider client; final
+hits also skip decoding. Interrupted reservations cannot be reset by rerunning the
+same logical request with different caps. A cold estimate is never treated as an
+exact required count. Corrupt retained objects fail before reuse.

@@ -75,7 +75,6 @@ def hrrr_day(
     generation="retained",
 ):
     from .hourly_weather.native_day import NativeHTTP, HOST, ArchiveMissing
-    from .hourly_weather.live import FIELDS
     from .hourly_weather.native_source import decode_hour
 
     fields = plan["required_inputs"]
@@ -104,23 +103,9 @@ def hrrr_day(
                 )
             except ArchiveMissing:
                 continue
-            lines = [line for line in index.read_text().splitlines() if line.strip()]
-            offsets = [int(line.split(":", 2)[1]) for line in lines]
-            if not offsets or offsets[0] < 0 or any(b <= a for a, b in zip(offsets, offsets[1:])):
-                raise ValueError("HRRR index offsets are invalid.")
-            if any(f"d={valid:%Y%m%d%H}:" not in line for line in lines):
-                raise ValueError("HRRR index has wrong requested UTC cycle.")
+            from .request_sources import hrrr_spans
             selections = []
-            for name in fields:
-                found = [i for i, line in enumerate(lines) if FIELDS[name] in line]
-                if len(found) != 1 or found[0] + 1 >= len(lines):
-                    raise ValueError(f"Missing/ambiguous/unbounded HRRR index field: {name}")
-                i = found[0]
-                if not any(marker in lines[i].split(":") for marker in ("anl", "0 hour fcst")):
-                    raise ValueError("Selected HRRR field is not instantaneous f00.")
-                span = (offsets[i], offsets[i + 1] - 1)
-                if span[1] - span[0] + 1 > 32 * 1024**2:
-                    raise LimitExceeded("Selected HRRR message exceeds 32 MiB cap.")
+            for name, span in hrrr_spans(index, valid, fields):
                 cached, _, _ = http.cached_transfer(
                     uri,
                     folder,
