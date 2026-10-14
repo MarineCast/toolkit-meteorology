@@ -23,11 +23,12 @@ PARAMETERS = {
     151: ("msl", "Pa"),
     164: ("tcc", "(0 - 1)"),
     228: ("tp", "m"),
+    144: ("sf", "m of water equivalent"),
 }
 NORMALIZATION_METHOD = "era5-cds-regular-latlon-message-v1"
 
 
-def normalize_message(metadata: dict, latitude, longitude, values, *, budget=None) -> pd.DataFrame:
+def normalize_message(metadata: dict, latitude, longitude, values, *, budget=None, geometry_cache=None, include_forecast_metadata=False) -> pd.DataFrame:
     """Validate decoded metadata before conversion; missing values stay missing."""
     if metadata.get("dataset") != DATASET or metadata.get("product_type") != "reanalysis":
         raise ValueError("Expected CDS ERA5 single-level reanalysis, not a substitute source.")
@@ -63,9 +64,9 @@ def normalize_message(metadata: dict, latitude, longitude, values, *, budget=Non
         raise ValueError(f"{name}: unexpected source units; expected {units}.")
     if name in ("u10", "v10") and metadata.get("uvRelativeToGrid") != 0:
         raise ValueError("ERA5 wind must be verified earth-relative.")
-    if metadata.get("data_type") != ("fc" if name == "tp" else "an"):
+    if metadata.get("data_type") != ("fc" if name in ("tp", "sf") else "an"):
         raise ValueError("Unexpected ERA5 analysis/forecast parameter provenance.")
-    if name == "tp":
+    if name in ("tp", "sf"):
         if (
             metadata.get("stepType") != "accum"
             or metadata.get("step_units") != "hours"
@@ -75,7 +76,7 @@ def normalize_message(metadata: dict, latitude, longitude, values, *, budget=Non
             or metadata["endStep"] - metadata["startStep"] != 1
         ):
             raise ValueError(
-                "CDS tp must be one-hour accumulation, not cumulative ERA5-Land/MARS or f00 zero."
+                "CDS tp/sf must be one-hour accumulation, not cumulative ERA5-Land/MARS or f00 zero."
             )
         init = _utc(metadata["init_time_utc"])
         if init + timedelta(hours=metadata["endStep"]) != valid:
@@ -97,15 +98,27 @@ def normalize_message(metadata: dict, latitude, longitude, values, *, budget=Non
         raise ValueError("Source coordinate/value shapes disagree or are empty.")
     if not (np.isfinite(lat).all() and np.isfinite(lon).all()) or np.any(abs(lat) > 90):
         raise ValueError("Invalid source coordinates.")
-    order = np.lexsort((lon, lat))
-    lat, lon, data = lat[order], lon[order], data[order]
-    if len(set(zip(lat, lon))) != len(data):
-        raise ValueError("Duplicate source grid point.")
-    if len(np.unique(lat)) * len(np.unique(lon)) != len(data):
-        raise ValueError("Regular grid rectangle has missing source coordinates.")
-    for axis in (np.unique(lat), np.unique(lon)):
-        if len(axis) > 1 and not np.allclose(np.diff(axis), 0.25, rtol=0, atol=1e-8):
-            raise ValueError("Coordinates disagree with declared 0.25 degree grid.")
+    coordinate_identity = hashlib.sha256(
+        np.column_stack((lat, lon)).astype("<f8").tobytes()).hexdigest()
+    cached = None if geometry_cache is None else geometry_cache.get(coordinate_identity)
+    if cached is None:
+        order = np.lexsort((lon, lat))
+        lat, lon, data = lat[order], lon[order], data[order]
+        if len(set(zip(lat, lon))) != len(data):
+            raise ValueError("Duplicate source grid point.")
+        if len(np.unique(lat)) * len(np.unique(lon)) != len(data):
+            raise ValueError("Regular grid rectangle has missing source coordinates.")
+        for axis in (np.unique(lat), np.unique(lon)):
+            if len(axis) > 1 and not np.allclose(np.diff(axis), 0.25, rtol=0, atol=1e-8):
+                raise ValueError("Coordinates disagree with declared 0.25 degree grid.")
+        grid_hash = hashlib.sha256(np.column_stack((lat, lon)).astype("<f8").tobytes()).hexdigest()
+        cached = (order, lat, lon, grid_hash)
+        if geometry_cache is not None:
+            geometry_cache.clear()  # stream-local, one source grid retained
+            geometry_cache[coordinate_identity] = cached
+    else:
+        order, lat, lon, grid_hash = cached
+        data = data[order]
     if np.isinf(data).any():
         raise ValueError("Infinite source value; bitmap missingness must decode as NaN.")
     good = data[np.isfinite(data)]
@@ -113,15 +126,13 @@ def normalize_message(metadata: dict, latitude, longitude, values, *, budget=Non
         (name in ("t2m", "d2m") and np.any((good < 150) | (good > 350)))
         or (name == "msl" and np.any((good < 70000) | (good > 120000)))
         or (name == "tcc" and np.any((good < 0) | (good > 1)))
-        or (name == "tp" and np.any(good < 0))
+        or (name in ("tp", "sf") and np.any(good < 0))
     ):
         raise ValueError(f"{name}: decoded value outside physical contract.")
     if not isinstance(metadata.get("source_sha256"), str) or not re.fullmatch(
         "[0-9a-f]{64}", metadata["source_sha256"]
     ):
         raise ValueError("Source-file SHA256 receipt is required.")
-    coords = np.column_stack((lat, lon)).astype("<f8").tobytes()
-    grid_hash = hashlib.sha256(coords).hexdigest()
     frame = pd.DataFrame(
         dict(
             SOURCE_GRID_INDEX=np.arange(len(data)),
@@ -142,6 +153,10 @@ def normalize_message(metadata: dict, latitude, longitude, values, *, budget=Non
             NORMALIZATION_METHOD=NORMALIZATION_METHOD,
         )
     )
+    if include_forecast_metadata:
+        frame['INIT_TIME_UTC'] = _utc(metadata['init_time_utc']).isoformat()
+        frame['FORECAST_HOUR'] = int(metadata['endStep'])
+        frame['SOURCE_DATA_TYPE'] = metadata['data_type']
     if budget is not None:
         budget.checkpoint()
     return frame
@@ -187,7 +202,7 @@ def consolidate(
     )
 
 
-def decode_grib(path: str | Path, *, retrieved_at_utc: str, budget=None):
+def decode_grib(path: str | Path, *, retrieved_at_utc: str, budget=None, parameters=None, include_forecast_metadata=False):
     """Read one message at a time; ecCodes is an optional isolated acquisition extra."""
     import eccodes as ec
 
@@ -196,6 +211,9 @@ def decode_grib(path: str | Path, *, retrieved_at_utc: str, budget=None):
         budget.checkpoint(additional_memory=path.stat().st_size)
     sha = checksum_path(path)
     count = 0
+    geometry_cache = {}
+    coordinates = None
+    grid_identity = None
     with path.open("rb") as handle:
         while (message := ec.codes_grib_new_from_file(handle)) is not None:
             try:
@@ -237,6 +255,8 @@ def decode_grib(path: str | Path, *, retrieved_at_utc: str, budget=None):
                     source_sha256=sha,
                     step_units="hours" if get("stepUnits") == 1 else "unsupported",
                 )
+                if parameters is not None and PARAMETERS.get(meta["paramId"], (None,))[0] not in parameters:
+                    continue
                 if meta["paramId"] in (165, 166):
                     meta["uvRelativeToGrid"] = get("uvRelativeToGrid")
                 if budget is not None:
@@ -249,13 +269,22 @@ def decode_grib(path: str | Path, *, retrieved_at_utc: str, budget=None):
                 if get("bitmapPresent"):
                     bitmap = np.asarray(ec.codes_get_array(message, "bitmap"))
                     values = np.where(bitmap == 0, np.nan, values)
+                # ecCodes grid-section digest covers dimensions, scan order,
+                # coordinates and Earth geometry; inspect it on every message.
+                current_grid = get("md5GridSection")
+                if current_grid != grid_identity:
+                    coordinates = (ec.codes_get_array(message, "latitudes"),
+                                   ec.codes_get_array(message, "longitudes"))
+                    grid_identity = current_grid
+                    geometry_cache.clear()
                 count += 1
                 yield normalize_message(
                     meta,
-                    ec.codes_get_array(message, "latitudes"),
-                    ec.codes_get_array(message, "longitudes"),
+                    *coordinates,
                     values,
                     budget=budget,
+                    geometry_cache=geometry_cache,
+                    include_forecast_metadata=include_forecast_metadata,
                 )
             finally:
                 ec.codes_release(message)

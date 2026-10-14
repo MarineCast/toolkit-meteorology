@@ -1,6 +1,79 @@
 # Python API
 
-The root package exposes the supported high-level workflow. Existing deeper imports remain available for advanced usage, but internal module names are not a stable compatibility promise.
+## Selective weather requests
+
+Import the getters from `meteorology`. They accept inclusive UTC dates, a WGS84
+`(west, south, east, north)` bbox and an explicit `"hrrr"` or `"era5"` source;
+workspace and study configuration are unnecessary. All getters delegate to the
+same planner, dependency selection, executor and cache. Read the
+[source support matrix and scientific semantics](../request-api.md) before use.
+
+```python
+from meteorology import get_weather
+
+preview = get_weather(
+    variables=["temperature", "wind"],
+    start_date="2024-01-01", end_date="2024-01-01",
+    bbox=(-124.0, 48.0, -123.0, 48.5), data_source="hrrr",
+    dry_run=True,
+)
+```
+
+`dry_run=True` returns a planning dictionary without network access or writes.
+Execution returns `WeatherResult`. `get_precip` is exactly the
+`get_precipitation` alias. ERA5 snowfall is millimetres of water equivalent falling
+during the interval, distinct from snow depth. Unsupported source/variable/support
+combinations fail before acquisition.
+
+::: meteorology
+    options:
+      members:
+        - get_weather
+        - get_temperature
+        - get_wind
+        - get_cloud_cover
+        - get_pressure
+        - get_relative_humidity
+        - get_dewpoint
+        - get_visibility
+        - get_precipitation
+        - get_snowfall
+      show_source: false
+
+### Shared keyword options
+
+The root getters forward their `**options` to this shared implementation. Options
+include frequency, support, cache location, limits, dry run, explicit refresh,
+`result_id` pinning and `retained_cache_bytes` namespace quota. The v2 lineage and
+source-vintage policies are described in [request API](../request-api.md).
+The generated-GRIB fixture options always label their inputs synthetic.
+
+::: meteorology.request.get_weather
+    options:
+      show_source: false
+
+### Result methods
+
+`from meteorology import WeatherResult` exposes the following class lazily.
+Use the getters to construct it. `.metadata` returns the selected view's lineage
+and coverage; `.to_pandas()` materializes selected rows, while `.to_parquet(path)`
+streams an atomic export with embedded JSON metadata. The
+[cache and provenance contract](../request-api.md#results-caching-and-provenance)
+describes immutable inputs, subset reuse and corruption handling.
+
+::: meteorology.request_cache.WeatherResult
+    options:
+      members:
+        - metadata
+        - to_pandas
+        - to_parquet
+      show_source: false
+
+## Existing family APIs
+
+The following APIs retain the configured family workflows. Existing deeper
+imports remain available for advanced usage, but internal module names are not
+a stable compatibility promise.
 
 ```python
 import meteorology

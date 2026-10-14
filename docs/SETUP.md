@@ -19,7 +19,10 @@ python -m pip install -e '.[test]'
 python -m pytest -q
 ```
 
-For live HRRR acquisition, install `.[acquisition]` instead, or combine extras as
+For selective HRRR requests install `.[native-pilot]`; ERA5 uses `.[era5]`.
+HTML map inspectors use `.[visualization]`. Generic getters need no workspace
+initialization; see [weather requests](request-api.md). For legacy live Herbie
+acquisition, install `.[acquisition]` instead, or combine extras as
 `'.[test,acquisition]'`. Acquisition uses Herbie, cfgrib and a compatible ecCodes runtime.
 The package's offline build and astronomy paths do not require Herbie. See
 [development](DEVELOPMENT.md) for regular wheel validation.
@@ -59,6 +62,7 @@ meteorology stages
 python -m meteorology --help
 ```
 
-Python APIs use the same environment-variable/current-directory rule. Package installation paths
+Legacy family Python APIs use the same environment-variable/current-directory rule.
+The new `get_*` functions use explicit bounds/source and `cache_dir` independently. Package installation paths
 are not writable data workspaces. Relative configured output paths resolve under the workspace;
 absolute paths remain absolute. Continue with [configuration](CONFIGURATION.md).

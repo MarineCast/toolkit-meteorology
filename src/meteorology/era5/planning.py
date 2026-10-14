@@ -4,8 +4,6 @@ from __future__ import annotations
 from datetime import date, timedelta
 from importlib.util import find_spec
 import math
-import os
-from pathlib import Path
 
 from ..study import load_study_config
 
@@ -18,12 +16,9 @@ GIB = 1024**3
 
 def access_preflight() -> dict:
     """Report presence only: no credential reads, client creation or provider call."""
-    rc = Path(os.environ.get('CDSAPI_RC', str(Path.home()/'.cdsapirc'))).expanduser()
+    from .credentials import resolve_credentials
     return dict(cdsapi_installed=find_spec('cdsapi') is not None,
-                credential_file_present=rc.is_file(),
-                token_environment_present=bool(os.environ.get('CDSAPI_KEY')),
-                endpoint_environment_present=bool(os.environ.get('CDSAPI_URL')),
-                authenticated_access='not_checked', dataset_terms='not_checked_manual_acceptance_required',
+                **resolve_credentials(inspect_only=True).public(),
                 setup_url='https://cds.climate.copernicus.eu/how-to-api',
                 terms_url=f'https://cds.climate.copernicus.eu/datasets/{DATASET}?tab=download')
 

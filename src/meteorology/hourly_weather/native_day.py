@@ -146,13 +146,11 @@ def _sha(path, budget):
     return digest.hexdigest()
 
 
-class NativeHTTP:
-    def __init__(self, budget, plan, *, opener=None):
-        self.budget = budget
-        self.plan = plan
-        self.opener = opener or build_opener(
-            ProxyHandler({}), HTTPSHandler(context=ssl.create_default_context()), NoRedirect()
-        )
+class NativeCache:
+    """Qualified receipt reader with no HTTP transport or provider access."""
+
+    def __init__(self, budget, plan):
+        self.budget, self.plan = budget, plan
 
     def cached_transfer(self, uri, folder, prefix, *, valid, reservation, byte_range=None):
         allowed = {cycle["uri"] for cycle in self.plan["cycles"]}
@@ -190,7 +188,16 @@ class NativeHTTP:
                 ):
                     raise ArchiveError("Cached source bytes differ from their qualified receipt.")
                 return (path, metadata), attempts, binding
+            if receipt_path.exists() and json.loads(receipt_path.read_text()).get("status") == "COMPLETE":
+                raise ArchiveError("Completed cached source bytes are absent.")
         return None, attempts, binding
+
+class NativeHTTP(NativeCache):
+    def __init__(self, budget, plan, *, opener=None):
+        super().__init__(budget, plan)
+        self.opener = opener or build_opener(
+            ProxyHandler({}), HTTPSHandler(context=ssl.create_default_context()), NoRedirect()
+        )
 
     def transfer(self, uri, folder, prefix, *, valid, reservation, byte_range=None):
         cached, attempts, binding = self.cached_transfer(
@@ -205,7 +212,7 @@ class NativeHTTP:
         metadata = dict(binding, status="PLANNED")
         meta_path = path.with_suffix(path.suffix + ".source.json")
         self.budget.check_disk(folder, additional_bytes=8192)
-        atomic_json(meta_path, metadata)
+        self.budget.write_json(meta_path, metadata)
 
         def open_response():
             headers = {
@@ -265,7 +272,7 @@ class NativeHTTP:
                     etag=etag,
                     retrieved_at_utc=datetime.now(timezone.utc).isoformat(),
                 )
-                atomic_json(meta_path, metadata)
+                self.budget.write_json(meta_path, metadata)
                 return response
             except BaseException:
                 response.close()
@@ -275,6 +282,7 @@ class NativeHTTP:
             open_response, path, budget=self.budget, reservation_bytes=reservation
         )
         self.budget.persist()
+        self.budget.retain_directory(folder)
         return path, metadata
 
 
@@ -470,6 +478,9 @@ def run_day(study_config, plan, output, *, opener=None, decoder=decode_hour, bud
             raise ValueError("Output is bound to a different immutable plan.")
         atomic_json(root / "PLAN.json", plan)
         http = NativeHTTP(budget, plan, opener=opener)
+        if decoder is decode_hour:
+            from functools import partial
+            decoder = partial(decode_hour, geometry_cache={})
         frames = []
         hours = []
         missing = []

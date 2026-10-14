@@ -1,5 +1,5 @@
 site_name: Meteorology Toolkit
-site_description: Reproducible meteorological and astronomical H3 data products
+site_description: Source-selective weather requests and reproducible meteorological and astronomical products
 site_url: https://marinecast.github.io/toolkit-meteorology/
 repo_url: https://github.com/MarineCast/toolkit-meteorology
 repo_name: MarineCast/toolkit-meteorology
@@ -47,6 +47,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Get started:
+      - Weather requests: request-api.md
       - Quickstart: getting-started/quickstart.md
       - Installation: SETUP.md
       - Configuration: CONFIGURATION.md
@@ -58,6 +59,12 @@ nav:
       - Limitations: limitations.md
   - Guides:
       - Acquisition and build: WORKFLOWS.md
+      - ERA5 and HRRR retrospective products: era5-retrospective.md
+      - Native source pilots:
+          - HRRR UTC-day pilot: HRRR_NATIVE_DAY_PILOT.md
+          - ERA5 CDS lifecycle and pilot: CDS_JOB_INTEGRATION_AND_PILOTS.md
+      - Shared study configuration: shared-study.md
+      - Marine reporting integration: marine-reporting.md
       - Hourly weather: hourly-weather.md
       - Live one-week demo: live-week-demo.md
       - Measured demo results: live-week-results.md
@@ -70,6 +77,10 @@ nav:
       - Sources and rights: DATA_SOURCES.md
   - Development:
       - Implementation tracker: IMPLEMENTATION_TRACKER.md
+      - Request handoff: request-handoff.md
+      - Request refactor evidence: request-refactor-evidence.md
+      - Request review fixes: request-review-evidence.md
+      - Cleanup inventory: request-cleanup.md
       - Architecture: ARCHITECTURE.md
       - Development checks: DEVELOPMENT.md
       - Archived validation: archived-validation.md

@@ -133,3 +133,13 @@ then the full required suite and installed-wheel checks from outside the checkou
 Read `docs/HRRR_NATIVE_DAY_PILOT.md` before execution. Mocked HTTP and generated
 GRIB tests do not qualify actual NOAA archive coverage. `native_day plan` is offline;
 `native_day run` uses the exact reviewed source/date/bbox/caps and private cache.
+
+Standalone request changes: install `.[dev,native-pilot]`, run
+`python -m pytest -q tests/test_request_api.py tests/test_request_transport.py
+tests/test_processing_scaling.py tests/test_concurrency.py`, then the full suite,
+`ruff check src tests benchmarks demo`, strict docs and wheel/sdist checks.
+Generated GRIB tests skip when the optional codec is absent; CI installs it.
+Core installed-wheel smoke must run outside the checkout without Folium, Branca
+or GeoPandas and exercise source/variable/get planning plus legacy offline products.
+Use `benchmarks/native_processing.py` for deterministic read/decode counts; timing
+is environment-specific, and no routine test contacts NOAA/CDS.

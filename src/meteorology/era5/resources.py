@@ -18,6 +18,8 @@ import resource
 import sys
 import time
 
+import psutil
+
 MIB = 1024**2
 ROW_BYTES = 2048  # arrays/index + bounded identity strings/nullable values/Python overhead
 COPIES = 4  # concat, selection/consolidation/sort, group/pivot and output overlap
@@ -27,12 +29,17 @@ PARQUET_BATCH = 4096
 
 
 def memory_estimate(
-    points: int, *, point_batch: int = POINT_BATCH, source_bytes: int = 128 * MIB
+    points: int,
+    *,
+    point_batch: int = POINT_BATCH,
+    source_bytes: int = 128 * MIB,
+    records_per_point: int = 2 * (6 * 24 + 25),
 ) -> dict:
     if type(points) is not int or points <= 0:
         raise ValueError("Positive native grid size required.")
     # Two expvers, six instantaneous parameters * 24 hours and 25 tp slots.
-    records_per_point = 2 * (6 * 24 + 25)
+    if type(records_per_point) is not int or records_per_point <= 0:
+        raise ValueError("Positive per-point record allowance required.")
     normalized_day = points * records_per_point * ROW_BYTES
     aggregate = min(points, point_batch) * records_per_point * ROW_BYTES * COPIES
     parquet_read = PARQUET_BATCH * ROW_BYTES * COPIES
@@ -65,7 +72,7 @@ class Limits:
 
 
 class Budget:
-    def __init__(self, limits: Limits, *, rss=None, clock=None, staging_root=None):
+    def __init__(self, limits: Limits, *, rss=None, peak_rss=None, clock=None, staging_root=None):
         if (
             any(
                 type(v) is not int or v <= 0
@@ -87,12 +94,19 @@ class Budget:
         self.staging_root = None if staging_root is None else Path(staging_root).resolve()
         self.clock = clock or time.monotonic
         self.started = self.clock()
-        self.rss = rss or (
+        if rss is None:
+            process = psutil.Process()
+            self.rss = lambda: process.memory_info().rss
+        else:
+            self.rss = rss
+        # Historical high-water reporting is independent from admission.
+        self.historical_peak = peak_rss or (
             lambda: int(
                 resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
                 * (1 if sys.platform == "darwin" else 1024)
             )
         )
+        self.current_rss = 0
         self.requests = 0
         self.reserved = 0
         self.received = 0
@@ -131,7 +145,8 @@ class Budget:
         if self.previous_elapsed + self.clock() - self.started > self.limits.seconds:
             raise LimitExceeded("Compute time cap exceeded at cooperative checkpoint.")
         measured = self.rss()
-        self.peak_rss = max(self.peak_rss, measured)
+        self.current_rss = measured
+        self.peak_rss = max(self.peak_rss, measured, self.historical_peak())
         if measured + additional_memory > self.limits.memory_bytes:
             raise LimitExceeded(
                 "Memory cap exceeded by measured RSS plus planned allocation; use a fresh worker/smaller chunk."
@@ -146,6 +161,12 @@ class Budget:
         size = sum(p.stat().st_size for p in root.rglob("*") if p.is_file()) if root.exists() else 0
         if size + additional_bytes > self.limits.staging_bytes:
             raise LimitExceeded("Owned staging byte cap exceeded.")
+
+    def write_json(self, path, value):
+        atomic_json(Path(path), value)
+
+    def retain_directory(self, path):
+        pass  # Legacy aggregate pilot accounting deliberately keeps all siblings.
 
     def reserve_transfer(self, size):
         self.checkpoint()
@@ -165,6 +186,7 @@ class Budget:
             reserved_transfer_bytes=self.reserved,
             received_transfer_bytes=self.received,
             peak_rss_bytes=self.peak_rss,
+            current_rss_bytes=self.current_rss,
             elapsed_seconds=self.previous_elapsed + self.clock() - self.started,
             enforcement="cooperative estimate/checkpoint checks; streamed byte cap; no OS hard-memory preemption",
         )
@@ -202,9 +224,12 @@ def _bounded_transfer_locked(
     if partial.exists() or receipt.exists():
         raise FileExistsError("Transfer run already exists; use a new immutable destination.")
     budget.reserve_transfer(reservation_bytes)
+    incremental = getattr(budget, "incremental_storage", False)
+    if incremental:
+        budget.begin_write(partial, reservation_bytes)
     budget.check_disk(destination.parent, additional_bytes=4096)
     state = dict(status="RESERVED", reserved_bytes=reservation_bytes, received_bytes=0)
-    atomic_json(receipt, state)
+    budget.write_json(receipt, state)
     try:
         with open_response() as response, partial.open("xb") as f:
             length = response.headers.get("Content-Length")
@@ -219,7 +244,8 @@ def _bounded_transfer_locked(
                         )
                     break
                 budget.checkpoint(additional_memory=min(65536, remaining))
-                budget.check_disk(destination.parent, additional_bytes=min(65536, remaining) + 4096)
+                if not incremental:
+                    budget.check_disk(destination.parent, additional_bytes=min(65536, remaining) + 4096)
                 chunk = response.read(min(65536, remaining))
                 if not chunk:
                     break
@@ -230,6 +256,8 @@ def _bounded_transfer_locked(
                         "Opener returned more bytes than requested; partial not promoted."
                     )
                 f.write(chunk)
+                if incremental:
+                    budget.progress(partial, state["received_bytes"])
             if length is not None and state["received_bytes"] != int(length):
                 raise ValueError(
                     "Response ended before declared Content-Length; partial not promoted."
@@ -245,11 +273,17 @@ def _bounded_transfer_locked(
                     break
                 digest.update(chunk)
         state.update(status="COMPLETE", sha256=digest.hexdigest())
+        if incremental:
+            budget.finish_write(partial)
         os.replace(partial, destination)
-        atomic_json(receipt, state)
+        if incremental:
+            budget.move_storage(partial, destination, retained=True)
+        budget.write_json(receipt, state)
     except BaseException:
+        if incremental and str(partial.relative_to(budget.namespace)) in json.loads(budget.ledger.read_text())["allocations"]:
+            budget.finish_write(partial)
         state["status"] = "INCOMPLETE_NOT_PROMOTED"
-        atomic_json(receipt, state)
+        budget.write_json(receipt, state)
         raise
     return receipt
 

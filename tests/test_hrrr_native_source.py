@@ -168,3 +168,37 @@ def test_same_dimensions_with_different_earth_geometry_rejected(tmp_path):
             ec.codes_release(m)
     with pytest.raises(ValueError, match="source grid changed"):
         decode(files, bbox)
+
+
+def test_selective_temperature_reuses_geometry_but_rejects_changed_grid(tmp_path, monkeypatch):
+    import eccodes as ec
+    files, bbox = gribs(tmp_path)
+    cache = {}
+    coordinates = []
+    original = ec.codes_get_array
+    def measured(message,key,*args,**kwargs):
+        if key in {'latitudes','longitudes'}:
+            coordinates.append(key)
+        return original(message,key,*args,**kwargs)
+    monkeypatch.setattr(ec,'codes_get_array',measured)
+    selected = {'temperature_2m_k':files['temperature_2m_k']}
+    def execute():
+        return decode_hour(selected,valid=pd.Timestamp('2024-01-01T00:00:00Z'),bbox=bbox,
+                    halo=.2,budget=Budget(Limits(),rss=lambda:0),expected_shape=(4,4),
+                    selected_fields=set(selected),geometry_cache=cache)
+    frame, _ = execute()
+    again, _ = execute()
+    assert frame.equals(again)
+    assert coordinates == ['latitudes','longitudes']
+    assert 'WIND_SPEED_10M_MS' not in frame
+    path = selected['temperature_2m_k']
+    with path.open('rb') as stream:
+        m = ec.codes_grib_new_from_file(stream)
+    try:
+        ec.codes_set(m,'DxInMetres',4000)
+        with path.open('wb') as stream:
+            ec.codes_write(m,stream)
+    finally:
+        ec.codes_release(m)
+    with pytest.raises(ValueError,match='native grid differs'):
+        execute()

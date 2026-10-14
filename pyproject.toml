@@ -24,18 +24,19 @@ classifiers = [
   "Topic :: Scientific/Engineering :: GIS",
 ]
 dependencies = [
-  "branca>=0.7", "folium>=0.20", "geopandas>=1", "h3>=4", "numpy>=1.26", "pandas>=2.1",
-  "pyarrow>=14", "pydantic>=2", "pyproj>=3.6", "PyYAML>=6",
+  "h3>=4", "numpy>=1.26", "pandas>=2.1",
+  "psutil>=5.9", "pyarrow>=14", "pydantic>=2", "pyproj>=3.6", "PyYAML>=6",
   "scikit-learn>=1.4", "shapely>=2", "xarray>=2024.1",
 ]
 
 [project.optional-dependencies]
+visualization = ["branca>=0.7", "folium>=0.20", "geopandas>=1"]
 acquisition = ["herbie-data>=2024.3", "cfgrib>=0.9", "eccodes>=2.35"]
 era5 = ["cdsapi>=0.7.7", "eccodes>=2.35"]
 native-pilot = ["eccodes>=2.35"]
 test = ["pytest>=8"]
 docs = ["mkdocs-material>=9.5", "mkdocstrings[python]>=0.25", "pymdown-extensions>=10.2,<12.2"]
-dev = ["pytest>=8", "ruff>=0.8", "build>=1.2", "twine>=5", "mkdocs-material>=9.5", "mkdocstrings[python]>=0.25", "pymdown-extensions>=10.2,<12.2"]
+dev = ["branca>=0.7", "folium>=0.20", "geopandas>=1", "pytest>=8", "ruff>=0.8", "build>=1.2", "twine>=5", "mkdocs-material>=9.5", "mkdocstrings[python]>=0.25", "pymdown-extensions>=10.2,<12.2"]
 
 [project.urls]
 Documentation = "https://marinecast.github.io/toolkit-meteorology/"

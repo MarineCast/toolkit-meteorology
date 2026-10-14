@@ -9,7 +9,9 @@ import logging
 import os
 import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
+
+from ..concurrency import bounded_results
 from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
@@ -1083,9 +1085,8 @@ def _download_surface_weather_locked(
             record(acquire(value))
     else:
         with ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = {executor.submit(acquire, value): value for value in times}
-            for future in as_completed(futures):
-                record(future.result())
+            for row in bounded_results(executor,acquire,times,max_inflight=2*workers):
+                record(row)
     requested_rows.sort(key=lambda row: str(row["VALID_TIME_UTC"]))
     merged_rows = checkpoint()
 

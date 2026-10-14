@@ -60,8 +60,9 @@ consolidation makes a new release and receipt. Retrieval as-of is explicit and
 historical provider publication time is unknown, not fabricated from a 5-day lag.
 
 These APIs are source-processing helpers with synthetic verification. They do not
-publish a final Data release, generate a coastal mask, implement a marine H3
-a qualified real marine H3 crosswalk, submit CDS jobs, or claim real-source completeness. Production publication
+publish a final Data release, generate a coastal mask, implement a qualified marine H3 crosswalk or claim real-source completeness.
+Bounded job submission is implemented in `era5.transport` / `era5.jobs` and used
+by the [standalone request API](request-api.md); native pilot plans remain separate. Production publication
 and actual authenticated bounded acquisition remain gated integration work.
 
 ## Access and source facts
@@ -69,8 +70,9 @@ and actual authenticated bounded acquisition remain gated integration work.
 [CDS setup](https://cds.climate.copernicus.eu/how-to-api) requires local personal
 token configuration and manual dataset terms acceptance from the
 [ERA5 download form](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels?tab=download).
-The adapter checks file/environment presence without reading tokens, creating a
-client, accepting terms or submitting data jobs. Tokens must stay outside chat.
+Offline preflight checks configured credential mechanisms without reading secret
+files or creating a client. Execution uses the same redacted resolver and requires
+previous manual terms acceptance. Tokens must stay outside chat.
 
 [ERA5 documentation](https://confluence.ecmwf.int/spaces/CKB/pages/76414402/ERA5+data+documentation)
 identifies final expver 1, preliminary expver 5 and possible ERA5T revisions before
@@ -140,7 +142,7 @@ allocation; this is a reviewed proposal, not live-pilot budget approval.
 `era5.execution.process_native_day` gates on current production-qualified shared
 selection before file access. It streams message normalization to compact native
 Parquet, then aggregates fixed point batches. It preflights source bytes, grid size
-and planned allocations, checks measured process peak RSS/time at checkpoints and
+and planned allocations, checks current resident RSS/time at checkpoints and reports historical peak separately and
 checks owned staging before writes and terminal commit. Metric floats have stable
 nullable Arrow schemas even when a whole point batch is missing. Output is a fresh
 source-processing checkpoint, not a final marine product; interruptions retain
@@ -152,8 +154,8 @@ request and byte reservations are committed before opening. Restart cannot reset
 reservations or change caps. Reads never exceed the remaining allowance. Unknown-
 length responses exhausting it stop unpromoted rather than reading an extra byte.
 Incomplete payloads and interruptions retain receipts/partials. No access token or
-provider response body is logged. Official job submission, polling and result URL
-qualification still need their bounded integration before a live source pilot.
+provider response body is logged. Official job submission, polling and result URL qualification use the separate
+bounded `jobs` / `transport` implementation. Actual live CDS qualification remains unrun.
 
 These are conservative preallocation estimates and cooperative fail-stop checks.
 They do not promise OS-level prevention of an allocation or wall-clock overrun

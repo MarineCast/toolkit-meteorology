@@ -1,0 +1,643 @@
+"""Immutable, checksum-backed request results and shared source caches."""
+
+from __future__ import annotations
+
+from copy import deepcopy
+from datetime import timedelta, date
+import fcntl
+from importlib.util import find_spec
+from importlib.metadata import version, PackageNotFoundError
+
+from ._version import __version__
+import json
+import os
+from pathlib import Path
+import uuid
+
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+
+from .artifacts import checksum_path
+from .era5.resources import ROW_BYTES
+from .request_storage import RequestBudget
+from .request import digest
+from .request_vintage import CacheError, selected as selected_vintage, promote
+from .request_sources import inspect_sources
+
+
+FLOATS = {"VALUE", "SOURCE_LAT", "SOURCE_LON", "SOURCE_GRID_DISTANCE_M", "COVERAGE_FRACTION"}
+INTS = {"SOURCE_GRID_INDEX", "H3_RESOLUTION", "VALID_HOURS", "EXPECTED_HOURS"}
+COLUMNS = [
+    "DATE",
+    "H3_INDEX",
+    "H3_RESOLUTION",
+    "SOURCE_GRID_INDEX",
+    "SOURCE_LAT",
+    "SOURCE_LON",
+    "SOURCE_GRID_HASH",
+    "SOURCE_GRID_DISTANCE_M",
+    "VALID_TIME_UTC",
+    "METRIC",
+    "VALUE",
+    "UNITS",
+    "SOURCE",
+    "STATUS",
+    "VALID_HOURS",
+    "EXPECTED_HOURS",
+    "COVERAGE_FRACTION",
+    "TIMEZONE",
+    "INTERVAL_START_UTC",
+    "INTERVAL_END_UTC",
+    "METHOD",
+    "REDUCTION",
+    "WIND_VECTOR_BASIS",
+    "RETRIEVED_AT_UTC",
+    "SOURCE_SHA256_RECEIPTS",
+    "SOURCE_VALUE_STATUS",
+    "SOURCE_DEPENDENCIES",
+    "CONSOLIDATION_STATUS",
+    "AVAILABLE_AT_UTC",
+    "AVAILABILITY_POLICY",
+    "EVIDENCE_KIND",
+]
+RESULT_SCHEMA = pa.schema(
+    [
+        pa.field(c, pa.float64() if c in FLOATS else pa.int64() if c in INTS else pa.string())
+        for c in COLUMNS
+    ]
+)
+
+
+def result_table(frame, metadata=None):
+    frame = frame.reindex(columns=COLUMNS)
+    schema = RESULT_SCHEMA
+    if metadata is not None:
+        schema = schema.with_metadata(
+            {
+                b"meteorology.manifest": json.dumps(
+                    metadata, sort_keys=True, allow_nan=False
+                ).encode()
+            }
+        )
+    return pa.Table.from_pandas(frame, schema=schema, preserve_index=False)
+
+
+def _safe_path(directory, relative):
+    path = Path(relative)
+    if path.is_absolute() or ".." in path.parts:
+        raise CacheError("Cache artifact path escapes its result directory.")
+    return directory / path
+
+
+def _validate(directory, manifest, *, selected=None):
+    if manifest.get("manifest_sha256") != digest(
+        {k: v for k, v in manifest.items() if k != "manifest_sha256"}
+    ):
+        raise CacheError("Result manifest is corrupt; inspect cache or request refresh.")
+    for entry in manifest["artifacts"] if selected is None else selected:
+        path = _safe_path(directory, entry["path"])
+        if (
+            not path.is_file()
+            or path.stat().st_size != entry["bytes"]
+            or checksum_path(path) != entry["sha256"]
+        ):
+            raise CacheError("Result checksum is corrupt; retained evidence was not replaced.")
+        file = pq.ParquetFile(path)
+        expected_schema = (
+            RESULT_SCHEMA
+            if manifest["request"]["schema"].endswith("v2")
+            else pa.schema(
+                [
+                    f
+                    for f in RESULT_SCHEMA
+                    if f.name not in {"SOURCE_VALUE_STATUS", "SOURCE_DEPENDENCIES"}
+                ]
+            )
+        )
+        if file.metadata.num_rows != entry["rows"] or not file.schema_arrow.equals(
+            expected_schema, check_metadata=False
+        ):
+            raise CacheError("Result row count/schema differs from committed manifest.")
+    for entry in manifest["inputs"]:
+        path = Path(entry["path"])
+        if not path.is_file() or checksum_path(path) != entry["sha256"]:
+            raise CacheError(
+                "Retained source receipt is corrupt or absent; request refresh in a new generation."
+            )
+
+
+def _namespace(plan):
+    return plan["cache_dir"] / (
+        "fixtures" if plan["request"]["evidence_kind"] == "synthetic_fixture" else "real"
+    )
+
+
+def _compatible(existing, requested):
+    changing = {"variables", "inputs", "start", "end_exclusive"}
+    return (
+        all(existing.get(k) == v for k, v in requested.items() if k not in changing)
+        and set(requested["variables"]) <= set(existing["variables"])
+        and existing["start"]
+        <= requested["start"]
+        < requested["end_exclusive"]
+        <= existing["end_exclusive"]
+    )
+
+
+def _manifest(root, result_id):
+    if len(result_id) != 64 or any(c not in "0123456789abcdef" for c in result_id):
+        raise CacheError("result_id must be a SHA256 identity.")
+    path = root / "results" / result_id / "MANIFEST.json"
+    try:
+        manifest = json.loads(path.read_text())
+    except (OSError, ValueError):
+        raise CacheError(
+            "Selected result manifest is absent/corrupt; request refresh or inspect evidence."
+        ) from None
+    if manifest.get("result_id") != result_id:
+        raise CacheError("Selected manifest has a different result identity.")
+    return path, manifest
+
+
+def _find(plan, *, result_id=None, locked=False):
+    root = _namespace(plan)
+    if not root.exists():
+        if result_id:
+            raise CacheError("Pinned result does not exist in the selected cache namespace.")
+        return None
+    if not locked:
+        with (root / ".request.lock").open("a+b") as lease:
+            fcntl.flock(lease, fcntl.LOCK_SH)
+            return _find(plan, result_id=result_id, locked=True)
+    validated = set()
+    if result_id:
+        path, manifest = _manifest(root, result_id)
+        existing, requested = manifest["request"].copy(), plan["request"].copy()
+        # Pins explicitly retain the historical method/schema. Coverage, source,
+        # frequency, support and requested quantities still must match.
+        for k in (
+            "method",
+            "schema",
+            "producer_fingerprint",
+            "fixture_checksums",
+            "fixture_retrieved_at_utc",
+        ):
+            existing.pop(k, None)
+            requested.pop(k, None)
+        if not _compatible(existing, requested):
+            raise CacheError("Pinned result is incompatible with requested coverage/support.")
+        candidates = [(path, manifest)]
+    else:
+        generation, witnesses, registered = selected_vintage(plan, root)
+        for identity in witnesses:
+            path, manifest = _manifest(root, identity)
+            _validate(path.parent, manifest)
+            validated.add(identity)
+            if manifest["status"] != "COMPLETE":
+                raise CacheError("Active generation witness is not complete.")
+        candidates = []
+        if registered and isinstance(registered[0], dict):
+            eligible = [
+                r
+                for r in registered
+                if r["source_generation"] == generation
+                and _compatible(r["request"], plan["request"])
+            ]
+            eligible.sort(key=lambda r: (r["rows"], r["result_id"]))
+            paths = [root / "results" / r["result_id"] / "MANIFEST.json" for r in eligible[:1]]
+        else:
+            paths = [root / "results" / i / "MANIFEST.json" for i in registered]
+        if not registered:
+            paths = list((root / "results").glob("*/MANIFEST.json"))
+        for path in paths:
+            try:
+                manifest = json.loads(path.read_text())
+            except (OSError, ValueError):
+                raise CacheError(
+                    "Unreadable result manifest; explicit reconciliation required."
+                ) from None
+            if manifest.get("status") == "COMPLETE" and _compatible(
+                manifest.get("request", {}), plan["request"]
+            ):
+                if manifest.get("source_generation", "retained") == generation:
+                    candidates.append((path, manifest))
+        unindexed = [pair for pair in candidates if "source_generation" not in pair[1]]
+        if len(unindexed) > 1:
+            raise CacheError("Legacy results have no revision ordering; pin result_id or refresh.")
+        # Only after choosing source vintage may representation size break ties.
+        candidates.sort(
+            key=lambda pair: (sum(a["rows"] for a in pair[1]["artifacts"]), pair[1]["result_id"])
+        )
+    if not candidates:
+        return None
+    path, manifest = candidates[0]
+    wanted = [
+        a
+        for a in manifest["artifacts"]
+        if a["metric"] in plan["metrics"]
+        and plan["request"]["start"] <= a["day"] < plan["request"]["end_exclusive"]
+    ]
+    expected = {
+        (stamp.date().isoformat(), metric)
+        for stamp in pd.date_range(
+            plan["request"]["start"], plan["request"]["end_exclusive"], freq="D", inclusive="left"
+        )
+        for metric in plan["metrics"]
+    }
+    if {(a["day"], a["metric"]) for a in wanted} != expected or any(a["rows"] <= 0 for a in wanted):
+        raise CacheError("Selected result artifacts do not cover the requested dates/metrics.")
+    if manifest["result_id"] not in validated:
+        _validate(path.parent, manifest, selected=wanted)
+    view_request = deepcopy(plan["request"])
+    if result_id:
+        for key in ("method", "schema", "producer_fingerprint"):
+            view_request[key] = manifest["request"][key]
+    return WeatherResult(
+        path.parent, manifest, request=view_request, selected=wanted, cache_hit=True
+    )
+
+
+class WeatherResult:
+    """Disk-backed native/H3 long data. pandas is materialized only on request."""
+
+    def __init__(self, directory, manifest, *, request=None, selected=None, cache_hit=False):
+        self.directory = Path(directory)
+        self._manifest = deepcopy(manifest)
+        self._selected = deepcopy(manifest["artifacts"] if selected is None else selected)
+        self._request = deepcopy(request or manifest["request"])
+        self.cache_hit = cache_hit
+
+    @property
+    def metadata(self):
+        metadata = deepcopy(self._manifest)
+        metadata.update(
+            request=self._request,
+            artifacts=self._selected,
+            row_count=sum(a["rows"] for a in self._selected),
+            cache_hit=self.cache_hit,
+            selection_from_result_id=self._manifest["result_id"],
+        )
+        metadata["metrics"] = {
+            m: v
+            for m, v in metadata["metrics"].items()
+            if m in {a["metric"] for a in self._selected}
+        }
+        from .request_lineage import parameters
+
+        allowed = {
+            (a["day"], p, self._manifest["metrics"][a["metric"]]["reduction"] == "sum")
+            for a in self._selected
+            for p in parameters(self._request["source"], a["metric"])
+        }
+
+        def relevant(item):
+            stamp = pd.Timestamp(item["valid_time_utc"])
+            return any(
+                p == item["parameter"]
+                and pd.Timestamp(day, tz="UTC") + pd.Timedelta(hours=1 if accumulation else 0)
+                <= stamp
+                < pd.Timestamp(day, tz="UTC") + pd.Timedelta(hours=25 if accumulation else 24)
+                for day, p, accumulation in allowed
+            )
+
+        metadata["source_forecast_support"] = [
+            s for s in metadata.get("source_forecast_support", []) if relevant(s)
+        ]
+        metadata.pop("manifest_sha256", None)  # the view has its own durable identity
+        metadata["view_sha256"] = digest(metadata)
+        return metadata
+
+    def _tables(self):
+        _validate(self.directory, self._manifest, selected=self._selected)
+        for entry in self._selected:
+            file = pq.ParquetFile(_safe_path(self.directory, entry["path"]))
+            for batch in file.iter_batches(batch_size=4096):
+                table = pa.Table.from_batches([batch])
+                for field in RESULT_SCHEMA:
+                    if field.name not in table.column_names:
+                        table = table.append_column(field, pa.nulls(len(table), type=field.type))
+                yield table.select(COLUMNS).cast(RESULT_SCHEMA)
+
+    def to_pandas(self):
+        frames = [table.to_pandas() for table in self._tables()]
+        return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=COLUMNS)
+
+    def to_parquet(self, path):
+        """Stream to an atomic Parquet with complete durable JSON metadata."""
+        path = Path(path).expanduser().resolve()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # Explicit output overwrite is caller scope; never export over retained evidence.
+        if path.is_relative_to(self.directory.parents[1]) or any(
+            path == Path(r["path"]) for r in self._manifest["inputs"]
+        ):
+            raise ValueError("Output would replace immutable result/source evidence.")
+        temporary = path.with_name("." + path.name + "." + uuid.uuid4().hex + ".partial")
+        schema = RESULT_SCHEMA.with_metadata(
+            {
+                b"meteorology.manifest": json.dumps(
+                    self.metadata, sort_keys=True, allow_nan=False
+                ).encode()
+            }
+        )
+        try:
+            with pq.ParquetWriter(temporary, schema, compression="zstd") as writer:
+                for table in self._tables():
+                    writer.write_table(table.replace_schema_metadata(schema.metadata))
+            with temporary.open("rb") as stream:
+                os.fsync(stream.fileno())
+            os.replace(temporary, path)
+            descriptor = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+        except BaseException:
+            # Keep a failed export inspectable; no successful destination was published.
+            raise
+        return path
+
+
+def preview_request(plan, *, refresh=False, result_id=None):
+    hit = None if refresh else _find(plan, result_id=result_id)
+    generation = (
+        "preview-refresh"
+        if refresh
+        else (
+            selected_vintage(plan, _namespace(plan))[0]
+            if hit is None
+            else hit._manifest.get("source_generation", "legacy_unindexed")
+        )
+    )
+    work = (
+        inspect_sources(
+            plan,
+            _namespace(plan),
+            generation,
+            fixtures=plan["request"]["evidence_kind"] == "synthetic_fixture",
+        )
+        if hit is None
+        else dict(
+            reusable_source_objects=[],
+            missing_source_work=[],
+            remaining_provider_requests_lower_bound=0,
+            remaining_transfer_reservation_bytes=0,
+            exact_provider_requests=True,
+            uncertainties=[],
+        )
+    )
+    from .era5.credentials import resolve_credentials
+
+    return dict(
+        request=hit._request if hit is not None else plan["request"],
+        required_inputs=plan["required_inputs"],
+        metrics=plan["metrics"],
+        time_boundaries=plan["time_boundaries"],
+        accumulation_boundary=plan["accumulation_boundary"],
+        spatial_support=dict(
+            output=plan["request"]["spatial_output"],
+            bbox=plan["request"]["bbox"],
+            h3_cells=len(plan["support"]) if plan["support"] is not None else None,
+            estimated_native_points=plan["estimated_native_points"],
+        ),
+        cache=dict(
+            final_result_hit=hit is not None,
+            result_id=hit._manifest["result_id"] if hit is not None else None,
+            source_generation=generation,
+            resolution_required="refresh_whole_request_or_pin_result"
+            if not refresh and generation != "retained" and work["missing_source_work"]
+            else None,
+            **work,
+            provider_requests_if_hit=0,
+            missing_work=[]
+            if hit
+            else [
+                "selected source acquisition/receipt validation",
+                "normalization",
+                "UTC reductions",
+            ],
+        ),
+        expected_requests=plan["jobs"]
+        if plan["jobs"]
+        else dict(
+            cycles=(
+                date.fromisoformat(plan["request"]["end_exclusive"])
+                - date.fromisoformat(plan["request"]["start"])
+            ).days
+            * 24,
+            f00_fields=plan["required_inputs"],
+            index_then_exact_field_ranges=True,
+        ),
+        nominal_cold_cache_provider_requests=plan["nominal_provider_requests"],
+        nominal_provider_requests=0 if hit else plan["nominal_provider_requests"],
+        retention_policy=dict(
+            quota_bytes=plan["retained_cache_bytes"],
+            default="unbounded_no_eviction",
+            physical_disk_safeguard=True,
+        ),
+        transfer_size=plan["transfer_size"],
+        limits=vars(plan["limits"]),
+        memory_preflight=plan["memory_preflight"],
+        access=resolve_credentials(env_file=plan["credential_env_file"], inspect_only=True).public()
+        if plan["request"]["source"] == "era5" and work["missing_source_work"]
+        else {"credential_required": False},
+        production_shared_study_release=False,
+        network_requests_made=0,
+    )
+
+
+def execute_request(
+    plan, *, refresh=False, result_id=None, source_files=None, retrieved_at_utc=None
+):
+    root = _namespace(plan)
+    root.mkdir(parents=True, exist_ok=True)
+    # Namespace lease serializes source writers too. Concurrent compatible callers
+    # wait for the first terminal commit, then read it with zero provider requests.
+    with (root / ".request.lock").open("a+b") as lease:
+        fcntl.flock(lease, fcntl.LOCK_EX)
+        if not refresh:
+            hit = _find(plan, result_id=result_id, locked=True)
+            if hit is not None:
+                return hit
+        if find_spec("eccodes") is None:
+            raise ImportError(
+                "Install toolkit-meteorology[native-pilot] for HRRR or [era5] for ERA5 GRIB decoding."
+            )
+        token = uuid.uuid4().hex
+        generation = token if refresh else selected_vintage(plan, root)[0]
+        run_root = root / "runs" / (plan["request_id"] if not refresh else token)
+        run_root.mkdir(parents=True, exist_ok=True)
+        budget = RequestBudget(
+            plan["limits"],
+            namespace=root,
+            run_root=run_root,
+            retained_cache_bytes=plan["retained_cache_bytes"],
+        )
+        budget.bind_journal(run_root / "TRANSFER_BUDGET.json")
+        work = inspect_sources(plan, root, generation, fixtures=source_files is not None)
+        if not refresh and generation != "retained":
+            if work["missing_source_work"]:
+                raise CacheError(
+                    "Active vintage lacks this exact source selection; refresh the whole request or pin a result_id."
+                )
+            if source_files is not None:
+                witnesses = selected_vintage(plan, root)[1]
+                known = {
+                    receipt["sha256"]
+                    for identity in witnesses
+                    for receipt in _manifest(root, identity)[1]["inputs"]
+                }
+                if not set(plan["request"]["fixture_checksums"]) <= known:
+                    raise CacheError(
+                        "Supplied fixture bytes differ from active source vintage; refresh or pin a result_id."
+                    )
+        if (
+            budget.requests + work["remaining_provider_requests_lower_bound"]
+            > plan["limits"].requests
+        ):
+            raise ValueError("Verified remaining acquisition work exceeds request cap.")
+        if (
+            budget.reserved + work["remaining_transfer_reservation_bytes"]
+            > plan["limits"].transfer_bytes
+        ):
+            raise ValueError("Verified remaining transfer reservations exceed transfer cap.")
+        from .request_adapters import hrrr_day, era5_day, reduce_day
+
+        artifacts, inputs, grids = [], [], set()
+        forecast_support = []
+        stage = run_root / ("result-" + token)
+        stage.mkdir()
+        day = date.fromisoformat(plan["request"]["start"])
+        last = date.fromisoformat(plan["request"]["end_exclusive"])
+        geometry, mappings = {}, {}
+        complete = True
+        terminal = False
+        try:
+            budget.write_json(
+                run_root / "RUN_STATE.json", dict(status="ACQUIRING", request=plan["request"])
+            )
+            while day < last:
+                day_text = day.isoformat()
+                common = dict(
+                    source_files=source_files,
+                    retrieved_at_utc=retrieved_at_utc,
+                    generation=generation,
+                )
+                if plan["request"]["source"] == "hrrr":
+                    hourly, receipts = hrrr_day(
+                        plan, day_text, root, budget, geometry=geometry, mappings=mappings, **common
+                    )
+                else:
+                    hourly, receipts = era5_day(plan, day_text, root, run_root, budget, **common)
+                forecast_support.extend(hourly.attrs.get("source_forecast_support", []))
+                inputs.extend(receipts)
+                grids.update(hourly.SOURCE_GRID_HASH)
+                for metric, frame in reduce_day(hourly, plan, day_text):
+                    frame["EVIDENCE_KIND"] = plan["request"]["evidence_kind"]
+                    complete &= bool((frame.STATUS == "COMPLETE").all())
+                    path = stage / f"{day_text}.{metric}.parquet"
+                    budget.check_disk(root, additional_bytes=len(frame) * ROW_BYTES)
+                    table = result_table(frame)
+                    with budget.write_file(path, table.nbytes + 65536):
+                        pq.write_table(table, path, compression="zstd")
+                    artifacts.append(
+                        dict(
+                            path=path.name,
+                            day=day_text,
+                            metric=metric,
+                            rows=len(frame),
+                            bytes=path.stat().st_size,
+                            sha256=checksum_path(path),
+                        )
+                    )
+                day += timedelta(days=1)
+            # Canonical derived identity binds the actual source receipts/grids,
+            # requested reductions/support, scientific producer and schema versions.
+            unique_inputs = sorted({json.dumps(r, sort_keys=True) for r in inputs})
+            inputs = [json.loads(r) for r in unique_inputs]
+            identity = digest(
+                dict(
+                    request=plan["request"],
+                    inputs=inputs,
+                    source_grids=sorted(grids),
+                    source_generation=generation,
+                )
+            )
+            runtime = {}
+            for name in ("numpy", "pandas", "pyarrow", "h3", "pyproj", "shapely", "eccodes"):
+                try:
+                    runtime[name] = version(name)
+                except PackageNotFoundError:
+                    runtime[name] = None
+            manifest = dict(
+                software_version=__version__,
+                scientific_runtime=runtime,
+                source_forecast_support=forecast_support,
+                result_id=identity,
+                source_generation=generation,
+                request=plan["request"],
+                metrics=plan["metrics"],
+                status="COMPLETE" if complete else "PARTIAL",
+                artifacts=artifacts,
+                inputs=inputs,
+                source_grids=sorted(grids),
+                row_count=sum(a["rows"] for a in artifacts),
+                budget=budget.receipt(),
+                source_resolution="HRRR 3 km"
+                if plan["request"]["source"] == "hrrr"
+                else "ERA5 0.25 degree CDS distribution; ~31 km model information",
+                spatial_method="nearest-haversine-decoded-footprint-v1"
+                if plan["request"]["spatial_output"] == "h3"
+                else "native_grid_points_inside_bbox_v1",
+                production_shared_study_release=False,
+                limitations=[
+                    "Retrospective source processing, no independent regional accuracy validation.",
+                    "Daily means are sampled hourly values; partial days stay null.",
+                    "Snowfall is interval water equivalent, not ground snow depth or snowpack.",
+                    "Actual historical publication times are unknown.",
+                ],
+            )
+            manifest["manifest_sha256"] = digest(manifest)
+            _validate(stage, manifest)
+            budget.check_disk(root, additional_bytes=len(json.dumps(manifest).encode()) + 8192)
+            for entry in artifacts:
+                with (stage / entry["path"]).open("rb") as stream:
+                    os.fsync(stream.fileno())
+            budget.write_json(stage / "MANIFEST.json", manifest)
+            destination = root / "results" / identity
+            destination.parent.mkdir(exist_ok=True)
+            if destination.exists():
+                previous = json.loads((destination / "MANIFEST.json").read_text())
+                _validate(destination, previous)
+                # Preserve both attempts; never replace immutable terminal artifacts.
+                result = WeatherResult(destination, previous)
+            else:
+                os.rename(stage, destination)
+                budget.move_storage(stage, destination)
+                descriptor = os.open(destination.parent, os.O_RDONLY)
+                try:
+                    os.fsync(descriptor)
+                finally:
+                    os.close(descriptor)
+                result = WeatherResult(destination, manifest)
+            budget.write_json(
+                run_root / "RUN_STATE.json",
+                dict(status="COMMITTED_" + manifest["status"], result_id=identity),
+            )
+            # All fallible accounting/control writes precede active promotion.
+            # The atomic index replacement is the last publication operation.
+            budget.persist()
+            budget.retain_directory(run_root)
+            if complete:
+                promote(plan, root, result._manifest, refresh=refresh, budget=budget)
+            terminal = True
+            return result
+        except BaseException:
+            budget.write_json(
+                run_root / "RUN_STATE.json",
+                dict(status="INCOMPLETE_NOT_PUBLISHED", budget=budget.receipt()),
+            )
+            raise
+        finally:
+            if not terminal:
+                budget.persist()

@@ -1,5 +1,41 @@
 # Remaining meteorology implementation tracker
 
+## 2026-10-13 selective weather requests and processing refactor
+
+Added workspace-independent Python getters and `meteorology get`, source/variable
+discovery, one validated UTC request path, selective source dependencies,
+disk-backed results, immutable shared caches and durable export provenance.
+HRRR supports qualified R5 or native output; ERA5 supports native output, including
+one-hour precipitation and snowfall water-equivalent totals. Unsupported
+combinations fail before acquisition. Existing family, local-day/DST and
+shared-study publication contracts retain their separate meaning.
+
+Implementation: **PASS** for the exercised software scope. The final suite passed
+**433 tests**, with one opt-in live NOAA test skipped. Ruff, catalog/feature-policy
+freshness, generated variable-reference parity, strict MkDocs, wheel/sdist and
+Twine checks passed. Fresh core and ERA5-extra wheel environments outside the
+checkout passed offline checks and `pip check`; the core required no optional map
+libraries. macOS smoke joins the existing Linux Python 3.11–3.13 CI matrix; hosted
+results are separate from this local validation record.
+
+The equivalent synthetic ERA5 workload read **43,264 normalized records instead
+of 173,056**, with unchanged daily output checksum. Its final timing was
+3.408 s versus 3.258 s before; no wall-time improvement is claimed. Small physical
+row groups increased retained storage about 3.27 times for this fixture.
+Selected-field and cache tests verify operation counts without provider access.
+
+Source compatibility: **NOT_RUN** for new live NOAA requests and authenticated
+CDS payloads. Generated GRIB and mocked HTTP validate software/source-contract
+handling, not actual archive availability. Earlier bounded real-source evidence
+below applies only to its stated method, cycles and footprint.
+
+Empirical scientific acceptance: **NOT_RUN** for independent regional accuracy,
+historical native/regional rebuilds or downstream modeling integration. ERA5 H3
+sampling remains unqualified. This refactor does not close the M2–M7 gates below.
+
+See [weather requests](request-api.md), [refactor evidence](request-refactor-evidence.md),
+[cleanup decisions](request-cleanup.md) and the [request handoff](request-handoff.md).
+
 ## 2026-10-04 bounded live-week documentation demo
 
 Added `meteorology demo-hourly-week` with a write-free/network-free preview,

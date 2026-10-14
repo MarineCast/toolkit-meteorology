@@ -76,3 +76,19 @@ production approval/registry gates and producer-owned paths under the relative
 Data root. Full rectangle atmospheric companions remain distinct from marine
 reporting membership. The packaged JSON schema is separately pinned in embedded
 study provenance; actual source coverage remains independent of requested dates.
+
+
+## Standalone request path
+
+`capabilities` owns variable/input dependencies; `request` validates and plans
+explicit bbox/source/UTC requests. All root getters delegate to that path.
+`request_adapters` reuses strict native source decoders, bounded HTTP/job clients,
+point-block normalization and the existing validated HRRR nearest crosswalk.
+`request_cache` owns immutable source/result identities, locking and disk-backed
+`WeatherResult`; `request_cli` calls the same Python executor. Getters never invoke
+the CLI or mutate process-global workspace/study environment variables.
+
+This separate v1 request method/schema does not change family publication or the
+shared-study/marine reporting gates. Only this checkout is affected. Full
+[request semantics](request-api.md) and the [cleanup inventory](request-cleanup.md)
+document compatibility and the retained advanced tools.

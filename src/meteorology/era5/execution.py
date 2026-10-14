@@ -14,6 +14,7 @@ from ..artifacts import checksum_path
 from ..study import load_study_config
 from .source import decode_grib
 from .daily import utc_daily
+from .blocks import write_point_blocks
 from .resources import (
     Budget,
     LimitExceeded,
@@ -34,6 +35,7 @@ def process_native_day(
     day: str,
     budget: Budget,
     native_source_pilot: bool = False,
+    expected_grid: set[tuple[float, float]] | None = None,
 ) -> Path:
     """Stream normalization, then aggregate fixed native-point batches in one worker.
 
@@ -80,11 +82,15 @@ def process_native_day(
     grid_size = None
     grid_hash = None
     messages = 0
+    point_groups = {}
+    row_group = 0
     try:
         budget.check_disk(destination, additional_bytes=65536)
         atomic_json(state, dict(status="NORMALIZING", day=day, limits=vars(budget.limits)))
         for source, retrieved in source_files:
             for frame in decode_grib(source, retrieved_at_utc=retrieved, budget=budget):
+                if expected_grid is not None and set(zip(frame.SOURCE_LAT, frame.SOURCE_LON)) != expected_grid:
+                    raise ValueError("Delivered GRIB grid differs from exact pilot grid.")
                 messages += 1
                 if messages > 2 * (7 * 48 + 1):
                     raise LimitExceeded(
@@ -120,7 +126,7 @@ def process_native_day(
                     writer = pq.ParquetWriter(
                         normalized, table.schema, compression="zstd", use_dictionary=True
                     )
-                writer.write_table(table)
+                row_group = write_point_blocks(writer,table,point_groups,row_group)
                 budget.checkpoint()
         if writer is not None:
             writer.close()
@@ -130,27 +136,21 @@ def process_native_day(
         atomic_json(
             state, dict(status="AGGREGATING", day=day, grid_points=grid_size, messages=messages)
         )
+        file = pq.ParquetFile(normalized)
         for offset in range(0, grid_size, POINT_BATCH):
             indices = set(range(offset, min(offset + POINT_BATCH, grid_size)))
             budget.checkpoint(
                 additional_memory=len(indices) * 338 * ROW_BYTES * COPIES
                 + PARQUET_BATCH * ROW_BYTES * COPIES
             )
-            parts = []
-            rows = 0
-            for batch in pq.ParquetFile(normalized).iter_batches(batch_size=PARQUET_BATCH):
-                budget.checkpoint(additional_memory=PARQUET_BATCH * ROW_BYTES * COPIES)
-                frame = batch.to_pandas()
-                part = frame[frame.SOURCE_GRID_INDEX.isin(indices)].copy()
-                if len(part):
-                    parts.append(part)
-                    rows += len(part)
-                if rows > len(indices) * 338:
-                    raise LimitExceeded("Per-point time/parameter/expver row cap exceeded.")
-            if not parts:
-                raise ValueError("Native point batch absent from source.")
+            groups = point_groups.get(offset, [])
+            rows = sum(file.metadata.row_group(i).num_rows for i in groups)
+            if not groups or rows > len(indices) * 338:
+                raise LimitExceeded("Per-point time/parameter/expver row cap exceeded.")
             budget.checkpoint(additional_memory=rows * ROW_BYTES * COPIES)
-            records = pd.concat(parts, ignore_index=True)
+            records = file.read_row_groups(groups).to_pandas()
+            if set(records.SOURCE_GRID_INDEX) != indices:
+                raise ValueError("Native point block differs from its physical row groups.")
             result = utc_daily(records, day=day, expected_native_indices=indices, budget=budget)
             budget.check_disk(destination, additional_bytes=len(result) * 16 * 1024)
             # Nullable metric values have stable float schemas even if a whole point batch is missing.

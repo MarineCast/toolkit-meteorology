@@ -13,7 +13,6 @@ from .execution import process_native_day
 from .jobs import request_identity, run_job
 from .planning import DATASET, VARIABLES
 from .resources import Budget, Limits, atomic_json, memory_estimate
-from .source import decode_grib
 from .transport import CDSHTTPProvider
 
 MIB = 1024**2
@@ -82,18 +81,7 @@ def pilot_plan(study_config):
     return plan
 
 
-def _credential(path):
-    # Explicit local alias only. Never write a token to outputs or copy env files.
-    matches = []
-    for line in Path(path).read_text().splitlines():
-        if line.strip().startswith("COPERNICUS_API_KEY="):
-            matches.append(line.split("=", 1)[1].strip().strip("\"'"))
-    if len(matches) != 1:
-        raise ValueError("Exactly one configured token alias required.")
-    return matches[0]
-
-
-def run_pilot(study_config, plan, output, *, credential_env_file, provider_factory=CDSHTTPProvider):
+def run_pilot(study_config, plan, output, *, credential_env_file=None, provider_factory=CDSHTTPProvider):
     if plan != pilot_plan(study_config):
         raise ValueError("Plan differs from exact reviewed study/source/date/region/caps.")
     root = Path(output)
@@ -111,8 +99,9 @@ def run_pilot(study_config, plan, output, *, credential_env_file, provider_facto
         budget.bind_journal(journal)
         budget.check_disk(root, additional_bytes=65536)
         atomic_json(plan_path, plan)
+        from .credentials import resolve_credentials
         provider = provider_factory(
-            key=_credential(credential_env_file),
+            key=resolve_credentials(env_file=credential_env_file, required=True).key,
             budget=budget,
             storage_hosts=tuple(plan["storage_hosts"]),
             download_cap=plan["download_reservation_per_job"],
@@ -139,11 +128,6 @@ def run_pilot(study_config, plan, output, *, credential_env_file, provider_facto
                 )
                 sources.append((job_root / "source.grib", result["retrieved_at_utc"]))
             expected = {(lat, lon) for lat in [49, 49.25, 49.5] for lon in [-125.5, -125.25, -125]}
-            # Validate exact requested small grid before source processing can allocate larger batches.
-            for source, retrieved in sources:
-                for frame in decode_grib(source, retrieved_at_utc=retrieved, budget=budget):
-                    if set(zip(frame.SOURCE_LAT, frame.SOURCE_LON)) != expected:
-                        raise ValueError("Delivered GRIB grid differs from exact pilot grid.")
             manifest = process_native_day(
                 study_config,
                 sources,
@@ -151,6 +135,7 @@ def run_pilot(study_config, plan, output, *, credential_env_file, provider_facto
                 day=plan["day"],
                 budget=budget,
                 native_source_pilot=True,
+                expected_grid=expected,
             )
             from .pilot_qa import validate_native_pilot
 

@@ -123,7 +123,7 @@ def generated_pilot_grib(path, *, boundary_only=False):
                     ec.codes_release(m)
 
 
-def test_real_generated_grib_through_concrete_mocked_transport_and_independent_qa(tmp_path):
+def test_real_generated_grib_through_concrete_mocked_transport_and_independent_qa(tmp_path, monkeypatch):
     from meteorology.era5.transport import CDSHTTPProvider, API
     from .test_era5_transport import Opener, Response, HOST, CATALOGUE
 
@@ -161,6 +161,13 @@ def test_real_generated_grib_through_concrete_mocked_transport_and_independent_q
 
     env = tmp_path / "auth.fixture"
     env.write_text("COPERNICUS_API_KEY=SYNTHETIC_NOT_REAL\n")
+    import meteorology.era5.execution as execution
+    original = execution.decode_grib
+    decoded_sources = []
+    def counted(*args,**kwargs):
+        decoded_sources.append(args[0])
+        yield from original(*args,**kwargs)
+    monkeypatch.setattr(execution,'decode_grib',counted)
     manifest = run_pilot(
         STUDY,
         pilot_plan(STUDY),
@@ -168,6 +175,7 @@ def test_real_generated_grib_through_concrete_mocked_transport_and_independent_q
         credential_env_file=env,
         provider_factory=factory,
     )
+    assert len(decoded_sources) == 2  # one stream per delivered file, no pre-decode
     root = manifest.parent.parent
     qa = json.loads((root / "QA_RECEIPT.json").read_text())
     assert qa["checked_metric_rows"] == 81 and qa["complete_metric_rows"] == 81
@@ -184,3 +192,25 @@ def test_real_generated_grib_through_concrete_mocked_transport_and_independent_q
     frame.to_parquet(manifest.parent / "native-daily.parquet", index=False)
     with pytest.raises(ValueError, match="numerical"):
         validate_native_pilot(manifest.parent, budget=Budget(Limits(), rss=lambda: 0))
+
+
+def test_processing_checks_grid_in_the_only_decode_stream(tmp_path, monkeypatch):
+    import meteorology.era5.execution as execution
+    from meteorology.era5.source import decode_grib
+    source = tmp_path / 'day.grib'
+    generated_pilot_grib(source)
+    calls = []
+    def measured(*args, **kwargs):
+        calls.append(args[0])
+        yield from decode_grib(*args, **kwargs)
+    monkeypatch.setattr(execution, 'decode_grib', measured)
+    expected = {(lat, lon) for lat in [49,49.25,49.5] for lon in [-125.5,-125.25,-125]}
+    process_native_day(STUDY, [(source,'2025-01-01T00:00:00Z')], tmp_path/'valid',
+                       day='2024-01-01', budget=Budget(Limits(),rss=lambda:0),
+                       native_source_pilot=True, expected_grid=expected)
+    assert calls == [source]
+    with pytest.raises(ValueError, match='exact pilot grid'):
+        process_native_day(STUDY, [(source,'2025-01-01T00:00:00Z')], tmp_path/'bad',
+                           day='2024-01-01', budget=Budget(Limits(),rss=lambda:0),
+                           native_source_pilot=True, expected_grid={(0.,0.)})
+    assert not (tmp_path/'bad/MANIFEST.json').exists()
