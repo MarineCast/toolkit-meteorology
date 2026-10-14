@@ -2,6 +2,12 @@
 
 These limits are part of the product contract, not exceptional failures.
 
+The HRRR/local-day family constraints below retain their existing scope.
+The separate [ERA5 historical backfill](era5-backfill.md) uses UTC days, native
+quarter-degree distribution grids and optional verified nearest-grid R5 sampling.
+Its [performance and qualification report](era5-backfill-performance.md) distinguishes
+software validation, real ARCO transfer evidence and unrun live CDS/regional gates.
+
 - **Model, not observation:** HRRR values are numerical model fields. The approximate 3 km model grid and nearest-centroid mapping cannot resolve every coastal, terrain or street-scale condition. Source-grid distance is exposed so unusually distant assignments can be reviewed. No area-weighted H3 average is provided.
 - **Retrospective support:** The toolkit assembles historical f00 analyses and matched short-lead f01 rates. It does not certify future forecast skill. Dates, valid times, initialization times and declared availability are separate because using a future-valid field for a prediction at time `t` would cause leakage.
 - **Sparse daily summaries:** Six wall-clock samples discard sub-daily structure. Extrema are extrema of those six values, not a continuous-day minimum or maximum. DST days contain 23 or 25 civil hours while the weather reduction still uses six nominal four-hour points.

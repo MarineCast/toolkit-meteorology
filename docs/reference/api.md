@@ -1,5 +1,11 @@
 # Python API
 
+Historical multi-year ERA5 requests use
+[`meteorology.backfill_weather`](../era5-backfill.md); the disk-backed result
+provides `metadata`, `iter_tables()`, bounded `to_pandas(max_rows=...)` and a
+streamed `to_parquet(path)` export. Its partition companions remain the
+authoritative provenance; retain them with the output and raw source cache.
+
 ## Selective weather requests
 
 Import the getters from `meteorology`. They accept inclusive UTC dates, a WGS84

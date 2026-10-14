@@ -3,7 +3,8 @@
 [Documentation index](index.md)
 
 For a standalone bbox request use the [shared getters and matching CLI](request-api.md);
-no workspace initialization is needed. The advanced family examples below assume installation, an initialized workspace, and geography configured as described
+for retrospective multi-year ERA5 use [historical backfill](era5-backfill.md).
+Neither path requires workspace initialization. The advanced family examples below assume installation, an initialized workspace, and geography configured as described
 in [setup](SETUP.md) and [configuration](CONFIGURATION.md). Commands use an explicit short interval.
 They write products in the selected workspace.
 

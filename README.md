@@ -54,6 +54,43 @@ hits, missing work and resource limits without network access or writes.
 `meteorology sources` and `meteorology variables --data-source era5` show support.
 Help and standalone queries require no initialized workspace or shared study.
 
+## Backfill ten years of ERA5
+
+Install `.[era5]`, create a [Copernicus CDS account](https://cds.climate.copernicus.eu/how-to-api),
+save its personal token locally in `~/.cdsapirc`, and manually accept the ERA5
+single-level dataset terms. Never place credentials in source control.
+
+```sh
+meteorology backfill --start-date 2009-01-01 --end-date 2018-12-31 \
+  --bbox -129.7 45.9 -121.5 51.5 --workers 2 \
+  --cache-dir ./data/cache --output-dir ./data/meteorology --resume
+```
+
+Append `--dry-run` to inspect a plan without downloads or writes. This illustrative
+coastal rectangle plans 120 monthly jobs plus one terminal accumulation hour,
+instead of 7,304 daily jobs. It does not certify MarineCast's marine reporting mask.
+Default output is daily native-grid temperature, wind, RH, cloud, pressure,
+precipitation and dewpoint. Existing getters keep their short-request contract.
+
+```python
+from meteorology import backfill_weather
+
+result = backfill_weather(
+    "2009-01-01", "2018-12-31", (-129.7, 45.9, -121.5, 51.5),
+    cache_dir="./data/cache", output_dir="./data/meteorology", workers=2,
+)
+print(result.metadata["result_id"])
+for table in result.iter_tables():  # bounded Arrow batches
+    print(table.num_rows)          # ingest each batch downstream
+```
+
+Restart the same request and directories to reuse valid completed work. Optional
+`spatial_output="h3"` samples R5 centroids from verified ERA5 grid coordinates and
+retains their source identity and distance; it adds no atmospheric detail. The
+new [backfill guide](docs/era5-backfill.md) explains caps, credentials, retention,
+scientific support and the [performance evidence](docs/era5-backfill-performance.md).
+The under-48-hour decade target still requires live CDS throughput qualification.
+
 ## Returned data
 
 Daily output is long `DATE × H3_INDEX × METRIC` data for HRRR R5, or
@@ -78,10 +115,11 @@ date/metric partitions. No legacy releases are rewritten.
 | Interval precipitation | Unsupported | Supported |
 | Interval snowfall water equivalent | Unsupported | Supported |
 
-ERA5 H3 sampling is unqualified and rejected before acquisition. Its 0.25 degree
+ERA5 H3 sampling through the short getters remains unqualified and rejected before
+acquisition; the backfill API offers a separate verified nearest-grid R5 method. Its 0.25 degree
 CDS distribution does not add detail to the roughly 31 km model information.
 HRRR exposes the v4 CONUS decoder era from 2020-12-03 and checks actual decoded
-footprint and sampling distances. Requests are limited to seven UTC days and a
+footprint and sampling distances. Short getter requests are limited to seven UTC days and a
 bounded crop, one worker and explicit resource caps. Transfer sizes are unknown
 until measured. ERA5 needs local credentials and manual provider-terms acceptance.
 

@@ -1,5 +1,19 @@
 # Command reference
 
+## Historical ERA5 backfill
+
+```sh
+meteorology backfill --start-date 2009-01-01 --end-date 2018-12-31 \
+  --bbox -129.7 45.9 -121.5 51.5 --workers 2 --dry-run
+```
+
+Remove `--dry-run` after CDS account/token/manual terms setup to acquire the
+default daily atmospheric variables. Add `--output-dir` and `--cache-dir` for
+explicit locations. The [backfill guide](../era5-backfill.md) documents variable,
+frequency, native/R5 support, resource, retention and resume options. Inclusive
+multi-year dates are automatically split into safe monthly/partial-month jobs.
+`--study-config` can derive dates, bbox and Data-root destinations.
+
 ## Selective weather requests
 
 These commands use the shared Python request path and need no initialized

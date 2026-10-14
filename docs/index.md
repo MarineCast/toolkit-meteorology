@@ -13,6 +13,11 @@ Start with the [quickstart](getting-started/quickstart.md) and
 The [Python API](reference/api.md) and [CLI reference](reference/cli.md) document
 both selective requests and existing family workflows.
 
+For multi-year historical meteorology, use the
+[ERA5 backfill API and CLI](era5-backfill.md). It plans monthly regional jobs,
+resumes valid completed work and writes daily native-grid or optional sampled
+R5 features. See the [measured performance and remaining qualification gates](era5-backfill-performance.md).
+
 <div class="grid cards" markdown>
 
 - :material-weather-partly-cloudy: **Selective weather**<br>

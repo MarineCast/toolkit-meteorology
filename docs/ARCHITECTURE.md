@@ -92,3 +92,20 @@ This separate v1 request method/schema does not change family publication or the
 shared-study/marine reporting gates. Only this checkout is affected. Full
 [request semantics](request-api.md) and the [cleanup inventory](request-cleanup.md)
 document compatibility and the retained advanced tools.
+
+## Historical ERA5 executor
+
+`backfill_plan` admits partial/monthly temporal selections and a single terminal
+accumulation boundary. `backfill` coordinates independently leased source jobs,
+bounded prefetch, immutable Parquet partitions and durable result pointers.
+`backfill_resources` extends limits only for this executor and shares persistent
+aggregate counters across workers. `backfill_compute` decodes once to bounded
+numeric scratch, reduces daily native-grid data, then applies an optional cached
+R5 crosswalk. `backfill_metrics` measures client job wait and transfer separately.
+`backfill_cli` invokes the public executor without a subprocess or global study
+environment changes. See [backfill contracts and recovery](era5-backfill.md).
+
+Source locks cover one exact selection, not the whole namespace. Run locks stop
+duplicate logical runs; publication locks cover a single partition. Output lives
+at the explicit destination or the study-derived Data root, independently of
+cache ownership. Existing HRRR/getter/family executors remain available.

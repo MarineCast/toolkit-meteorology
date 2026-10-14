@@ -234,3 +234,23 @@ shared-study release. Existing source/method/schema versions and local-day
 products retain their original meaning. ERA5 snowfall parameter 144 has the same
 validated one-hour accumulation convention as tp and distinct water-equivalent
 units; snow depth and snowpack are not substituted.
+
+## Historical backfill product
+
+[`backfill_weather`](era5-backfill.md) uses method
+`era5-regional-historical-features-v1` and schema
+`meteorology-backfill-date-support-metric-v1`. Daily rows identify inclusive UTC
+dates, metric, nullable value, units, status and valid/expected hourly counts.
+Native support uses verified quarter-degree coordinates, grid hash and index.
+Optional R5 support adds H3 identity and centroid sampling distance; multiple
+cells can share the same atmospheric information. It is a rectangle companion,
+not a qualified shared-study marine release.
+
+The immutable partition companion contains metric/slot source lineage referenced
+by each row's `SOURCE_LINEAGE_ID`; `INPUT_MISSING_BITS` identifies missing slots
+per source parameter and point. Raw GRIB checksums, retrieval time, init/valid
+time, accumulation interval, lead, expver and grid hash remain recoverable.
+`AVAILABLE_AT_UTC` stays null: retrieval time is not historical operational
+availability. ERA5 is reanalysis, never an observation or a forecast issued then.
+The expanded daily metrics and disk-backed result have a separate contract from
+short getters and legacy family releases.

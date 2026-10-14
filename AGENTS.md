@@ -150,3 +150,12 @@ checks above. `python benchmarks/request_lifecycle.py` uses generated GRIB and
 mocked transport, asserting operation counts rather than timing thresholds.
 `demo/qualify_requests.py` defaults to offline planning; `--run` explicitly opts
 into bounded public-getter provider qualification after reference/terms setup.
+
+Historical backfill checks: `python -m pytest -q tests/test_backfill.py
+tests/test_request_lineage.py tests/test_era5_resources.py`, then the full checks
+above and a multi-year installed-wheel dry run. Read `docs/era5-backfill.md` before
+acquisition. `benchmarks/era5_backfill.py` defaults to generated GRIB/mock transport;
+`--live` requires configured CDS credentials and manually accepted terms.
+`benchmarks/era5_arco.py` performs bounded public metadata access by default and
+selected hourly transfers only with `--run`; its output is exploratory evidence,
+not an adopted backend or production qualification.

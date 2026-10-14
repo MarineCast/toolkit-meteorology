@@ -1,6 +1,24 @@
 # Production readiness evidence
 
-## Current status, 2026-10-02
+## Historical backfill checkpoint, 2026-10-14
+
+The [ERA5 historical executor](docs/era5-backfill.md) now supports monthly/adaptive
+regional requests, independent workers, persistent original budgets, selective
+resume and daily native-grid/optional nearest-grid R5 Parquet features. Local
+validation passed 523 tests with one opt-in live HRRR skip; 29 backfill tests
+also passed from the installed wheel outside the checkout with OrcaCast imports
+blocked and no visualization dependencies. Lint, strict docs, catalog/policy,
+variable docs, distribution checks and legacy offline wheel products passed.
+The dedicated branch is local and unmerged; hosted CI has not run for this work.
+
+The [performance report](docs/era5-backfill-performance.md) records generated-GRIB
+two-day/month/three-month measurements and a real bounded ARCO temperature probe.
+CDS credentials/manual acceptance are absent, so live CDS throughput, backend
+numerical equivalence, independent regional accuracy, a qualified marine mask and
+actual decade completion remain unverified. These software results do not certify
+a production meteorological release or the under-48-hour engineering target.
+
+## October 2 snapshot
 
 The six-snapshot retrospective daily family remains unchanged. A separate
 [hourly H3 atmosphere family](docs/hourly-weather.md) has passed its offline
