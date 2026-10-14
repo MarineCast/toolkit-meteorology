@@ -43,8 +43,8 @@ v4 CONUS decoder era. ERA5 H3, earlier HRRR decoder eras, broader resource workl
 authenticated CDS/new live NOAA compatibility and regional independent accuracy
 remain unverified or unimplemented as specified in the support matrix.
 
-The standalone request method is `meteorology-selective-utc-request-v1`, schema
-`meteorology-date-support-metric-v1`; family method/schema versions retain their
+The standalone request method is `meteorology-selective-utc-request-v2`, schema
+`meteorology-date-support-metric-v2`; family method/schema versions retain their
 old meaning. Shared-study publication still requires its original approvals and
 materialized registry/mask. No migration of retained products is needed.
 
@@ -109,3 +109,13 @@ CI are unrun. macOS smoke was added without removing the Linux matrix.
 | `bf4e6cd` | Cleanup, reusable active helpers, optional visualization and source packaging |
 | `3f29317` | Onboarding and offline request demo |
 | `9ec2019` | Public getter/transport/cache regressions and macOS smoke coverage |
+
+
+## PR 12 remaining review fixes
+
+All four findings were reproduced at `8a7e42d`. Source-vintage selection, slot/metric
+lineage, source-cache preflight and request-specific storage accounting are now
+covered by public generated-GRIB/mock-provider regressions. See
+[review evidence](request-review-evidence.md) for commands, measured counts,
+compatibility, examples and remaining qualification gates. No immutable v1 result
+is rewritten; explicit pins retain its historical semantics.
