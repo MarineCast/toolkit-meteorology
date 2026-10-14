@@ -143,3 +143,10 @@ Core installed-wheel smoke must run outside the checkout without Folium, Branca
 or GeoPandas and exercise source/variable/get planning plus legacy offline products.
 Use `benchmarks/native_processing.py` for deterministic read/decode counts; timing
 is environment-specific, and no routine test contacts NOAA/CDS.
+
+Request lifecycle checks: `python -m pytest -q tests/test_request_lifecycle.py
+tests/test_request_commit.py`, then the focused request suite and full required
+checks above. `python benchmarks/request_lifecycle.py` uses generated GRIB and
+mocked transport, asserting operation counts rather than timing thresholds.
+`demo/qualify_requests.py` defaults to offline planning; `--run` explicitly opts
+into bounded public-getter provider qualification after reference/terms setup.

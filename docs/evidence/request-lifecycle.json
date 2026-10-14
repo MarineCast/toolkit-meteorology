@@ -1,0 +1,99 @@
+[
+  {
+    "step": "initial",
+    "provider_calls": 5,
+    "transfer_bytes": 2592,
+    "decodes": 1,
+    "traversals": 1,
+    "staging_bytes": 65536,
+    "namespace_bytes": 173783,
+    "outstanding_bytes": 0,
+    "seconds": 0.41795862501021475,
+    "rss_bytes": 254492672,
+    "operational_warnings": []
+  },
+  {
+    "step": "final_hit",
+    "provider_calls": 0,
+    "transfer_bytes": 0,
+    "decodes": 0,
+    "traversals": 0,
+    "staging_bytes": 65536,
+    "namespace_bytes": 173783,
+    "outstanding_bytes": 0,
+    "seconds": 0.0018707080744206905,
+    "rss_bytes": 254492672,
+    "operational_warnings": []
+  },
+  {
+    "step": "refresh",
+    "provider_calls": 5,
+    "transfer_bytes": 2592,
+    "decodes": 1,
+    "traversals": 1,
+    "staging_bytes": 65536,
+    "namespace_bytes": 350944,
+    "outstanding_bytes": 0,
+    "seconds": 0.14967012498527765,
+    "rss_bytes": 256032768,
+    "operational_warnings": []
+  },
+  {
+    "step": "warm_reaggregation",
+    "provider_calls": 0,
+    "transfer_bytes": 0,
+    "decodes": 1,
+    "traversals": 1,
+    "staging_bytes": 65536,
+    "namespace_bytes": 522425,
+    "outstanding_bytes": 0,
+    "seconds": 0.13586104195564985,
+    "rss_bytes": 257507328,
+    "operational_warnings": []
+  },
+  {
+    "step": "reopen",
+    "provider_calls": 0,
+    "transfer_bytes": 0,
+    "decodes": 0,
+    "traversals": 1,
+    "staging_bytes": 65536,
+    "namespace_bytes": 522425,
+    "outstanding_bytes": 0,
+    "seconds": 0.0023655840195715427,
+    "rss_bytes": 257507328,
+    "operational_warnings": []
+  },
+  {
+    "step": "committed_accounting_failure",
+    "provider_calls": 5,
+    "transfer_bytes": 2592,
+    "decodes": 1,
+    "traversals": 1,
+    "staging_bytes": 88812,
+    "namespace_bytes": 700528,
+    "outstanding_bytes": 12980,
+    "seconds": 0.14029091701377183,
+    "rss_bytes": 258490368,
+    "operational_warnings": [
+      {
+        "code": "OPERATIONAL_RECONCILIATION_REQUIRED",
+        "stage": "post_commit_accounting",
+        "error_type": "OSError"
+      }
+    ]
+  },
+  {
+    "step": "recovery",
+    "provider_calls": 0,
+    "transfer_bytes": 0,
+    "decodes": 0,
+    "traversals": 1,
+    "staging_bytes": 65536,
+    "namespace_bytes": 701522,
+    "outstanding_bytes": 0,
+    "seconds": 0.012187415966764092,
+    "rss_bytes": 258703360,
+    "operational_warnings": []
+  }
+]

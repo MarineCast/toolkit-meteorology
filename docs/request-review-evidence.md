@@ -1,5 +1,9 @@
 # Remaining request API review findings: offline evidence
 
+The post-merge lifecycle patch is recorded in
+[the lifecycle section below](#post-merge-lifecycle-reliability-2026-10-14).
+Earlier sections retain the original PR 12 evidence and its validation dates.
+
 Inspected and fetched branch: `codex/meteorology-request-api`, PR 12, at
 `8a7e42d85bff4982cd91d384287a6da2e6ae2329`; local worktree clean and upstream
 identical. All four findings still existed. Only this owner repository changed.
@@ -203,3 +207,106 @@ the four new review regression files. Current-head hosted state is recorded at
 handoff; local checks do not substitute for it. At `722c723`, wheel and macOS
 smoke were observed successful; Linux tests (3.11/3.12/3.13) were still running
 at that snapshot.
+
+## Post-merge lifecycle reliability, 2026-10-14
+
+Fetched current main was exactly `368ddfcce690d02a2e0b0cade6817b6675e90307`.
+Both remaining findings existed there. Work uses the new branch
+`codex/meteorology-lifecycle-reliability`; only this owner checkout changed.
+
+| Reproduction against main | Fix | Regression and observed outcome |
+| --- | --- | --- |
+| Retain a 30,000-byte run file under a 100,000-byte staging cap, reopen, then reserve 5,000 bytes: staging incorrectly becomes 95,536 bytes and rejects the reservation. Public daily → refreshed hourly → daily processing also inherits the old execution's original limits. | Validated durable retained-path evidence and operational ledger v2; execution identity binds logical request and selected source generation, with unfinished refresh profiles preserving resume identity. | `test_request_lifecycle.py`: repeated reopen stays at 65,536 bytes, namespace/quota still counts retained data, genuine unfinished caps remain enforced, concurrent reaggregation returns one identity, and refreshed daily values use zero provider calls without changing old artifacts. |
+| Inject failure in active-index final accounting: refresh raises after the new generation becomes active. | Writer witnesses distinguish replacement from directory-fsync durability; versioned publication intent/receipt precedes commit. Confirmed commits return a result with operational warnings; unknown durability raises an explicit reconciliation error. | `test_request_commit.py`: before-pointer, writer accounting, both post-index retention operations, persistence, receipt, fsync, secondary-write, KeyboardInterrupt/SystemExit and bounded subprocess exit/restart cases pass. Old pins remain valid; recovery is idempotent and acquisition journals remain byte-identical. |
+
+The three initial reproductions failed **3/3 in 3.11 s** before implementation.
+Implementation commits: `6567e8b` (retention/execution), `644fb7f`
+(commit protocol/recovery), `3a57866` (preserve unresolved commit evidence).
+The [request lifecycle contract](request-api.md#execution-lifecycle-and-recovery)
+documents warnings, `WeatherResult.reconcile()`, conservative legacy handling and
+fingerprint effects. Scientific method/schema v2 and immutable v1/v2 products are
+unchanged. New producer fingerprints may reaggregate compatible retained sources;
+explicit old result pins remain readable. No acquisition budgets are reset.
+
+### Commands and validation
+
+Owner Python 3.12.13/ecCodes 2.47.1; generated codecs ran. The pre-edit existing
+six-file request suite passed **67 tests in 22.85 s**. Final commands:
+
+```sh
+.venv/bin/python -m pytest -q tests/test_request_storage.py tests/test_request_review.py tests/test_request_preflight.py tests/test_request_lineage.py tests/test_request_api.py tests/test_request_transport.py tests/test_request_lifecycle.py tests/test_request_commit.py tests/test_request_qualification.py
+.venv/bin/python -m pytest -q
+.venv/bin/ruff check src tests benchmarks demo
+.venv/bin/meteorology catalog --check
+.venv/bin/meteorology feature-policy --check
+.venv/bin/python -m meteorology.variables --markdown > /tmp/meteorology-lifecycle-variables.md
+diff -u docs/reference/variables.md /tmp/meteorology-lifecycle-variables.md
+.venv/bin/mkdocs build --strict
+.venv/bin/python -m build --no-isolation
+.venv/bin/python -m twine check dist/*
+.venv/bin/python -m pip check
+.venv/bin/python benchmarks/request_lifecycle.py
+git diff --check
+```
+
+Final focused suite: **94 passed in 32.20 s**. Full owner suite:
+**493 passed, 1 skipped in 126.68 s**. Outside-checkout installed-wheel request
+regressions: **94 passed in 32.47 s**, with ecCodes 2.49.0, pandas 3.0.6 and
+Arrow 26. Ruff, catalog/policy/generated-variable parity, strict MkDocs,
+wheel/sdist build, Twine, development/installed `pip check` and diff checks passed.
+The only full-suite skip is opt-in live NOAA; generated GRIB and mocked transport
+do not establish real-provider compatibility or independent regional accuracy.
+Fresh regular wheel checks use an outside-checkout Python 3.12 virtual environment,
+first core-only (no Folium/Branca/GeoPandas), then codec/test extras. Core help,
+source/variable/get planning, legacy synthetic products, 514-row matrix validation
+and `pip check` passed. Copied request tests use `--import-mode=importlib` against
+site-packages. Linux Python 3.11/3.12/3.13 full coverage remains; macOS 3.12 smoke
+explicitly includes all three new regression files. Final pushed-SHA hosted state
+is reported at PR handoff, separately from these local checks.
+
+Changed source files are `request_storage.py`, `request_cache.py`,
+`request_lifecycle.py`, `request_vintage.py`, `request.py` and `era5/resources.py`.
+Regression files are `test_request_lifecycle.py`, `test_request_commit.py`,
+`test_request_qualification.py` and one explicit request adjustment in
+`test_request_review.py`. CI/agent guidance, this evidence and JSON snapshot,
+request/API/handoff docs, `benchmarks/request_lifecycle.py` and
+`demo/qualify_requests.py` complete the patch.
+
+### Bounded lifecycle sequence
+
+`benchmarks/request_lifecycle.py` uses public ERA5 getters, generated GRIB and
+mocked provider jobs. [Raw measurements](evidence/request-lifecycle.json) include
+current RSS and warnings. Traversals count full-namespace `Path.rglob` walks.
+Operation counts, stable reopen staging and zero repaired reservations are asserted
+in the benchmark, which Linux CI runs; timing has no CI threshold.
+
+| Step | Calls | Transfer bytes | Decodes | Traversals | Staging bytes | Namespace bytes | Reserved bytes | Seconds |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Initial | 5 | 2592 | 1 | 1 | 65536 | 173783 | 0 | 0.417959 |
+| Final hit | 0 | 0 | 0 | 0 | 65536 | 173783 | 0 | 0.001871 |
+| Hourly refresh | 5 | 2592 | 1 | 1 | 65536 | 350944 | 0 | 0.149670 |
+| Warm daily reaggregation, cap 1 | 0 | 0 | 1 | 1 | 65536 | 522425 | 0 | 0.135861 |
+| Reopen | 0 | 0 | 0 | 1 | 65536 | 522425 | 0 | 0.002366 |
+| Committed accounting failure | 5 | 2592 | 1 | 1 | 88812 | 700528 | 12980 | 0.140291 |
+| Recovery | 0 | 0 | 0 | 1 | 65536 | 701522 | 0 | 0.012187 |
+
+RSS ranged from 254,492,672 to 258,703,360 bytes. Namespace bytes include immutable
+source/results and operational evidence; at the injected failure they also include
+unfinished accounting. The 65,536-byte staging figure is the control allowance.
+Recovery clears only known completed publication reservations, preserving retained
+science and original transfer journals. Durable retention/commit receipts add
+small JSON writes/fsyncs and storage; this correctness patch claims no general
+wall-time improvement. Startup reconciliation remains one traversal per processing,
+reopen or repair; ordinary final hits perform no full-namespace walk.
+
+### Qualification and limits
+
+The [public-getter qualification procedure](request-api.md#opt-in-qualification-through-public-getters)
+has exact offline/run commands and explicit caps for HRRR temperature/vector wind,
+ERA5 temperature and ERA5 precipitation/snowfall. Amounts require operator-supplied
+independently vetted nonzero reference bytes, SHA and matching UTC date/bbox.
+`test_request_qualification.py` exercises default zero-network planning and all
+three run paths using generated fixtures only, including next-midnight intervals.
+No historical wet/snowy observation is invented or silently widened.
+Live NOAA/CDS, credentials/accepted terms, native/regional rebuilds and independent
+scientific comparisons remain **NOT_RUN**. No merge, release or dataset rewrite.

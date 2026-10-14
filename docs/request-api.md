@@ -316,3 +316,114 @@ assert daily.metadata["budget"]["requests"] == 0
 Refresh performs acquisition; the generated-GRIB regression fixtures demonstrate
 these paths offline. Neither the example nor passing software checks certify
 regional accuracy, new geographic support or production backfill readiness.
+
+
+## Execution lifecycle and recovery
+
+A logical request identifies variables, dates, support and producer fingerprint.
+The selected source generation identifies the immutable source vintage. An
+execution ID binds that logical request to that generation. A different generation
+gets a different run directory and fresh execution counters; retrying an unfinished
+execution reuses its directory, original limits, consumed requests, transfer
+reservations and compute charges. Interrupted refreshes have a durable profile
+mapping to the same generation/execution, so another `refresh=True` resumes them
+instead of silently assigning a new budget. A completed or partial terminal refresh
+allows a later explicit refresh to start a new vintage.
+
+`STORAGE_LEDGER.json` is operational format v2. Explicitly retained run paths have
+a checksum-backed `RETAINED_STORAGE.json` record; reconciliation leaves those
+paths retained while charging them to namespace/quota totals. Unfinished tracked
+paths and shared-source reservations remain charged. Reconciliation scans once
+at startup/resume; writes update counters incrementally. Legacy unclassified paths
+stay conservatively charged, and legacy unfinished runs require explicit owner
+reconciliation rather than guessed completion or discarded counters.
+
+Lifecycle records and refresh profiles are checksum-backed format v2 and bind
+request, generation and execution identities. Scientific method/schema remain
+v2. The existing producer fingerprint includes changed operational code, so older
+derived representations may miss the current cache and reaggregate from compatible
+retained source bytes. Historical result pins and immutable v1/v2 artifacts remain
+readable; no old scientific manifest is rewritten. ERA5 exact-selection and
+mixed-generation guards remain in force.
+
+## Active-pointer commit protocol
+
+Validated result artifacts and immutable index history are written first. Storage
+and commit-receipt reservations precede pointer replacement. The active index is
+replaced atomically; successful directory fsync confirms durable publication. A
+versioned `REQUEST_PUBLICATION.json` intent/receipt and writer witness distinguish:
+
+| Outcome | API behavior |
+| --- | --- |
+| Failure before pointer replacement | Previous generation remains authoritative; the original failure propagates. |
+| Confirmed durable pointer, then accounting/maintenance failure | Return the committed result with `publication_status=COMMITTED_WITH_OPERATIONAL_WARNING` and `operational_warnings` in result/export/CLI metadata. |
+| Visible replacement without established durability | Raise `PublicationUncertainError`; require reconciliation and do not label it unpublished or definitely successful. |
+| KeyboardInterrupt/SystemExit or process exit | Preserve interruption; restart validates durable intent and evidence before confirming/repairing state. |
+
+Operational warnings do not alter immutable scientific manifests. Secondary
+error-state writes attach diagnostic notes rather than replacing the original
+exception. A confirmed commit is never rolled back automatically. Unresolved
+committed accounting blocks a new execution while allowing validated cached reads
+with warnings, preserving the pending commit evidence.
+
+A normal getter reconciles pending state under the namespace lease before reading
+or processing. `result.reconcile()` explicitly retries that bounded repair.
+Recovery validates referenced artifacts, confirms pointer durability by fsync,
+repairs only known completed control reservations and retention accounting, and
+leaves acquisition journals/counters unchanged. It is idempotent and makes no
+provider calls. Corrupt scientific evidence fails closed; persistent disk/ledger
+problems remain actionable warnings or reconciliation errors. A dry run reports
+uncertain durability instead of treating it as an ordinary cache hit. Explicit old
+result pins remain available for inspecting historical evidence.
+
+## Opt-in qualification through public getters
+
+`demo/qualify_requests.py` uses `get_weather`, native support and one exact UTC day.
+Its default is offline planning. Caps are explicit: memory 1 GiB, staging 2 GiB,
+transfer 512 MiB, elapsed 1800 seconds; HRRR has 128 request reservations and ERA5
+32. Retries/polling remain charged. No case, bbox or cap is widened automatically.
+
+For HRRR temperature/vector wind and ERA5 temperature, create a case JSON with
+`date` and `bbox`. For example, a compatibility-only plan can use:
+
+```json
+{"date":"2024-01-01","bbox":[-125.25,49.0,-125.0,49.25]}
+```
+
+This date is a compatibility example, not a wet/snowy reference case. Amounts
+qualification requires a different, independently vetted historical case selected
+by the operator. Retain its reference file next to the JSON and include:
+
+```json
+{"date":"<verified UTC date>","bbox":["<west>","<south>","<east>","<north>"],
+ "independent_reference":{"file":"reference-evidence.ext","sha256":"<actual checksum>",
+ "uri":"<independent authoritative source>","verification_statement":"<how nonzero tp and sf were verified>",
+ "verified_nonzero_parameters":["tp","sf"],"date":"<same verified UTC date>",
+ "bbox":["<same west>","<same south>","<same east>","<same north>"]}}
+```
+
+Replace placeholders with actual numeric bounds and independently reviewed evidence.
+The checksum and matching support protect supplied provenance; a human statement
+is a prerequisite, not automatic scientific certification. Do not guess a snowy
+case, treat synthetic guard fixtures as observations, or retry a zero result at a
+wider support. CDS credentials and manually accepted terms must already be configured;
+the script neither prints secrets nor accepts terms.
+
+```sh
+# Offline dry runs; compatibility.json and verified-amounts.json are operator inputs.
+python demo/qualify_requests.py --source hrrr --case /path/compatibility.json --cache-dir /path/private/hrrr
+python demo/qualify_requests.py --source era5-temperature --case /path/compatibility.json --cache-dir /path/private/era5-temperature
+python demo/qualify_requests.py --source era5-amounts --case /path/verified-amounts.json --cache-dir /path/private/era5-amounts
+# Explicit provider opt-in after reviewing each unchanged plan:
+python demo/qualify_requests.py --source hrrr --case /path/compatibility.json --cache-dir /path/private/hrrr --run
+python demo/qualify_requests.py --source era5-temperature --case /path/compatibility.json --cache-dir /path/private/era5-temperature --run
+python demo/qualify_requests.py --source era5-amounts --case /path/verified-amounts.json --cache-dir /path/private/era5-amounts --run
+```
+
+The procedure checks units, complete UTC slots/accumulation boundaries, native grid
+identity, initialization/lead and receipts, vector/magnitude identity, nonzero
+amounts, and a repeat cache hit. Exports use unique result-ID names and never replace
+existing qualification evidence. Software regressions, exact-case provider
+compatibility and independent regional scientific accuracy remain separate gates;
+passing software checks establishes neither of the latter two. These live commands
+were not executed as part of the lifecycle fix.

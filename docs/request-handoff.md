@@ -119,3 +119,12 @@ covered by public generated-GRIB/mock-provider regressions. See
 [review evidence](request-review-evidence.md) for commands, measured counts,
 compatibility, examples and remaining qualification gates. No immutable v1 result
 is rewritten; explicit pins retain its historical semantics.
+
+## Post-merge lifecycle reliability
+
+The follow-up branch from main `368ddfc` preserves completed retention on reopen
+and separates execution counters by source generation. Durable active-pointer
+commit witnesses now return committed results with operational warnings when
+later accounting fails; uncertain durability requires reconciliation. See the
+[post-merge evidence](request-review-evidence.md#post-merge-lifecycle-reliability-2026-10-14)
+for reproductions, regressions, measurements, compatibility and unrun live gates.
