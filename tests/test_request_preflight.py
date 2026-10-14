@@ -128,3 +128,35 @@ def test_interrupted_request_budget_remains_charged(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="request cap"):
         temperature(cache, limits=caps)
     assert len(provider.calls) == before
+
+
+def test_hrrr_fully_cached_processing_never_constructs_transport(tmp_path, monkeypatch):
+    from functools import partial
+    from meteorology import get_temperature
+    from .test_request_transport import hrrr_http_fixture
+    import meteorology.hourly_weather.native_day as nd
+    import meteorology.hourly_weather.native_source as ns
+
+    opener, bbox = hrrr_http_fixture(tmp_path)
+    monkeypatch.setattr(nd, "NativeHTTP", partial(nd.NativeHTTP, opener=opener))
+    monkeypatch.setattr(ns, "decode_hour", partial(ns.decode_hour, expected_shape=(4, 4)))
+    opts = dict(cache_dir=tmp_path / "cache", spatial_output="native")
+    get_temperature("2024-01-01", "2024-01-01", bbox, "hrrr", frequency="hourly", **opts)
+    before = len(opener.calls)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Cached HRRR bytes must not construct HTTP transport")
+
+    monkeypatch.setattr(nd, "NativeHTTP", forbidden)
+    preview = get_temperature("2024-01-01", "2024-01-01", bbox, "hrrr", dry_run=True, **opts)
+    assert preview["cache"]["remaining_provider_requests_lower_bound"] == 0
+    daily = get_temperature(
+        "2024-01-01",
+        "2024-01-01",
+        bbox,
+        "hrrr",
+        limits=Limits(memory_bytes=1024**3, requests=1),
+        **opts,
+    )
+    assert daily.metadata["budget"]["requests"] == 0
+    assert len(opener.calls) == before

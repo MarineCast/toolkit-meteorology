@@ -74,7 +74,7 @@ def hrrr_day(
     mappings=None,
     generation="retained",
 ):
-    from .hourly_weather.native_day import NativeHTTP, HOST, ArchiveMissing
+    from .hourly_weather.native_day import NativeCache, NativeHTTP, HOST, ArchiveMissing
     from .hourly_weather.native_source import decode_hour
 
     fields = plan["required_inputs"]
@@ -95,19 +95,26 @@ def hrrr_day(
         else:
             raw_identity = digest(dict(uri=uri, encoding="GRIB2", generation=generation))
             source_plan = dict(cycles=[dict(uri=uri)], plan_sha256=raw_identity, timeout_seconds=15)
-            http = NativeHTTP(budget, source_plan)
+            reader = NativeCache(budget, source_plan)
+            http = None
             folder = root / "sources/hrrr" / raw_identity
             try:
-                index, imeta = http.transfer(
+                cached_index, _, _ = reader.cached_transfer(
                     uri + ".idx", folder, "index", valid=valid, reservation=65536
                 )
+                if cached_index is None:
+                    http = NativeHTTP(budget, source_plan)
+                    cached_index = http.transfer(
+                        uri + ".idx", folder, "index", valid=valid, reservation=65536
+                    )
+                index, imeta = cached_index
             except ArchiveMissing:
                 continue
             from .request_sources import hrrr_spans
 
             selections = []
             for name, span in hrrr_spans(index, valid, fields):
-                cached, _, _ = http.cached_transfer(
+                cached, _, _ = reader.cached_transfer(
                     uri,
                     folder,
                     name,
@@ -123,6 +130,8 @@ def hrrr_day(
                 or budget.requests + len(outstanding) > budget.limits.requests
             ):
                 raise LimitExceeded("Remaining budget cannot cover selected HRRR cycle.")
+            if outstanding and http is None:
+                http = NativeHTTP(budget, source_plan)
             files = {}
             hour_receipts = [_receipt(index, imeta["retrieved_at_utc"], uri=uri + ".idx")]
             etags = set()
