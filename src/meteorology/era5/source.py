@@ -202,7 +202,7 @@ def consolidate(
     )
 
 
-def decode_grib(path: str | Path, *, retrieved_at_utc: str, budget=None, parameters=None, include_forecast_metadata=False):
+def decode_grib(path: str | Path, *, retrieved_at_utc: str, budget=None, parameters=None, include_forecast_metadata=False, valid_times=None):
     """Read one message at a time; ecCodes is an optional isolated acquisition extra."""
     import eccodes as ec
 
@@ -256,6 +256,8 @@ def decode_grib(path: str | Path, *, retrieved_at_utc: str, budget=None, paramet
                     step_units="hours" if get("stepUnits") == 1 else "unsupported",
                 )
                 if parameters is not None and PARAMETERS.get(meta["paramId"], (None,))[0] not in parameters:
+                    continue
+                if valid_times is not None and meta["valid_time_utc"] not in valid_times:
                     continue
                 if meta["paramId"] in (165, 166):
                     meta["uvRelativeToGrid"] = get("uvRelativeToGrid")

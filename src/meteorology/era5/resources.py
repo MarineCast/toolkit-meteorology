@@ -61,6 +61,10 @@ class LimitExceeded(ValueError):
     pass
 
 
+class TransferTooLarge(LimitExceeded):
+    """Payload size requires a smaller temporal selection, with bytes retained."""
+
+
 @dataclass(frozen=True)
 class Limits:
     memory_bytes: int = 512 * MIB
@@ -238,12 +242,12 @@ def _bounded_transfer_locked(
         with open_response() as response, partial.open("xb") as f:
             length = response.headers.get("Content-Length")
             if length is not None and (int(length) < 0 or int(length) > reservation_bytes):
-                raise LimitExceeded("Response payload exceeds reserved transfer bytes.")
+                raise TransferTooLarge("Response payload exceeds reserved transfer bytes.")
             while True:
                 remaining = reservation_bytes - state["received_bytes"]
                 if remaining == 0:
                     if length is None:
-                        raise LimitExceeded(
+                        raise TransferTooLarge(
                             "Unknown-length response exhausted reservation; stopped before reading extra bytes."
                         )
                     break

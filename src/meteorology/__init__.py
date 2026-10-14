@@ -138,6 +138,12 @@ def get_weather(variables, start_date, end_date, bbox, data_source, **options):
     return implementation(variables,start_date,end_date,bbox,data_source,**options)
 
 
+def backfill_weather(start_date=None, end_date=None, bbox=None, data_source="era5", **options):
+    """Resumable historical ERA5 weather with automatic monthly batching."""
+    from .backfill import backfill_weather as implementation
+    return implementation(start_date, end_date, bbox, data_source, **options)
+
+
 def get_temperature(start_date, end_date, bbox, data_source, **options):
     """Retrieve temperature through the shared source-selective request."""
     return get_weather(['temperature'],start_date,end_date,bbox,data_source,**options)
@@ -208,3 +214,4 @@ def __getattr__(name):
 __all__ += ['get_weather','get_temperature','get_wind','get_cloud_cover','get_pressure',
             'get_relative_humidity','get_dewpoint','get_visibility','get_precipitation',
             'get_precip','get_snowfall','get_precipitation_estimate','WeatherResult']
+__all__ += ['backfill_weather']

@@ -78,6 +78,8 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser("sources", help="List source capabilities without configuration.")
     query = commands.add_parser("get", add_help=False, help="Retrieve a bounded source-selective weather request.")
     query.add_argument("arguments", nargs=argparse.REMAINDER)
+    history = commands.add_parser("backfill", add_help=False, help="Retrieve resumable historical ERA5 weather.")
+    history.add_argument("arguments", nargs=argparse.REMAINDER)
     matrix = commands.add_parser("export-daily-matrix", help="Combine native daily weather and astronomy.")
     matrix.add_argument("--manifest", type=Path, action="append", required=True)
     matrix.add_argument("--output", type=Path, required=True)
@@ -86,7 +88,7 @@ def main(argv: list[str] | None = None) -> int:
         # Forward --help and other flags for commands with no family argument.
         if args.command in CLI_MODULES:
             args.arguments = extra + args.arguments
-        elif args.command != "get":
+        elif args.command not in {"get", "backfill"}:
             parser.error(f"unrecognized arguments: {' '.join(extra)}")
     # Request/discovery/help dispatch precedes legacy study/workspace validation.
     # Python getters never route through this process-global compatibility code.
@@ -103,6 +105,9 @@ def main(argv: list[str] | None = None) -> int:
                 parser.error("get uses --cache-dir; --workspace selects legacy family configuration")
             from .request_cli import main as request_main
             return request_main(extra + args.arguments)
+        if args.command == "backfill":
+            from .backfill_cli import main as backfill_main
+            return backfill_main(extra + args.arguments, study_config=args.study_config)
         if args.command == "variables" and "--data-source" in args.arguments:
             from .request_cli import discovery
             return discovery(args.arguments)

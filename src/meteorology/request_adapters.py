@@ -464,6 +464,12 @@ def era5_day(
 
 def reduce_day(hourly, plan, day):
     """Complete-slot sampled means or interval sums; no mean-filled partial days."""
+    # The executor captures forecast support before reduction. Pandas propagates
+    # attrs via deep copy on every scalar/column lookup; a large support catalog
+    # otherwise makes point/slot lineage lookup quadratic in spatial support.
+    # Keep the caller's catalog intact, and avoid carrying it through reductions.
+    hourly = hourly.copy(deep=False)
+    hourly.attrs = {}
     spatial = "H3_INDEX" if plan["request"]["spatial_output"] == "h3" else "SOURCE_GRID_INDEX"
     if hourly.duplicated([spatial, "VALID_TIME_UTC"]).any():
         raise ValueError("Duplicate support/hour keys in normalized request.")
