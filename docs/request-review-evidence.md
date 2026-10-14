@@ -20,8 +20,10 @@ No live acquisition, backfill, dataset rewrite, merge or release was performed.
 - `ed3b431`: hourly/metric dependency lineage and v2 contract.
 - `9aa0d10`: source-aware preflight and cache-only HRRR receipt reader.
 - `8b6ab8f`: request storage ledger, separate quota/disk safeguards, integration regressions and final vintage edge cases.
+- `722c723`: defer HRRR HTTP transport construction until source work is missing; forbid construction in the warm-cache regression.
+- `e5a10a4`: first complete review-evidence and documentation handoff.
 
-The final integration commit includes fixes found while exercising the four paths
+The storage integration commit includes fixes found while exercising the four paths
 together and formatting of the touched request modules. Family methods, local-day
 and shared-study publication contracts retain their existing semantics.
 
@@ -51,19 +53,24 @@ Relevant pre-edit baseline: **48 passed in 23.18 s**. Initial three cache/prefli
 reproductions: **2 failed, 1 passed in 4.87 s**; initial lineage reproductions:
 **3 failed in 5.75 s**. Intermediate whole suites passed **463 + 1 live skip** in
 208.51 s and **464 + 1 live skip** in 227.67 s as regressions were added.
-Focused final review regressions: **32 passed in 26.28 s**. Final owner suite:
-**465 passed, 1 skipped in 262.43 s** at implementation commit `8b6ab8f`. The skip
+Focused integration review regressions: **32 passed in 26.28 s**. Owner integration suite:
+**465 passed, 1 skipped in 262.43 s** at implementation commit `8b6ab8f`.
+Final owner suite at `722c723`: **466 passed, 1 skipped in 231.82 s**.
+The late HRRR cache-only transport regression also passed with transport
+construction forbidden; focused preflight/transport checks passed **10 tests in
+18.93 s**. The skip
 is the opt-in live NOAA test; generated-GRIB tests ran. This includes the existing
 legacy, ERA5 fixed-pilot, native HRRR, resource, concurrency and scaling regressions.
 
 Fresh regular wheel, installed under `/tmp` and imported from its own site-packages,
-passed **66 request API/transport/review regressions in 57.78 s**, using Python 3.12,
+passed **67 request API/transport/review regressions in 47.83 s**, using Python 3.12,
 ecCodes 2.49, pandas 3.0.6, Arrow 26 and no Folium/Branca/GeoPandas. Core
 source/variable/get planning, legacy synthetic weather/daylight/lunar/matrix
 generation, 514-row matrix validation and `pip check` passed outside the checkout.
 Codec/test extras were added only after the core-only checks.
 Ruff, catalog/policy parity, generated variable-doc parity, wheel/sdist build,
 Twine, development/installed `pip check` and strict MkDocs passed.
+The final rendered site has **39 HTML pages and 2,216 verified internal links/anchors**.
 Build uses installed build dependencies without isolation; the first editable
 install with isolation was blocked by sandbox DNS, then the no-isolation install
 passed. First strict-doc attempt caught a not-yet-written evidence-page link;
@@ -73,7 +80,7 @@ the completed documentation is rebuilt strictly.
 
 `benchmarks/request_review.py` runs generated tiny HRRR messages and mocked HTTP,
 then 100 storage checks with 0/100/1000 tiny retained files. The before replay uses
-read-only `git archive 8a7e42d src` through `PYTHONPATH`; after uses the owner code.
+read-only `git archive 8a7e42d src` through `PYTHONPATH`; after uses implementation commit `722c723`.
 Before equivalent processing uses cap 1024; after uses cap 1 for warm source and
 48 for partial source, below nominal cold counts. A separate original-head cap
 1/48 replay rejects both paths. Inputs and requested quantities are otherwise
@@ -83,9 +90,9 @@ No timing threshold is imposed; tests assert operations and correctness.
 
 | Workload | Requests before/after | Bytes before/after | Decodes before/after | Traversals before/after | Stat calls before/after | Wall seconds before/after |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| warm-final | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 102 / 103 | 0.009677 / 0.010607 |
-| warm-source | 0 / 0 | 0 / 0 | 24 / 24 | 2 / 1 | 1168 / 1252 | 0.461431 / 0.527351 |
-| partial-source | 48 / 48 | 9024 / 9024 | 24 / 24 | 148 / 1 | 74214 / 4937 | 2.663415 / 2.428589 |
+| warm-final | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 102 / 103 | 0.009677 / 0.008692 |
+| warm-source | 0 / 0 | 0 / 0 | 24 / 24 | 2 / 1 | 1168 / 1252 | 0.461431 / 0.426314 |
+| partial-source | 48 / 48 | 9024 / 9024 | 24 / 24 | 148 / 1 | 74214 / 4937 | 2.663415 / 1.773790 |
 
 No intermediate normalized Parquet is read in these HRRR workloads: row-group reads
 are 0 before/after. The ERA5 regression still exercises point-block normalization
@@ -93,9 +100,9 @@ and daily reaggregation; exact retained-source reuse makes zero provider calls.
 
 | Workload | Current RSS bytes before/after | Historical peak bytes before/after | Namespace bytes before/after | Run-tree control bytes before/after | Unfinished partial bytes before/after |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| warm-final | 287080448 / 285605888 | 287080448 / 285605888 | 112172 / 108092 | 604 / 894 | 0 / 0 |
-| warm-source | 289046528 / 287752192 | 289046528 / 287752192 | 182644 / 178569 | 1200 / 1774 | 0 / 0 |
-| partial-source | 291176448 / 290799616 | 291176448 / 290799616 | 347699 / 399668 | 1802 / 2662 | 0 / 0 |
+| warm-final | 287080448 / 284180480 | 287080448 / 284180480 | 112172 / 108114 | 604 / 894 | 0 / 0 |
+| warm-source | 289046528 / 286998528 | 289046528 / 286998528 | 182644 / 178613 | 1200 / 1775 | 0 / 0 |
+| partial-source | 291176448 / 289669120 | 291176448 / 289669120 | 347699 / 399804 | 1802 / 2664 | 0 / 0 |
 
 The namespace total includes immutable results, raw sources, generation snapshots,
 retained run journals and accounting controls. Successful runs have no active
@@ -106,9 +113,9 @@ native allocation guarantee; runs shared the local development environment.
 
 | Retained tiny files | Traversals before/after | Stat calls before/after | Wall seconds before/after |
 | --- | ---: | ---: | ---: |
-| 0 | 100 / 1 | 301 / 209 | 0.024436 / 0.109925 |
-| 100 | 100 / 1 | 20301 / 409 | 0.261485 / 0.101621 |
-| 1000 | 100 / 1 | 200301 / 2209 | 2.419398 / 0.172378 |
+| 0 | 100 / 1 | 301 / 209 | 0.024436 / 0.075276 |
+| 100 | 100 / 1 | 20301 / 409 | 0.261485 / 0.087080 |
+| 1000 | 100 / 1 | 200301 / 2209 | 2.419398 / 0.125990 |
 
 The measured count reduction does not establish a general wall-time speedup.
 Durable leases, atomic ledger writes, active-evidence validation and richer lineage
@@ -193,4 +200,6 @@ The original PR head `8a7e42d` had observed successful Linux tests (3.11, 3.12,
 3.13), wheel and macOS smoke on 2026-10-13. Those outcomes do not validate these
 new commits. The existing matrix is preserved; macOS smoke now explicitly includes
 the four new review regression files. Current-head hosted state is recorded at
-handoff; local checks do not substitute for it.
+handoff; local checks do not substitute for it. At `722c723`, wheel and macOS
+smoke were observed successful; Linux tests (3.11/3.12/3.13) were still running
+at that snapshot.
