@@ -13,6 +13,7 @@ from pathlib import Path
 import shutil
 
 from .era5.resources import Budget, LimitExceeded, atomic_json
+from .request import digest
 
 CONTROL_BYTES = 65536
 DISK_MARGIN = 16 * 1024**2
@@ -39,11 +40,12 @@ class RequestBudget(Budget):
             }
             self.reconciliations += 1
             state["bytes"] = sum(files.values())
+            retained = self._retained_paths()
             tracked = state.setdefault("files", {})
             for key, entry in tracked.items():
                 entry["bytes"] = files.get(key, 0)
             for key, size in files.items():
-                if key.startswith(self.owner + "/") and key not in tracked:
+                if key.startswith(self.owner + "/") and key not in tracked and key not in retained:
                     tracked[key] = dict(bytes=size, owner=self.owner, retained=False)
             state["owners"] = {}
             state["reserved"] = 0
@@ -81,8 +83,30 @@ class RequestBudget(Budget):
                 if self.ledger.exists()
                 else dict(bytes=0, files={}, allocations={})
             )
+            if state.get("version", 1) not in (1, 2):
+                raise ValueError("Unknown request storage ledger version; reconcile explicitly.")
+            state["version"] = 2
             yield state
             atomic_json(self.ledger, state)
+
+    def _retained_paths(self):
+        path = self.run_root / "RETAINED_STORAGE.json"
+        if not path.exists():
+            return set()  # Legacy unclassified files remain conservatively charged.
+        record = json.loads(path.read_text())
+        if (
+            record.get("version") != 1
+            or record.get("owner") != self.owner
+            or record.get("sha256") != digest({k: v for k, v in record.items() if k != "sha256"})
+            or any(
+                not key.startswith(self.owner + "/") or ".." in Path(key).parts
+                for key in record.get("paths", [])
+            )
+        ):
+            raise ValueError(
+                "Retained storage lifecycle evidence is invalid; reconciliation required."
+            )
+        return set(record["paths"])
 
     def _key(self, path):
         path = Path(path).resolve()
@@ -192,6 +216,24 @@ class RequestBudget(Budget):
     def retain_directory(self, path):
         prefix = self._key(path)
         with self._state() as state:
+            retained = self._retained_paths()
+            retained.update(
+                key
+                for key, entry in state["files"].items()
+                if key.startswith(self.owner + "/")
+                and entry["owner"] == self.owner
+                and (key == prefix or key.startswith(prefix + "/"))
+            )
+            if retained:
+                marker = self.run_root / "RETAINED_STORAGE.json"
+                retained.add(self._key(marker))
+                record = dict(version=1, owner=self.owner, paths=sorted(retained))
+                record["sha256"] = digest(record)
+                encoded = len(json.dumps(record, indent=2).encode()) + 1
+                self._admit(state, encoded)
+                old_size = marker.stat().st_size if marker.exists() else 0
+                atomic_json(marker, record)
+                state["bytes"] += marker.stat().st_size - old_size
             for key, entry in list(state["files"].items()):
                 if (key == prefix or key.startswith(prefix + "/")) and entry["owner"] == self.owner:
                     self._owner(state, entry["owner"])["bytes"] -= entry["bytes"]

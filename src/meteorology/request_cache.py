@@ -465,7 +465,21 @@ def execute_request(
             )
         token = uuid.uuid4().hex
         generation = token if refresh else selected_vintage(plan, root)[0]
-        run_root = root / "runs" / (plan["request_id"] if not refresh else token)
+        # A logical request and selected source vintage identify an execution.
+        # Same-vintage retries reuse its journal; a new vintage has fresh counters.
+        execution_id = digest(
+            dict(version=2, request_id=plan["request_id"], source_generation=generation)
+        )
+        for legacy_path in (root / "runs").glob("*/RUN_STATE.json"):
+            legacy = json.loads(legacy_path.read_text())
+            if legacy.get("version") is None and legacy.get("status") in {
+                "ACQUIRING",
+                "INCOMPLETE_NOT_PUBLISHED",
+            }:
+                raise CacheError(
+                    f"Legacy unfinished execution requires explicit reconciliation: {legacy_path.parent}"
+                )
+        run_root = root / "runs" / execution_id
         run_root.mkdir(parents=True, exist_ok=True)
         budget = RequestBudget(
             plan["limits"],
@@ -514,7 +528,15 @@ def execute_request(
         terminal = False
         try:
             budget.write_json(
-                run_root / "RUN_STATE.json", dict(status="ACQUIRING", request=plan["request"])
+                run_root / "RUN_STATE.json",
+                dict(
+                    version=2,
+                    execution_id=execution_id,
+                    request_id=plan["request_id"],
+                    source_generation=generation,
+                    status="ACQUIRING",
+                    request=plan["request"],
+                ),
             )
             while day < last:
                 day_text = day.isoformat()
@@ -622,7 +644,14 @@ def execute_request(
                 result = WeatherResult(destination, manifest)
             budget.write_json(
                 run_root / "RUN_STATE.json",
-                dict(status="COMMITTED_" + manifest["status"], result_id=identity),
+                dict(
+                    version=2,
+                    execution_id=execution_id,
+                    request_id=plan["request_id"],
+                    source_generation=generation,
+                    status="COMMITTED_" + manifest["status"],
+                    result_id=identity,
+                ),
             )
             # All fallible accounting/control writes precede active promotion.
             # The atomic index replacement is the last publication operation.
@@ -635,7 +664,14 @@ def execute_request(
         except BaseException:
             budget.write_json(
                 run_root / "RUN_STATE.json",
-                dict(status="INCOMPLETE_NOT_PUBLISHED", budget=budget.receipt()),
+                dict(
+                    version=2,
+                    execution_id=execution_id,
+                    request_id=plan["request_id"],
+                    source_generation=generation,
+                    status="INCOMPLETE_NOT_PUBLISHED",
+                    budget=budget.receipt(),
+                ),
             )
             raise
         finally:
