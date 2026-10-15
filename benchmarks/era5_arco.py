@@ -40,6 +40,7 @@ def probe(
     run=False,
     variables=None,
     sample_output=None,
+    include_terminal_hour=False,
     transfer_bytes=256 * 1024**2,
     max_requests=100,
     max_seconds=300,
@@ -115,6 +116,7 @@ def probe(
             bbox=bbox,
             start=start,
             end=end,
+            include_terminal_hour=include_terminal_hour,
             scientific_equivalence="NOT_RUN_REQUIRES_CDS_NUMERICAL_AND_ACCUMULATION_COMPARISON",
             preferred_backend=False,
             reason="global spatial chunks and unqualified message-level provenance",
@@ -144,7 +146,7 @@ def probe(
             origin = datetime(1900, 1, 1, tzinfo=timezone.utc)
             positions = range(
                 int((first - origin).total_seconds() / 3600),
-                int((last - origin).total_seconds() / 3600) + 24,
+                int((last - origin).total_seconds() / 3600) + 24 + int(include_terminal_hour),
             )
             time_spec = metadata["time/.zarray"]
             if metadata["time/.zattrs"]["units"] != "hours since 1900-01-01 00:00:00":
@@ -205,6 +207,31 @@ def probe(
             raise FileExistsError("Benchmark evidence is never overwritten.")
         output.write_text(json.dumps(report, indent=2))
         return report
+    except BaseException as error:
+        # Failed transfers remain charged in a separate immutable receipt. Never
+        # confuse an interrupted probe with a completed timing/sample artifact.
+        failure = Path(output).with_suffix(".failure.json")
+        failure.parent.mkdir(parents=True, exist_ok=True)
+        if not failure.exists():
+            with failure.open("x") as stream:
+                json.dump(
+                    dict(
+                        status="INCOMPLETE",
+                        exception_type=type(error).__name__,
+                        received_bytes=received,
+                        provider_requests=requests,
+                        seconds=time.perf_counter() - started,
+                        receipts=receipts,
+                        caps=dict(
+                            transfer_bytes=transfer_bytes,
+                            max_requests=max_requests,
+                            max_seconds=max_seconds,
+                        ),
+                    ),
+                    stream,
+                    indent=2,
+                )
+        raise
     finally:
         active.clear()
         thread.join(timeout=1)
@@ -219,6 +246,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--run", action="store_true")
     parser.add_argument("--sample-output", type=Path)
+    parser.add_argument("--include-terminal-hour", action="store_true")
     args = parser.parse_args()
     result = probe(
         args.start_date,
@@ -228,6 +256,7 @@ if __name__ == "__main__":
         run=args.run,
         variables=args.variables,
         sample_output=args.sample_output,
+        include_terminal_hour=args.include_terminal_hour,
     )
     print(
         json.dumps(

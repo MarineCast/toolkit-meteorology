@@ -263,12 +263,12 @@ The optional codec was installed outside the project; it is not required for CDS
 
 The original probe was temperature-only transfer/representation evidence. The
 later checkpoint above adds temperature numerical comparison with CDS, without
-establishing complete meteorological equivalence. Month/three-month ARCO all-variable
-transfers were not widened beyond the bounded probe because the global chunks
-already establish the overfetch issue. Other ARCO collections/layouts were not
+establishing complete meteorological equivalence. The matched two-day seven-field
+benchmark below adds direct timings and numerical comparisons. Month/three-month
+ARCO all-variable benchmarks remain unrun. Other ARCO collections/layouts were not
 exhaustively tested. CDS remains the implemented strict regional backend; the
-fastest scientifically equivalent backend has **not** been established by a live
-head-to-head comparison. ARCO is deliberately unavailable as an execution backend.
+fastest scientifically equivalent backend has **not** been established. ARCO is
+deliberately unavailable as an execution backend.
 
 Live metadata was also checked for `co/single-level-reanalysis.zarr-v2` (181,026
 bytes) and `co/single-level-forecast.zarr-v2` (97,308 bytes). Their meteorological
@@ -277,6 +277,80 @@ instantaneous fields and `[1, 1, 542080]` for forecast-step accumulations. These
 stores expose a different spatial/forecast representation, with no regional
 spatial chunks. Their contents were not substituted for validated CDS GRIB.
 Exact metadata hashes, variable arrays and collection vintages are in the report.
+
+## Matched seven-field CDS/ARCO benchmark
+
+The completed January 1–2, 2009 comparison found similar end-to-end time over
+the full study rectangle, with much greater ARCO transfer:
+
+| Measured pipeline | CDS | Google ARCO |
+| --- | ---: | ---: |
+| Wall time | 85.13 s | 87.83 s |
+| HTTP response bytes, including metadata | 719,389 | 863,338,399 |
+| HTTP requests | 21 | 365 |
+| Sampled peak RSS | 270,090,240 B | 436,469,760 B |
+| Daily rows | 21,252 | 21,252 |
+
+ARCO transferred **1,200×** as many bytes. Its acquisition/decode/crop phase took
+87.65 s; shared daily reductions took 0.128 s. CDS decode/normalization took
+1.40 s and aggregation 0.076 s; client-observed job wait summed to 110.25 s across
+the concurrent jobs and overlaps wall time. Thus this experiment found no
+end-to-end speed advantage for Google on this machine and regional selection.
+It does not establish which provider is always faster or a multi-year ETA.
+
+The [machine-readable comparison](evidence/era5-backend-comparison-20261014.json)
+checks **255,783 hourly coordinate/time/field pairs** and every daily row. There
+were no missing-source disagreements. Daily RH had one null/support disagreement
+under the same v2 supported-domain policy; other metrics' support flags agreed.
+Maximum daily differences included temperature mean 0.000332 °C, precipitation
+0.00250 mm and circular mean-vector wind direction 0.379 degrees. These are
+descriptive measurements, not adopted equivalence tolerances. CDS remains the
+implemented backend; no scientific contract was relaxed or value clipped.
+
+`benchmarks/era5_backend_comparison.py` compares exactly two UTC days over the
+same 759-point native study rectangle. Both paths use seven source fields and
+the same v2 arithmetic for all 14 daily metrics. ARCO precipitation additionally
+reads the following midnight and tests the hypothesis that each timestamp ends
+a one-hour interval. Its benchmark artifacts are labelled `ARCO_EXPERIMENTAL`;
+they do not invent GRIB forecast init/step/expver metadata or qualify a production
+backend. Hourly and daily differences are descriptive, with no adopted
+cross-backend acceptance threshold.
+
+Each acquisition phase runs in a separate process with fresh local directories
+and at most four workers. CDS uses two source jobs, a 15-minute cap, 512 HTTP calls
+and 512 MiB reserved transfer. ARCO uses seven concurrent field tasks with at
+most four active: wind fields each admit 192 MiB; other fields each admit 128 MiB,
+giving a **1 GiB aggregate transfer cap**, at most 490 requests and 15 minutes.
+Only cropped regional samples and checksum receipts persist; global chunks are
+discarded after cropping. Successful field receipts and source jobs survive a
+failure. Timing includes transfer, decoding, regional reduction and output; the
+subsequent numeric comparison is excluded. ARCO's prototype uses simpler
+publication/metadata than the transactional CDS executor.
+
+The initial January 2024 attempt showed that a fresh local CDS cache does not
+imply a cold provider cache: its repeated exact selection completed in 6.07 s
+with near-zero client-observed job wait. ARCO completed five fields but the
+128 MiB per-field allowance stopped both wind fields. This incomplete attempt
+is preserved and excluded from completed head-to-head timings. A second pair
+uses January 1–2, 2009, which had not been requested by this benchmark. Provider
+caches still cannot be controlled; these runs do not establish decade throughput.
+
+Install optional `numcodecs` for the ARCO phase only. Run these phases sequentially:
+
+```sh
+python benchmarks/era5_backend_comparison.py cds \
+  --start-date 2009-01-01 --end-date 2009-01-02 --output-dir /tmp/backend-comparison
+python benchmarks/era5_backend_comparison.py arco \
+  --start-date 2009-01-01 --end-date 2009-01-02 --output-dir /tmp/backend-comparison
+python benchmarks/era5_backend_comparison.py compare \
+  --start-date 2009-01-01 --end-date 2009-01-02 --output-dir /tmp/backend-comparison
+```
+
+Use a new directory for a new trial. The final phase performs no provider access:
+it verifies exact coordinate/time/key alignment, reports circular direction
+errors, checks source/derivation support flags and compares hourly fields against
+retained CDS GRIB independently of the daily reduction. It also preserves the
+distinction between numerical agreement and independent regional accuracy.
 
 ## Conditional ten-year estimate
 

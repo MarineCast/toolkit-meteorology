@@ -162,3 +162,8 @@ not an adopted backend or production qualification.
 `python benchmarks/era5_aggregation.py --help` describes a local retained-source
 replay with exact all-column/lineage comparison against an exported prior reducer;
 see `docs/era5-backfill-performance.md` for the bounded command and timing scope.
+Backend benchmark changes: `python -m pytest -q tests/test_backend_benchmark.py`,
+then the full suite and ordinary lint/docs/distribution checks. The live
+`benchmarks/era5_backend_comparison.py` phases are explicit acquisition: two UTC
+days, seven fields, four workers, separate processes and local caches. Read
+`docs/era5-backfill-performance.md` for caps, numerical comparison and limitations.
