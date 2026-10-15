@@ -415,6 +415,8 @@ OUTPUT_TYPES = {
     "BACKEND": pa.string(),
     "STATUS": pa.string(),
     "VALID_HOURS": pa.int64(),
+    "INVALID_HOURS": pa.int64(),
+    "INVALID_DERIVATION_BITS": pa.string(),
     "EXPECTED_HOURS": pa.int64(),
     "COVERAGE_FRACTION": pa.float64(),
     "INTERVAL_START_UTC": pa.string(),

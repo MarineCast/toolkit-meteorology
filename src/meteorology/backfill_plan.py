@@ -8,8 +8,8 @@ from .capabilities import dependencies, ERA5_NAMES
 from .request import digest, plan_weather
 from .era5.resources import Limits
 
-METHOD = "era5-regional-historical-features-v1"
-SCHEMA = "meteorology-backfill-date-support-metric-v1"
+METHOD = "era5-regional-historical-features-v2"
+SCHEMA = "meteorology-backfill-date-support-metric-v2"
 DEFAULT_VARIABLES = (
     "temperature",
     "wind",

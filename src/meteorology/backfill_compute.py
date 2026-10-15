@@ -291,10 +291,6 @@ def day_frames(cube, boundary, day, request, spatial, lineage):
         elif metric.startswith("RELATIVE_HUMIDITY"):
             t, td = arrays["t2m"] - 273.15, arrays["d2m"] - 273.15
             hourly = 100 * np.exp(17.67 * td / (td + 243.5) - 17.67 * t / (t + 243.5))
-            if np.any(hourly[np.isfinite(hourly)] > 100.01) or np.any(
-                td[np.isfinite(td)] < -123.15
-            ):
-                raise ValueError("Temperature/dewpoint exceeds supported water-RH contract.")
         else:
             hourly = arrays[parameters[0]].copy()
             if parameters[0] in {"t2m", "d2m"}:
@@ -306,6 +302,12 @@ def day_frames(cube, boundary, day, request, spatial, lineage):
             elif accumulated:
                 hourly *= 1000
         joint = np.logical_and.reduce([np.isfinite(values) for values in arrays.values()])
+        invalid = np.zeros_like(joint)
+        if metric.startswith("RELATIVE_HUMIDITY"):
+            invalid = joint & (
+                ~np.isfinite(hourly) | (hourly < 0) | (hourly > 100.01) | (td < -123.15)
+            )
+            joint = joint & ~invalid
         if request["frequency"] == "hourly":
             selections = [(position, slice(position, position + 1)) for position in range(24)]
         else:
@@ -314,6 +316,7 @@ def day_frames(cube, boundary, day, request, spatial, lineage):
             expected = 24 if position is None else 1
             valid = joint[selected]
             counts = valid.sum(axis=0)
+            invalid_counts = invalid[selected].sum(axis=0)
             deps = (
                 dependencies
                 if position is None
@@ -322,6 +325,8 @@ def day_frames(cube, boundary, day, request, spatial, lineage):
             catalog = dict(
                 dependencies=deps, parameters=parameters, grid_hash=cube["metadata"]["grid_hash"]
             )
+            if metric.startswith("RELATIVE_HUMIDITY"):
+                catalog["derivation_policy"] = "bolton-water-rh-0-to-100.01-unsupported-null-v2"
             lineage_id = digest(catalog)
             lineage[lineage_id] = catalog
             for aggregate in aggregates if position is None else ("instant",):
@@ -376,6 +381,14 @@ def day_frames(cube, boundary, day, request, spatial, lineage):
                         BACKEND="CDS",
                         STATUS=status[ids],
                         VALID_HOURS=counts[ids],
+                        INVALID_HOURS=invalid_counts[ids],
+                        INVALID_DERIVATION_BITS=[
+                            format(
+                                sum(1 << h for h in range(expected) if invalid[selected][h, index]),
+                                "x",
+                            )
+                            for index in ids
+                        ],
                         EXPECTED_HOURS=expected,
                         COVERAGE_FRACTION=counts[ids] / expected,
                         INTERVAL_START_UTC=(
@@ -403,7 +416,9 @@ def day_frames(cube, boundary, day, request, spatial, lineage):
                         VALUE_STATUS=np.where(
                             calm[ids] & (counts[ids] == expected),
                             "UNDEFINED_CALM_MEAN",
-                            status[ids],
+                            np.where(
+                                invalid_counts[ids] > 0, "OUTSIDE_SUPPORTED_RH_DOMAIN", status[ids]
+                            ),
                         ),
                         CONSOLIDATION_STATUS="contains_preliminary_ERA5T"
                         if any(d.get("selected_revision") == 5 for d in deps)

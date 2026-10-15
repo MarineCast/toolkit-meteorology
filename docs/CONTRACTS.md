@@ -238,8 +238,8 @@ units; snow depth and snowpack are not substituted.
 ## Historical backfill product
 
 [`backfill_weather`](era5-backfill.md) uses method
-`era5-regional-historical-features-v1` and schema
-`meteorology-backfill-date-support-metric-v1`. Daily rows identify inclusive UTC
+`era5-regional-historical-features-v2` and schema
+`meteorology-backfill-date-support-metric-v2`. Daily rows identify inclusive UTC
 dates, metric, nullable value, units, status and valid/expected hourly counts.
 Native support uses verified quarter-degree coordinates, grid hash and index.
 Optional R5 support adds H3 identity and centroid sampling distance; multiple
@@ -254,3 +254,16 @@ time, accumulation interval, lead, expver and grid hash remain recoverable.
 availability. ERA5 is reanalysis, never an observation or a forecast issued then.
 The expanded daily metrics and disk-backed result have a separate contract from
 short getters and legacy family releases.
+
+### Backfill v2 derived-value support
+
+A live coastal ERA5 pilot exposed two finite input pairs with dewpoint 0.001953125 K
+above temperature and derived Bolton water-RH up to 100.0141401 percent. The cause
+has not been independently established; these values lie outside the existing
+0–100.01 percent supported RH domain. Backfill method/schema v2 keep that domain
+and the unchanged formula. Unsupported finite derivations make the affected RH
+slots unavailable, with `INVALID_HOURS` and `INVALID_DERIVATION_BITS` distinct from
+source missingness. Daily RH requires all 24 supported derivations. Temperature,
+dewpoint and unrelated metrics retain their own support. No value is clipped.
+Existing short getters retain their strict rejection behavior. Immutable v1
+artifacts and their original method/schema remain unchanged.

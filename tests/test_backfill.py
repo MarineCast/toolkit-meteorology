@@ -26,6 +26,7 @@ class Provider:
         self.rain_by_month = {}
         self.wind_flip = False
         self.preliminary_cloud = False
+        self.dewpoint_above_temperature_hour = None
 
     def factory(self, *, budget, **kwargs):
         owner = self
@@ -46,7 +47,10 @@ class Provider:
                         for day in selection["day"]:
                             hours = [int(t[:2]) for t in selection["time"]]
                             for ordinal, batch in enumerate(
-                                [[hour] for hour in hours] if owner.wind_flip else [hours]
+                                [[hour] for hour in hours]
+                                if owner.wind_flip
+                                or owner.dewpoint_above_temperature_hour is not None
+                                else [hours]
                             ):
                                 file = owner.directory / (identity + "-" + day + f"-{ordinal}.grib")
                                 fields = [(parameters, 1)]
@@ -66,12 +70,21 @@ class Provider:
                                         snow=0.002,
                                         expver=expver,
                                         missing_messages=owner.missing or (),
-                                        samples_override={
-                                            "u10": 3 if batch[0] < 12 else -3,
-                                            "v10": 4 if batch[0] < 12 else -4,
-                                        }
-                                        if owner.wind_flip
-                                        else None,
+                                        samples_override=dict(
+                                            (
+                                                {
+                                                    "u10": 3 if batch[0] < 12 else -3,
+                                                    "v10": 4 if batch[0] < 12 else -4,
+                                                }
+                                                if owner.wind_flip
+                                                else {}
+                                            ),
+                                            **(
+                                                {"t2m": 283.15, "d2m": 283.151953125}
+                                                if batch[0] == owner.dewpoint_above_temperature_hour
+                                                else {}
+                                            ),
+                                        ),
                                     )
                                     with file.open("rb") as stream:
                                         shutil.copyfileobj(stream, merged)
@@ -677,6 +690,39 @@ def test_transient_download_resumes_remote_job_without_resubmission(tmp_path, mo
     assert result.metadata["status"] == "COMPLETE"
     assert len(attempts) == 2 and attempts[0] == attempts[1]
     assert len(provider.selections) == 1
+
+
+def test_unsupported_rh_is_counted_separately_from_missing_source_values(tmp_path):
+    provider = Provider(tmp_path)
+    provider.dewpoint_above_temperature_hour = 8
+    result = backfill_weather(
+        "2024-01-01",
+        "2024-01-01",
+        BBOX,
+        variables=["temperature", "relative_humidity"],
+        **options(tmp_path, provider),
+    )
+    data = result.to_pandas()
+    rh = data[data.METRIC.str.startswith("RELATIVE_HUMIDITY")]
+    assert rh.VALUE.isna().all() and set(rh.VALID_HOURS) == {23}
+    assert set(rh.INVALID_HOURS) == {1} and set(rh.INVALID_DERIVATION_BITS) == {"100"}
+    assert set(rh.VALUE_STATUS) == {"OUTSIDE_SUPPORTED_RH_DOMAIN"}
+    assert all(set(json.loads(bits).values()) == {"0"} for bits in rh.INPUT_MISSING_BITS)
+    other = data[~data.METRIC.str.startswith("RELATIVE_HUMIDITY")]
+    assert set(other.STATUS) == {"COMPLETE"} and set(other.INVALID_HOURS) == {0}
+    assert result.metadata["status"] == "PARTIAL"
+    assert result.metadata["method"].endswith("v2")
+    hourly = backfill_weather(
+        "2024-01-01",
+        "2024-01-01",
+        BBOX,
+        frequency="hourly",
+        variables=["relative_humidity"],
+        **options(tmp_path, provider),
+    ).to_pandas()
+    unsupported = hourly[hourly.INVALID_HOURS > 0]
+    assert len(unsupported) == 4 and unsupported.VALUE.isna().all()
+    assert set(unsupported.INVALID_DERIVATION_BITS) == {"1"}
 
 
 def test_adaptive_resume_skips_published_children_without_decode(tmp_path, monkeypatch):
