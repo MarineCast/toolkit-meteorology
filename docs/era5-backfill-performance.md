@@ -85,6 +85,50 @@ and local contention can change it. The one-worker month is consistent with
 roughly 18.5 hours when extrapolated serially, or about 9.2 hours under ideal
 two-worker overlap. Those are estimates, not a completed decade benchmark.
 
+## Further local aggregation optimization
+
+The reducer now reuses each day's hourly input arrays, packs hourly support flags
+with NumPy, and serializes identical missing-input patterns once per selection.
+The cache holds one day's inputs; it does not grow with the backfill interval.
+The scientific method, schema, hourly bit ordering, missingness and lineage are
+unchanged.
+
+Two local replays of the retained real January source compared **all columns and
+lineage for 329,406 rows exactly** against the previous reducer. Aggregation fell
+from **12.06 s to 1.37 s** (8.83×) and **11.42 s to 1.14 s** (10.04×). These timings
+exclude source decoding, network waits and Parquet publication. A linear decade
+projection saves roughly 20 minutes of aggregation; it does not establish a
+similar end-to-end speedup. The measured CDS wait remains the largest bottleneck.
+See the [optimization evidence](evidence/era5-backfill-speed-20261014.json).
+
+A bounded four-worker live attempt downloaded all three monthly sources and
+committed January/February in 83.91 s, but stopped on the terminal boundary with
+`AmbiguousSubmission`: no durable remote ID was returned. The read-only CDS job
+list confirmed the three known monthly jobs; it did not resolve the uncertain
+boundary submission. Raw evidence, both partitions and all charged counters were
+retained. No ambiguous request was resubmitted. This is an **incomplete run**, not
+a completed three-month timing or a controlled two-versus-four-worker comparison.
+Provider cache state also differs from the earlier two-worker run. Four workers
+remain configurable, but their sustained throughput is unqualified. Keep the
+12–24-hour decade planning range until a complete comparison is available.
+
+The local replay is reproducible from retained source evidence without provider
+access. Export the previous reducer from revision `1532a30` to a local file, then:
+
+```sh
+python benchmarks/era5_aggregation.py \
+  --source-record /path/to/source/SOURCE.json \
+  --boundary-cube /path/to/following-month/edges/midnight.npz \
+  --reference-module /tmp/backfill_compute_previous.py \
+  --start 2024-01-01 --end 2024-01-31 \
+  --bbox -129.7 45.9 -121.5 51.5 \
+  --output-dir /tmp/aggregation-replay
+```
+
+The output directory must be new. Replay verifies source/normalized checksums,
+uses the existing bounded decoder, and retains normalized scratch plus its small
+report there. It makes zero network requests and does not modify source caches.
+
 ## Scope and reproducibility
 
 Measurements were made on 2026-10-14, macOS, Python 3.12.13 and ecCodes 2.47.1,

@@ -159,3 +159,6 @@ acquisition. `benchmarks/era5_backfill.py` defaults to generated GRIB/mock trans
 `benchmarks/era5_arco.py` performs bounded public metadata access by default and
 selected hourly transfers only with `--run`; its output is exploratory evidence,
 not an adopted backend or production qualification.
+`python benchmarks/era5_aggregation.py --help` describes a local retained-source
+replay with exact all-column/lineage comparison against an exported prior reducer;
+see `docs/era5-backfill-performance.md` for the bounded command and timing scope.

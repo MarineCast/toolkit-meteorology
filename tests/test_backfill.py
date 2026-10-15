@@ -6,6 +6,7 @@ import shutil
 import threading
 import uuid
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -15,6 +16,90 @@ from meteorology.capabilities import ERA5_NAMES
 from .request_fixtures import era5_grib
 
 BBOX = (-125.25, 49, -125, 49.25)
+
+
+@pytest.mark.parametrize("hours", [1, 24])
+def test_hour_flags_preserve_bit_order_and_repeated_spatial_support(hours):
+    from meteorology.backfill_compute import hour_bits
+
+    mask = np.random.default_rng(314).random((hours, 11)) < 0.4
+    mask[:, 0], mask[:, 1] = False, True
+    mask[:, 2] = False
+    mask[-1, 2] = True
+    ids = np.array([2, 0, 1, 10, 2, 5])
+    expected = [
+        format(sum(1 << hour for hour in range(hours) if mask[hour, point]), "x") for point in ids
+    ]
+    assert hour_bits(mask, ids) == expected
+    assert expected[0] == format(1 << (hours - 1), "x")
+    assert expected[1] == "0" and expected[2] == format((1 << hours) - 1, "x")
+
+
+@pytest.mark.parametrize("frequency", ["daily", "hourly"])
+def test_point_specific_support_flags_separate_missing_input_invalid_rh_and_calm(frequency):
+    from meteorology.backfill_compute import day_frames
+
+    parameters = ["t2m", "d2m", "u10", "v10", "tp"]
+    values = np.empty((5, 25, 3))
+    for index, value in enumerate([283.15, 278.15, 3, 4, 0.001]):
+        values[index] = value
+    values[0, 0, 0] = np.nan
+    values[0, 23, 1] = np.inf
+    values[1, 5, 2] = 283.151953125
+    values[2, 0, 0] = np.nan
+    values[3, 23, 0] = np.nan
+    values[2:4, :, 2] = 0  # complete calm vector has a null direction, no missing input
+    values[4, 24, 0] = np.nan  # accumulation ends at the following midnight
+    cube = dict(
+        parameters=np.array(parameters),
+        values=values,
+        times=np.array(
+            [stamp.value for stamp in pd.date_range("2024-01-01", periods=25, tz="UTC", freq="h")]
+        ),
+        coordinates=np.array([[49, -125], [49.25, -125], [49.25, -124.75]]),
+        metadata=dict(grid_hash="test-grid", evidence={}),
+    )
+    ids = np.array([2, 0, 2, 1])
+    spatial = (ids, ["a", "b", "c", "d"], np.zeros(4), "test-repeated-support")
+    data = pd.concat(
+        day_frames(
+            cube,
+            None,
+            "2024-01-01",
+            dict(
+                variables=["temperature", "wind", "relative_humidity", "precipitation"],
+                frequency=frequency,
+            ),
+            spatial,
+            {},
+        ),
+        ignore_index=True,
+    )
+    if frequency == "daily":
+        temperature = data[data.METRIC == "TEMPERATURE_2M_C_MEAN"]
+        assert [json.loads(v) for v in temperature.INPUT_MISSING_BITS] == [
+            {"t2m": "0"},
+            {"t2m": "1"},
+            {"t2m": "0"},
+            {"t2m": "800000"},
+        ]
+        assert temperature.VALID_HOURS.tolist() == [24, 23, 24, 23]
+        rh = data[data.METRIC == "RELATIVE_HUMIDITY_2M_PCT_MEAN"]
+        assert rh.INVALID_DERIVATION_BITS.tolist() == ["20", "0", "20", "0"]
+        rain = data[data.METRIC == "PRECIPITATION_MM"]
+        assert json.loads(rain.iloc[1].INPUT_MISSING_BITS) == {"tp": "800000"}
+        direction = data[data.METRIC == "WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR"]
+        assert json.loads(direction.iloc[1].INPUT_MISSING_BITS) == {"u10": "1", "v10": "800000"}
+        assert direction.iloc[0].VALUE_STATUS == "UNDEFINED_CALM_MEAN"
+    else:
+        rh = data[(data.METRIC == "RELATIVE_HUMIDITY_2M_PCT") & (data.INVALID_HOURS > 0)]
+        assert len(rh) == 2 and set(rh.INVALID_DERIVATION_BITS) == {"1"}
+        temperature = data[(data.METRIC == "TEMPERATURE_2M_C") & (data.VALID_HOURS == 0)]
+        assert len(temperature) == 2
+        assert all(json.loads(v) == {"t2m": "1"} for v in temperature.INPUT_MISSING_BITS)
+    assert (
+        data[(data.VALID_HOURS < data.EXPECTED_HOURS) | (data.INVALID_HOURS > 0)].VALUE.isna().all()
+    )
 
 
 class Provider:

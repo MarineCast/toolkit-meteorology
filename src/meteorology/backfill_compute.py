@@ -178,6 +178,13 @@ def series(cube, boundary, parameter, stamps):
     return np.array(values), evidence
 
 
+def hour_bits(mask, ids):
+    """Pack at most one UTC day's flags, with the first hour in the low bit."""
+    weights = np.left_shift(np.uint32(1), np.arange(len(mask), dtype=np.uint32))
+    packed = (mask[:, ids] * weights[:, None]).sum(axis=0, dtype=np.uint32)
+    return [format(int(value), "x") for value in packed]
+
+
 def mapping(cube, bbox, output, cache):
     coordinates = cube["coordinates"]
     w, s, e, n = bbox
@@ -276,12 +283,18 @@ def day_frames(cube, boundary, day, request, spatial, lineage):
     specifications = []
     for variable in request["variables"]:
         specifications.extend(WIND if variable == "wind" else [BASE[variable]])
+    # Reuse the same native hourly inputs for wind components, speed/direction,
+    # temperature and RH. This cache is bounded to one day, not the source chunk.
+    inputs = {}
     for metric, units, parameters, aggregates in specifications:
         accumulated = parameters[0] in {"tp", "sf"}
         stamps = pd.date_range(start + pd.Timedelta(hours=int(accumulated)), periods=24, freq="h")
         arrays, dependencies = {}, []
         for parameter in parameters:
-            values, evidence = series(cube, boundary, parameter, stamps)
+            key = (parameter, accumulated)
+            if key not in inputs:
+                inputs[key] = series(cube, boundary, parameter, stamps)
+            values, evidence = inputs[key]
             arrays[parameter] = values
             dependencies.extend(evidence)
         if metric.startswith("WIND_SPEED"):
@@ -329,6 +342,17 @@ def day_frames(cube, boundary, day, request, spatial, lineage):
                 catalog["derivation_policy"] = "bolton-water-rh-0-to-100.01-unsupported-null-v2"
             lineage_id = digest(catalog)
             lineage[lineage_id] = catalog
+            bits = {
+                p: hour_bits(~np.isfinite(values[selected]), ids) for p, values in arrays.items()
+            }
+            # Every aggregate shares its source support. Most points also share
+            # one flag pattern; serialize each distinct pattern just once.
+            patterns, input_missing = {}, []
+            for flags in zip(*(bits[p] for p in parameters)):
+                if flags not in patterns:
+                    patterns[flags] = json.dumps(dict(zip(parameters, flags)), sort_keys=True)
+                input_missing.append(patterns[flags])
+            invalid_bits = hour_bits(invalid[selected], ids)
             for aggregate in aggregates if position is None else ("instant",):
                 data = np.where(valid, hourly[selected], 0)
                 calm = np.zeros(data.shape[-1], dtype=bool)
@@ -350,20 +374,6 @@ def day_frames(cube, boundary, day, request, spatial, lineage):
                     counts == expected, "COMPLETE", np.where(counts > 0, "PARTIAL", "UNAVAILABLE")
                 )
                 status = np.where(calm & (counts == expected), "UNAVAILABLE", status)
-                bits = {
-                    p: [
-                        format(
-                            sum(
-                                1 << h
-                                for h in range(expected)
-                                if not np.isfinite(values[selected][h, index])
-                            ),
-                            "x",
-                        )
-                        for index in ids
-                    ]
-                    for p, values in arrays.items()
-                }
                 name = (
                     metric
                     if position is not None or aggregate == "sum"
@@ -382,13 +392,7 @@ def day_frames(cube, boundary, day, request, spatial, lineage):
                         STATUS=status[ids],
                         VALID_HOURS=counts[ids],
                         INVALID_HOURS=invalid_counts[ids],
-                        INVALID_DERIVATION_BITS=[
-                            format(
-                                sum(1 << h for h in range(expected) if invalid[selected][h, index]),
-                                "x",
-                            )
-                            for index in ids
-                        ],
+                        INVALID_DERIVATION_BITS=invalid_bits,
                         EXPECTED_HOURS=expected,
                         COVERAGE_FRACTION=counts[ids] / expected,
                         INTERVAL_START_UTC=(
@@ -409,10 +413,7 @@ def day_frames(cube, boundary, day, request, spatial, lineage):
                         SOURCE_GRID_DISTANCE_M=distance,
                         SPATIAL_METHOD=spatial_method,
                         SOURCE_LINEAGE_ID=lineage_id,
-                        INPUT_MISSING_BITS=[
-                            json.dumps({p: bits[p][i] for p in parameters}, sort_keys=True)
-                            for i in range(len(ids))
-                        ],
+                        INPUT_MISSING_BITS=input_missing,
                         VALUE_STATUS=np.where(
                             calm[ids] & (counts[ids] == expected),
                             "UNDEFINED_CALM_MEAN",
