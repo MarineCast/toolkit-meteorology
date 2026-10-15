@@ -132,6 +132,10 @@ same-area/month selection containing all requested days, hours and parameters.
 This relaxed subset reuse is limited to the new backfill path; exact-source guards
 of existing getters remain unchanged.
 
+Resume pins the retained source vintage, including preliminary ERA5T when present.
+For a newer acquisition, choose fresh cache/output directories and inspect its
+expver/retrieval evidence; a new acquisition does not itself prove final ERA5.
+
 `PROGRESS.json` is operational progress. Signed `CURRENT.json` partition pointers,
 immutable companion manifests and checksum-valid sources determine completed
 work after a crash. Corrupt derived artifacts trigger selective repair; their old
@@ -161,7 +165,12 @@ never assembled by the executor.
 
 Temperature/dewpoint convert K to degC, pressure Pa to hPa, cloud fraction to
 percent, and tp/sf metres to millimetres. RH uses the existing Bolton saturation
-formula over water and its supported temperature/dewpoint domain. Wind speed
+formula over water and its supported temperature/dewpoint domain. v2 marks finite
+derivations outside 0–100.01 percent unsupported, preserving a null daily RH if
+any of its 24 hours is unsupported. `INVALID_HOURS` and the hex
+`INVALID_DERIVATION_BITS` distinguish those slots from missing source values;
+`VALUE_STATUS=OUTSIDE_SUPPORTED_RH_DOMAIN` identifies the reason. Temperature and
+other metrics keep their independent support. Values are never clipped. Wind speed
 averages hourly magnitudes, not the magnitude of mean U/V. Direction is FROM
 the daily mean earth-relative vector; a calm mean has a null value and
 `VALUE_STATUS=UNDEFINED_CALM_MEAN`, with complete input counts retained.
@@ -276,7 +285,9 @@ hourly normalized intermediates are optional. Existing evidence is never deleted
 
 ## Qualification state
 
-CDS credentials are absent from the current environment. Live two-day/month/
-three-month and numerical backend comparisons remain pending provider access.
-Software fixtures and metadata inspection cannot establish production regional
-accuracy or the engineering target of a ten-year run under 48 hours.
+CDS authentication and existing dataset-term acceptance were verified on October
+14. Real two-day/month/three-month native runs, a calculation comparison, and a
+temperature-only ARCO comparison are recorded in the performance report.
+These checks do not establish independent regional accuracy, all-variable
+backend equivalence, an approved marine mask or
+the engineering target of a ten-year run under 48 hours.

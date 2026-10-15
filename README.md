@@ -89,7 +89,8 @@ Restart the same request and directories to reuse valid completed work. Optional
 retains their source identity and distance; it adds no atmospheric detail. The
 new [backfill guide](docs/era5-backfill.md) explains caps, credentials, retention,
 scientific support and the [performance evidence](docs/era5-backfill-performance.md).
-The under-48-hour decade target still requires live CDS throughput qualification.
+Live pilots support a provisional 12–24-hour decade planning range with two
+workers; a full decade has not been timed, and CDS queues can change.
 
 ## Returned data
 

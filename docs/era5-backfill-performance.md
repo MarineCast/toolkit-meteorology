@@ -1,9 +1,89 @@
 # ERA5 backfill performance and qualification
 
 The monthly executor removes thousands of redundant jobs and substantially
-reduces local processing. Actual CDS queue/transfer throughput is still unmeasured
-because this environment has no CDS credentials or accepted-term evidence.
-The under-48-hour decade goal remains conditional.
+reduces local processing. CDS authentication and existing licence acceptance were
+verified on October 14, followed by a real two-day backfill and numerical checks.
+The under-48-hour decade goal remains conditional on sustained provider throughput.
+
+## Live CDS checkpoint and RH support
+
+The [access checkpoint](evidence/era5-cds-access-20261014.json) verifies account
+authentication and existing `cc-by` revision 1 acceptance without changing terms.
+The credential is local with owner-only permissions and is excluded from reports.
+The [live evidence](evidence/era5-backfill-live-20261014.json) retains counters,
+source/report checksums and numerical results.
+
+The first real day exposed two finite T/Td pairs whose Bolton water-RH exceeded
+the existing 100.01 percent support limit: maximum 100.0141401 percent, with
+dewpoint 0.001953125 K above temperature. The cause has not been independently
+established. Backfill v2 keeps the formula/domain and records unsupported slots
+explicitly, with null affected daily RH, `INVALID_HOURS`, `INVALID_DERIVATION_BITS`
+and `VALUE_STATUS=OUTSIDE_SUPPORTED_RH_DOMAIN`. Other metrics retain independent
+support. Existing short getters keep their strict whole-request rejection.
+The [ECMWF documentation](https://confluence.ecmwf.int/pages/viewpage.action?pageId=388500357)
+describes near-surface RH as a derivation from temperature/dewpoint, usually with
+respect to water; this checkpoint does not adopt a different saturation formula.
+
+The real 2024-01-01/02 optimized native run completed in **87.24 seconds** with
+**230,653,952 bytes** sampled peak RSS (220 MiB), two source jobs/decodes, **23 HTTP
+requests**, and **720,279 response bytes** including metadata. Raw GRIB totalled
+**667,260 bytes**; retained cache plus output was **1,432,040 bytes** for 21,252 rows.
+Summed concurrent stages were submission 2.71 s, client-observed queue/job wait
+144.52 s, response transfer 1.90 s, decode/normalize 5.64 s, aggregation 2.29 s and
+Parquet writing 0.108 s. Queue durations overlap and exceed wall time when summed.
+
+The resumed daily-strategy reference, explicitly excluding RH, completed in
+181.58 s with four decodes and 12,144 rows. Its earlier failed RH attempt and
+diagnostic normalization remain charged/preserved in separate journals; two
+initial source files were reused. This is an operational comparison, not a
+controlled cold-run speedup ratio. All **12,144 common non-RH values** matched
+within floating-point precision (maximum difference `4.55e-13`). Direct hourly
+Bolton recomputation checked all 1,518 daily RH rows: 1,512 supported rows matched,
+and six rows correctly stayed null, each with one unsupported hour. Independent
+raw-GRIB reductions also checked all 7,590 added extrema and mean-vector direction
+values (maximum difference `5.69e-14`). All 21,252 output rows were checked by
+these calculations. No clipping or filled daily mean was used.
+
+The real full-month run completed in **564.68 seconds** (9.41 minutes), with
+**323,616,768 bytes** sampled peak RAM (309 MiB), two jobs/decodes, **43 HTTP
+requests** and **10,368,880 response bytes**. It emitted **329,406 rows** and retained
+**21,376,678 bytes** of cache plus output. Stage times were submission 2.47 s,
+client-observed queue/job wait 488.30 s, transfer 3.09 s, decode/normalization
+43.18 s, aggregation 19.10 s, and Parquet writes 1.32 s. It used one worker and
+ran alongside the other benchmarks; these timings do not isolate server queue
+time from provider production/status latency.
+
+A fresh ARCO temperature probe retained a small regional sample for comparison.
+All **36,432 hourly coordinate/time pairs** matched the CDS support exactly.
+CDS-minus-ARCO temperature RMSE was **0.000462 K**, maximum absolute difference
+**0.0010071 K**. This is temperature-only numerical evidence with no adopted
+backend-equivalence threshold; precipitation, snowfall, other variables and
+revision/forecast provenance remain separate qualification gates. The optional
+`--sample-output` on `benchmarks/era5_arco.py --run` retains only the cropped
+regional arrays, not global source planes.
+
+The larger live runs use explicit 512-request, 512 MiB reserved-transfer and
+30-minute limits. The month uses one worker and three-month run uses two;
+they can compete in the CDS queue and share underlying provider caches. Their
+results are measurements for those runs, not isolated throughput guarantees.
+
+The real three-month run (January–March 2024, including leap day) completed in
+**997.66 seconds** (16.63 minutes), with **966,966 rows**, four jobs/decodes,
+**128 HTTP requests**, **30,400,231 response bytes**, and **328,761,344 bytes**
+sampled peak RAM (314 MiB). Cache plus output totalled **62,705,148 bytes**.
+Summed stages were submission 10.52 s, client-observed queue/job wait 1,621.44 s,
+transfer 5.24 s, decode/normalization 170.45 s, aggregation 63.02 s and Parquet
+writes 5.53 s. The two workers overlap those durations. Final manifests report
+`PARTIAL` where RH support is incomplete, although all requested source chunks
+and output partitions finished. A verified cached repeat returned 966,966 rows
+in 4.84 s with **zero provider requests, transfers and GRIB decodes**.
+
+At that observed two-worker throughput, a linear 3,652-day projection is
+**11.12 hours**. Use **12–24 hours as a provisional planning range**, with the
+48-hour target still conditional: queue load, provider caches, outages, retries
+and local contention can change it. The one-worker month is consistent with
+roughly 18.5 hours when extrapolated serially, or about 9.2 hours under ideal
+two-worker overlap. Those are estimates, not a completed decade benchmark.
 
 ## Scope and reproducibility
 
@@ -112,7 +192,7 @@ are bounded lower bounds, not completed full-period timings. Retained sources,
 getter manifests, counters and interruption logs were preserved. A separate
 comparison of the completed 21-day baseline prefix against the optimized full
 month matched **143,451 common values exactly**. The full old month/three-month
-comparison remains incomplete; live CDS runs for all three periods remain unrun.
+comparison remains incomplete. Later live CDS evidence is recorded above.
 
 ## Real public ARCO probe
 
@@ -137,8 +217,9 @@ Decode/crop took **0.161 s**. Actual time coordinates were checked and cropped
 regional shape was `48 × 23 × 33`; temperatures ranged 261.310–285.516 K.
 The optional codec was installed outside the project; it is not required for CDS.
 
-This is temperature-only transfer/representation evidence, not numerical parity
-with CDS or complete meteorological validation. Month/three-month ARCO all-variable
+The original probe was temperature-only transfer/representation evidence. The
+later checkpoint above adds temperature numerical comparison with CDS, without
+establishing complete meteorological equivalence. Month/three-month ARCO all-variable
 transfers were not widened beyond the bounded probe because the global chunks
 already establish the overfetch issue. Other ARCO collections/layouts were not
 exhaustively tested. CDS remains the implemented strict regional backend; the
@@ -160,6 +241,9 @@ The full-area 2009-01-01–2018-12-31 plan has 3,652 days, **121 source jobs**
 The conservative monthly numeric cube is at most 38,997,504 bytes for the default
 seven parameters. Default reserved source transfer is at most roughly 7.6 GiB
 before retries/metadata; this is a reservation bound, not measured payload size.
+
+The live throughput projection above supersedes the earlier provider-free estimate
+below. It does not establish stationary CDS queue behavior.
 
 Linear projection of the generated three-month pipelines gives about **1.5–2 hours**
 for 3,652 days of local software work. Treat **three hours** as a planning allowance,
@@ -199,8 +283,9 @@ checksums, interrupted publication/resume, selective repair, same-source duplica
 callers, independent acquisition, size splitting and persistent original caps.
 They establish software behavior and calculation parity, not real regional accuracy.
 
-Live CDS two-day, month and three-month benchmarks remain **NOT_RUN** pending
-account/token/manual terms. CDS-versus-ARCO numerical/accumulation/revision parity,
-independent regional meteorological accuracy, shared marine-mask qualification,
-actual decade throughput and a production MarineCast ingest remain **NOT_RUN**.
+Live CDS authentication and two-day/month/three-month results are recorded above.
+CDS-versus-ARCO all-variable
+accumulation/revision equivalence, independent regional meteorological accuracy,
+shared marine-mask qualification, actual decade throughput and a production
+MarineCast ingest remain **NOT_RUN** or unestablished.
 The implementation never promotes synthetic evidence into those qualifications.

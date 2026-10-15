@@ -39,11 +39,14 @@ def probe(
     *,
     run=False,
     variables=None,
+    sample_output=None,
     transfer_bytes=256 * 1024**2,
     max_requests=100,
     max_seconds=300,
 ):
     started = time.perf_counter()
+    if sample_output is not None and not run:
+        raise ValueError("Regional samples require explicit --run.")
     received, requests, peak, receipts = 0, 0, 0, []
     active = threading.Event()
     active.set()
@@ -171,6 +174,23 @@ def probe(
                 for v, values in samples.items()
             }
             report["decode_crop_seconds"] = decode_seconds
+            if sample_output is not None:
+                target = Path(sample_output)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with target.open("xb") as stream:
+                    np.savez_compressed(
+                        stream,
+                        **{v: np.array(values) for v, values in samples.items()},
+                        latitude_deg=latitude[lat_ids],
+                        longitude_deg=longitude[lon_ids],
+                        time_hours_since_1900=np.array(list(positions)),
+                    )
+                report["regional_sample_artifact"] = dict(
+                    path=str(target),
+                    bytes=target.stat().st_size,
+                    sha256=hashlib.sha256(target.read_bytes()).hexdigest(),
+                    format="arco-region-samples-v1",
+                )
         report.update(
             received_bytes=received,
             provider_requests=requests,
@@ -198,6 +218,7 @@ if __name__ == "__main__":
     parser.add_argument("--variables", nargs="+", choices=VARIABLES, default=["2m_temperature"])
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--run", action="store_true")
+    parser.add_argument("--sample-output", type=Path)
     args = parser.parse_args()
     result = probe(
         args.start_date,
@@ -206,6 +227,7 @@ if __name__ == "__main__":
         args.output,
         run=args.run,
         variables=args.variables,
+        sample_output=args.sample_output,
     )
     print(
         json.dumps(

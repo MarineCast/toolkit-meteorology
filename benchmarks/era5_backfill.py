@@ -40,8 +40,13 @@ ALIASES = {
 }
 
 
-def benchmark(period, bbox, directory, *, live=False, workers=2, only=None):
+def benchmark(period, bbox, directory, *, live=False, workers=2, only=None, baseline_exclude=()):
     first, last = PERIODS[period]
+    if set(baseline_exclude) - set(DEFAULT_VARIABLES):
+        raise ValueError("Baseline exclusions must name primary benchmark variables.")
+    baseline_variables = [v for v in DEFAULT_VARIABLES if v not in baseline_exclude]
+    if not baseline_variables:
+        raise ValueError("At least one baseline variable is required.")
     root = Path(directory)
     root.mkdir(parents=True, exist_ok=True)
     provider = None if live else Provider(root)
@@ -100,7 +105,7 @@ def benchmark(period, bbox, directory, *, live=False, workers=2, only=None):
                 while cursor <= date.fromisoformat(last):
                     end = min(cursor + timedelta(days=6), date.fromisoformat(last))
                     result = get_weather(
-                        DEFAULT_VARIABLES,
+                        baseline_variables,
                         cursor.isoformat(),
                         end.isoformat(),
                         bbox,
@@ -179,6 +184,8 @@ def benchmark(period, bbox, directory, *, live=False, workers=2, only=None):
         report = dict(
             period=period,
             bbox=bbox,
+            optimized_variables=list(DEFAULT_VARIABLES),
+            baseline_excluded_variables=list(baseline_exclude),
             evidence_kind="real_cds" if live else "generated_grib_mock_transport",
             measurements=measurements,
             numerical_parity=dict(
@@ -204,6 +211,7 @@ if __name__ == "__main__":
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--only", choices=["baseline", "optimized"])
+    parser.add_argument("--baseline-exclude", nargs="+", choices=DEFAULT_VARIABLES, default=[])
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="meteorology-backfill-benchmark-") as temporary:
         print(
@@ -215,6 +223,7 @@ if __name__ == "__main__":
                     live=args.live,
                     workers=args.workers,
                     only=args.only,
+                    baseline_exclude=args.baseline_exclude,
                 ),
                 indent=2,
             )

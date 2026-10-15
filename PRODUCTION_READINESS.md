@@ -5,18 +5,23 @@
 The [ERA5 historical executor](docs/era5-backfill.md) now supports monthly/adaptive
 regional requests, independent workers, persistent original budgets, selective
 resume and daily native-grid/optional nearest-grid R5 Parquet features. Local
-validation passed 523 tests with one opt-in live HRRR skip; 29 backfill tests
+validation passed 524 tests with one opt-in live HRRR skip; 30 backfill tests
 also passed from the installed wheel outside the checkout with OrcaCast imports
 blocked and no visualization dependencies. Lint, strict docs, catalog/policy,
 variable docs, distribution checks and legacy offline wheel products passed.
 The dedicated branch is local and unmerged; hosted CI has not run for this work.
 
 The [performance report](docs/era5-backfill-performance.md) records generated-GRIB
-two-day/month/three-month measurements and a real bounded ARCO temperature probe.
-CDS credentials/manual acceptance are absent, so live CDS throughput, backend
-numerical equivalence, independent regional accuracy, a qualified marine mask and
-actual decade completion remain unverified. These software results do not certify
-a production meteorological release or the under-48-hour engineering target.
+two-day/month/three-month measurements and live CDS/ARCO evidence. Authentication
+and existing licence acceptance passed. Real two-day/month/three-month runs succeeded;
+all two-day output calculations were checked, and temperature-only CDS/ARCO
+differences were measured. Backfill v2 preserves unsupported RH slots explicitly
+without clipping or failing unrelated metrics. The real three-month run took
+16.63 minutes at 314 MiB peak pipeline RAM; its 11.12-hour decade projection remains
+conditional on provider throughput. All-variable backend equivalence, independent
+regional accuracy,
+a qualified marine mask and actual decade completion remain unverified. These
+results do not certify a production release or the under-48-hour target.
 
 ## October 2 snapshot
 

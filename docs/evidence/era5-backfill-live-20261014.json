@@ -1,0 +1,994 @@
+{
+  "client_date": "2026-10-14",
+  "source_attribution": "Copernicus Climate Change Service ERA5 via CDS; public Google ARCO ERA5 copy",
+  "method": "era5-regional-historical-features-v2",
+  "schema": "meteorology-backfill-date-support-metric-v2",
+  "credential_in_report": false,
+  "source_report_sha256": {
+    "two_day_optimized": "3fb867fac6452b39ed761c658e8594bcedc903b1270c344997325891fb003e02",
+    "two_day_resumed_baseline_without_rh": "22a87dd8ac6f9467358fd9bd5a45be08152c25233759fc33f9f9c6840100029c",
+    "cds_calculation_parity": "f32947fe4e346557681be64f2ab757d1952886a5564c381287f2ea1de390103d",
+    "temperature_backend_comparison": "4d9bb84a3af0c77943a93c0f3c03e999bf3496c7eb503efa1ad96da4dd0e5a92",
+    "arco_live_probe": "6c72707f8eb2496bbe6860de5a5b07186b32cfb2c0cd298a96965bbe7f789e2d",
+    "one_month_optimized": "b9561bc930f50de447463774c72fb045dde69b8cdb14b295cd6fd563c03d2bb1",
+    "three_month_optimized": "851ff1080b811ee53988ec6d06e21cd311375e8bc8674df17ea8b74c73d678f4",
+    "warm_three_month_resume": "e6000c61acbf356df4d120ef6994b96fbb07b5a9c05fcc2c84136fe84fda963f"
+  },
+  "independent_regional_accuracy": "NOT_RUN",
+  "backend_all_variable_equivalence": "NOT_ESTABLISHED",
+  "two_day_optimized": {
+    "period": "two-day",
+    "bbox": [
+      -129.7,
+      45.9,
+      -121.5,
+      51.5
+    ],
+    "evidence_kind": "real_cds",
+    "measurements": {
+      "optimized": {
+        "seconds": 87.43621820898261,
+        "pipeline_seconds": 87.23919783404563,
+        "verification_seconds": 0.197020374936983,
+        "pipeline_peak_rss_bytes": 230653952,
+        "current_execution": {
+          "provider_requests": 23,
+          "transferred_bytes": 720279,
+          "stage_seconds": {
+            "submission_seconds": 2.708447583951056,
+            "client_observed_queue_job_seconds": 144.51990620791912,
+            "transfer_seconds": 1.895993125042878,
+            "decode_normalize_seconds": 5.6359552500071,
+            "spatial_mapping_seconds": 8.012494072318077e-05,
+            "aggregation_seconds": 2.2871779174311087,
+            "parquet_write_seconds": 0.10764095815829933
+          },
+          "operation_counts": {
+            "submitted_jobs": 2,
+            "decodes": 2
+          },
+          "decodes": 2,
+          "peak_rss_bytes": 230653952,
+          "elapsed_seconds": 87.21816958405543
+        },
+        "decodes": 2,
+        "traversals": 3,
+        "rss_bytes": 225443840,
+        "provider_calls": null,
+        "source_jobs": null,
+        "payload_bytes": null,
+        "retained_bytes": 694268,
+        "output_bytes": 737772,
+        "rows": 21252
+      }
+    },
+    "numerical_parity": {
+      "compared_values": 0,
+      "max_absolute_difference": null
+    },
+    "baseline_revision": "daily strategy with shallow-attrs CPU fix; original full-area reduction interrupted after >20 minutes",
+    "rss_semantics": "20 ms process RSS sampling during pipeline only; use --only in a fresh process to avoid allocator carry-over",
+    "independent_regional_accuracy": "NOT_RUN"
+  },
+  "two_day_resumed_baseline_without_rh": {
+    "period": "two-day",
+    "bbox": [
+      -129.7,
+      45.9,
+      -121.5,
+      51.5
+    ],
+    "optimized_variables": [
+      "temperature",
+      "wind",
+      "relative_humidity",
+      "cloud_cover",
+      "pressure",
+      "precipitation",
+      "dewpoint"
+    ],
+    "baseline_excluded_variables": [
+      "relative_humidity"
+    ],
+    "evidence_kind": "real_cds",
+    "measurements": {
+      "baseline": {
+        "seconds": 181.9420451669721,
+        "pipeline_seconds": 181.57725900004152,
+        "verification_seconds": 0.3647861669305712,
+        "pipeline_peak_rss_bytes": 463388672,
+        "current_execution": null,
+        "decodes": 4,
+        "traversals": 1,
+        "rss_bytes": 568492032,
+        "provider_calls": null,
+        "source_jobs": null,
+        "payload_bytes": null,
+        "retained_bytes": 62185433,
+        "output_bytes": 0,
+        "rows": 12144
+      }
+    },
+    "numerical_parity": {
+      "compared_values": 0,
+      "max_absolute_difference": null
+    },
+    "baseline_revision": "daily strategy with shallow-attrs CPU fix; original full-area reduction interrupted after >20 minutes",
+    "rss_semantics": "20 ms process RSS sampling during pipeline only; use --only in a fresh process to avoid allocator carry-over",
+    "independent_regional_accuracy": "NOT_RUN"
+  },
+  "cds_calculation_parity": {
+    "evidence_kind": "real_cds",
+    "compared_common_values": 12144,
+    "max_absolute_difference": 4.547473508864641e-13,
+    "legacy_excluded_variable": "relative_humidity",
+    "reason": "legacy strict whole-request rejection on out-of-domain RH",
+    "rh_daily_rows_checked": 1518,
+    "rh_supported_daily_rows_matched": 1512,
+    "rh_daily_rows_with_unsupported_slots": 6,
+    "rh_invalid_hours": 6,
+    "rh_value_policy": "Bolton water formula unchanged; domain unchanged; no clipping; unsupported finite slots explicit",
+    "baseline_manifests": [
+      {
+        "sha256": "d6400c3f402658c4c1a9195bc16fdd7b03ab2b5d4883afdda1c6c4d009df3edb",
+        "path": "/private/tmp/meteorology-backfill-live-two-day-20261014/baseline/real/results/1956a872cc32fb35c9fc584feefab314858e460b6f4f3255eec4c2102786c9a0/MANIFEST.json"
+      }
+    ],
+    "optimized_manifest_sha256": "8ee221a175408e168c73172b37adf45d984a05b11171499dbe0b06fcdb102d9e",
+    "independent_regional_accuracy": "NOT_RUN",
+    "added_metric_values_independently_recomputed": 7590,
+    "added_metric_max_absolute_difference": 5.684341886080802e-14,
+    "all_21252_daily_rows_checked": true
+  },
+  "temperature_backend_comparison": {
+    "variable": "2m_temperature",
+    "units": "K",
+    "matched_values": 36432,
+    "exact_coordinate_and_utc_hour_match": true,
+    "mean_difference_cds_minus_arco": -0.00011498455840032458,
+    "rmse_K": 0.0004618613348621675,
+    "max_absolute_difference_K": 0.001007080078125,
+    "p99_absolute_difference_K": 0.00091552734375,
+    "cds_sources": [
+      {
+        "sha256": "43d74234845cb0175e4d62adb7574bbea07a90dd59690ea1035e133ed817d36d",
+        "bytes": 665280
+      }
+    ],
+    "arco_samples_sha256": "c9c352492ce72c2bcbedcf3ff7952445936fdce037d7561bffc7d6197e96d5b2",
+    "scientific_equivalence": "NOT_ESTABLISHED_TEMPERATURE_ONLY_NO_ACCEPTANCE_THRESHOLD_ADOPTED"
+  },
+  "arco_live_probe": {
+    "source": "https://storage.googleapis.com/gcp-public-data-arco-era5/ar/full_37-1h-0p25deg-chunk-1.zarr-v3",
+    "collection": {
+      "valid_time_start": "1940-01-01",
+      "last_updated": "2026-10-14 03:42:18.714749+00:00",
+      "valid_time_stop": "2026-06-30",
+      "valid_time_stop_era5t": "2026-10-08"
+    },
+    "variables": {
+      "2m_temperature": {
+        "array": {
+          "chunks": [
+            1,
+            721,
+            1440
+          ],
+          "compressor": {
+            "blocksize": 0,
+            "clevel": 5,
+            "cname": "lz4",
+            "id": "blosc",
+            "shuffle": 1
+          },
+          "dtype": "<f4",
+          "fill_value": "NaN",
+          "filters": null,
+          "order": "C",
+          "shape": [
+            1323648,
+            721,
+            1440
+          ],
+          "zarr_format": 2
+        },
+        "attrs": {
+          "_ARRAY_DIMENSIONS": [
+            "time",
+            "latitude",
+            "longitude"
+          ],
+          "long_name": "2 metre temperature",
+          "short_name": "t2m",
+          "units": "K"
+        }
+      },
+      "2m_dewpoint_temperature": {
+        "array": {
+          "chunks": [
+            1,
+            721,
+            1440
+          ],
+          "compressor": {
+            "blocksize": 0,
+            "clevel": 5,
+            "cname": "lz4",
+            "id": "blosc",
+            "shuffle": 1
+          },
+          "dtype": "<f4",
+          "fill_value": "NaN",
+          "filters": null,
+          "order": "C",
+          "shape": [
+            1323648,
+            721,
+            1440
+          ],
+          "zarr_format": 2
+        },
+        "attrs": {
+          "_ARRAY_DIMENSIONS": [
+            "time",
+            "latitude",
+            "longitude"
+          ],
+          "long_name": "2 metre dewpoint temperature",
+          "short_name": "d2m",
+          "units": "K"
+        }
+      },
+      "10m_u_component_of_wind": {
+        "array": {
+          "chunks": [
+            1,
+            721,
+            1440
+          ],
+          "compressor": {
+            "blocksize": 0,
+            "clevel": 5,
+            "cname": "lz4",
+            "id": "blosc",
+            "shuffle": 1
+          },
+          "dtype": "<f4",
+          "fill_value": "NaN",
+          "filters": null,
+          "order": "C",
+          "shape": [
+            1323648,
+            721,
+            1440
+          ],
+          "zarr_format": 2
+        },
+        "attrs": {
+          "_ARRAY_DIMENSIONS": [
+            "time",
+            "latitude",
+            "longitude"
+          ],
+          "long_name": "10 metre U wind component",
+          "short_name": "u10",
+          "units": "m s**-1"
+        }
+      },
+      "10m_v_component_of_wind": {
+        "array": {
+          "chunks": [
+            1,
+            721,
+            1440
+          ],
+          "compressor": {
+            "blocksize": 0,
+            "clevel": 5,
+            "cname": "lz4",
+            "id": "blosc",
+            "shuffle": 1
+          },
+          "dtype": "<f4",
+          "fill_value": "NaN",
+          "filters": null,
+          "order": "C",
+          "shape": [
+            1323648,
+            721,
+            1440
+          ],
+          "zarr_format": 2
+        },
+        "attrs": {
+          "_ARRAY_DIMENSIONS": [
+            "time",
+            "latitude",
+            "longitude"
+          ],
+          "long_name": "10 metre V wind component",
+          "short_name": "v10",
+          "units": "m s**-1"
+        }
+      },
+      "mean_sea_level_pressure": {
+        "array": {
+          "chunks": [
+            1,
+            721,
+            1440
+          ],
+          "compressor": {
+            "blocksize": 0,
+            "clevel": 5,
+            "cname": "lz4",
+            "id": "blosc",
+            "shuffle": 1
+          },
+          "dtype": "<f4",
+          "fill_value": "NaN",
+          "filters": null,
+          "order": "C",
+          "shape": [
+            1323648,
+            721,
+            1440
+          ],
+          "zarr_format": 2
+        },
+        "attrs": {
+          "_ARRAY_DIMENSIONS": [
+            "time",
+            "latitude",
+            "longitude"
+          ],
+          "long_name": "Mean sea level pressure",
+          "short_name": "msl",
+          "standard_name": "air_pressure_at_mean_sea_level",
+          "units": "Pa"
+        }
+      },
+      "total_cloud_cover": {
+        "array": {
+          "chunks": [
+            1,
+            721,
+            1440
+          ],
+          "compressor": {
+            "blocksize": 0,
+            "clevel": 5,
+            "cname": "lz4",
+            "id": "blosc",
+            "shuffle": 1
+          },
+          "dtype": "<f4",
+          "fill_value": "NaN",
+          "filters": null,
+          "order": "C",
+          "shape": [
+            1323648,
+            721,
+            1440
+          ],
+          "zarr_format": 2
+        },
+        "attrs": {
+          "_ARRAY_DIMENSIONS": [
+            "time",
+            "latitude",
+            "longitude"
+          ],
+          "long_name": "Total cloud cover",
+          "short_name": "tcc",
+          "standard_name": "cloud_area_fraction",
+          "units": "(0 - 1)"
+        }
+      },
+      "total_precipitation": {
+        "array": {
+          "chunks": [
+            1,
+            721,
+            1440
+          ],
+          "compressor": {
+            "blocksize": 0,
+            "clevel": 5,
+            "cname": "lz4",
+            "id": "blosc",
+            "shuffle": 1
+          },
+          "dtype": "<f4",
+          "fill_value": "NaN",
+          "filters": null,
+          "order": "C",
+          "shape": [
+            1323648,
+            721,
+            1440
+          ],
+          "zarr_format": 2
+        },
+        "attrs": {
+          "_ARRAY_DIMENSIONS": [
+            "time",
+            "latitude",
+            "longitude"
+          ],
+          "long_name": "Total precipitation",
+          "short_name": "tp",
+          "units": "m"
+        }
+      },
+      "snowfall": {
+        "array": {
+          "chunks": [
+            1,
+            721,
+            1440
+          ],
+          "compressor": {
+            "blocksize": 0,
+            "clevel": 5,
+            "cname": "lz4",
+            "id": "blosc",
+            "shuffle": 1
+          },
+          "dtype": "<f4",
+          "fill_value": "NaN",
+          "filters": null,
+          "order": "C",
+          "shape": [
+            1323648,
+            721,
+            1440
+          ],
+          "zarr_format": 2
+        },
+        "attrs": {
+          "_ARRAY_DIMENSIONS": [
+            "time",
+            "latitude",
+            "longitude"
+          ],
+          "long_name": "Snowfall",
+          "short_name": "sf",
+          "standard_name": "lwe_thickness_of_snowfall_amount",
+          "units": "m of water equivalent"
+        }
+      }
+    },
+    "requested_variables": [
+      "2m_temperature"
+    ],
+    "bbox": [
+      -129.7,
+      45.9,
+      -121.5,
+      51.5
+    ],
+    "start": "2024-01-01",
+    "end": "2024-01-02",
+    "scientific_equivalence": "NOT_RUN_REQUIRES_CDS_NUMERICAL_AND_ACCUMULATION_COMPARISON",
+    "preferred_backend": false,
+    "reason": "global spatial chunks and unqualified message-level provenance",
+    "regional_samples": {
+      "2m_temperature": {
+        "shape": [
+          48,
+          23,
+          33
+        ],
+        "minimum": 261.30999755859375,
+        "maximum": 285.5157470703125,
+        "mean": 278.7837219238281
+      }
+    },
+    "decode_crop_seconds": 0.12621383520308882,
+    "regional_sample_artifact": {
+      "path": "/private/tmp/meteorology-backfill-live-arco-temperature-20261014.npz",
+      "bytes": 97934,
+      "sha256": "c9c352492ce72c2bcbedcf3ff7952445936fdce037d7561bffc7d6197e96d5b2",
+      "format": "arco-region-samples-v1"
+    },
+    "received_bytes": 112734309,
+    "provider_requests": 52,
+    "peak_rss_bytes": 150388736,
+    "total_seconds": 25.728572292020544,
+    "receipts": [
+      {
+        "object": ".zmetadata",
+        "bytes": 132785,
+        "sha256": "2a414847a800690c34146b48e40ba50da3218a7e4b2da4be9d5d82e5c607d81f",
+        "seconds": 0.26794908300507814
+      },
+      {
+        "object": "latitude/0",
+        "bytes": 844,
+        "sha256": "ad2559188f8603a7a136eb4b81c1e96a4a78549a184b6e09def2a60a78631c25",
+        "seconds": 0.13671241595875472
+      },
+      {
+        "object": "longitude/0",
+        "bytes": 1587,
+        "sha256": "7942ebac63ba4e69e05575019aaebe2b2ebb927b316590cac1dcfc7eb08f09ee",
+        "seconds": 0.10699999995995313
+      },
+      {
+        "object": "time/16",
+        "bytes": 3581,
+        "sha256": "c36f63e9bd0eeb9248494981bce06637366f25e6e16010235596b2a2516b05d8",
+        "seconds": 0.1676971249980852
+      },
+      {
+        "object": "2m_temperature/1086960.0.0",
+        "bytes": 2349921,
+        "sha256": "af4daccb5a7e9aa5b7caa8521d9de9e045e627a6bbce7c0e08a1e276a8198807",
+        "seconds": 0.6359751659911126
+      },
+      {
+        "object": "2m_temperature/1086961.0.0",
+        "bytes": 2349441,
+        "sha256": "c4152a387802d1dc6b76ad590fb6c2bfce31f3a18fdff4a4db67d9125ae44091",
+        "seconds": 0.4815896659856662
+      },
+      {
+        "object": "2m_temperature/1086962.0.0",
+        "bytes": 2346844,
+        "sha256": "7c2b909466604fbc487de2b79d71b57071e20fcc9c77a8707467b5bc3ad866a1",
+        "seconds": 0.5324083750601858
+      },
+      {
+        "object": "2m_temperature/1086963.0.0",
+        "bytes": 2344997,
+        "sha256": "176db3d9a933183e59c9a36e0ae324871d7362b9d33d3dc360f9a513da9c0a6b",
+        "seconds": 0.6030850000679493
+      },
+      {
+        "object": "2m_temperature/1086964.0.0",
+        "bytes": 2343655,
+        "sha256": "b0dd9b5ac3997fef6c82dfd27d1e6928b80624febec7a3ffafee1dec17b7109c",
+        "seconds": 0.6931035000598058
+      },
+      {
+        "object": "2m_temperature/1086965.0.0",
+        "bytes": 2342436,
+        "sha256": "fbdb0fb8e72e237eff3f086faf7193b443cd4527f0c9c063a4a827f2b1edff16",
+        "seconds": 0.7391902500530705
+      },
+      {
+        "object": "2m_temperature/1086966.0.0",
+        "bytes": 2341169,
+        "sha256": "b724ccab84d69b799587392b7d3ab7d58ef252facff4097cfc33dcb32eca288b",
+        "seconds": 0.5551885419990867
+      },
+      {
+        "object": "2m_temperature/1086967.0.0",
+        "bytes": 2341729,
+        "sha256": "6a6f263a08e0230ea68cff55325c10debeac432ea80618d9c199f836f0a56dcb",
+        "seconds": 0.48616587498690933
+      },
+      {
+        "object": "2m_temperature/1086968.0.0",
+        "bytes": 2341581,
+        "sha256": "079fcdd62f77ca927eb1ceeeeeeb39d37d8cd13c5bc1c2d2c966574ea55a8253",
+        "seconds": 0.5550731669645756
+      },
+      {
+        "object": "2m_temperature/1086969.0.0",
+        "bytes": 2341704,
+        "sha256": "bf6dec08abe66a5ce6bd9343ca42ff1fdfaca7b109c0f028bedb45b6bfdd6958",
+        "seconds": 0.46614037500694394
+      },
+      {
+        "object": "2m_temperature/1086970.0.0",
+        "bytes": 2343888,
+        "sha256": "058892e0a6a1a4f4a18328fb0c02c419bece5a4f5f9eee7edcf49036fc24e820",
+        "seconds": 0.508936292026192
+      },
+      {
+        "object": "2m_temperature/1086971.0.0",
+        "bytes": 2344176,
+        "sha256": "b911c68d4e7842e0c32d9f210a1bbe398dcbd885621b124411942fecb51b89f0",
+        "seconds": 0.46988483297172934
+      },
+      {
+        "object": "2m_temperature/1086972.0.0",
+        "bytes": 2344463,
+        "sha256": "1854556c70a877f77d099d496c443e66f87eaba6ff27d30f925c053b734ba638",
+        "seconds": 0.5341380839236081
+      },
+      {
+        "object": "2m_temperature/1086973.0.0",
+        "bytes": 2344632,
+        "sha256": "c76641587c364d3dff60a789d71fdf5d5050343fad4d68e07b4db3fef82b95c5",
+        "seconds": 0.4993869580794126
+      },
+      {
+        "object": "2m_temperature/1086974.0.0",
+        "bytes": 2346555,
+        "sha256": "d47f3e0078800d88228b23ab68b62edc80052ee0f4ad0e7bf630c23357c3e23d",
+        "seconds": 0.502619415987283
+      },
+      {
+        "object": "2m_temperature/1086975.0.0",
+        "bytes": 2347208,
+        "sha256": "bbf4b84fea3cdf52b8370530440f84b2695569e6ac1c1fb40ff71b34fff1665c",
+        "seconds": 0.6092667499324307
+      },
+      {
+        "object": "2m_temperature/1086976.0.0",
+        "bytes": 2348803,
+        "sha256": "9cf84622ca584702168ce8b85bd9b48d83eb19718fe39a08acb5b4df5a7fa480",
+        "seconds": 0.5463630839949474
+      },
+      {
+        "object": "2m_temperature/1086977.0.0",
+        "bytes": 2349875,
+        "sha256": "35c2542ad802819214446ac2dbd7707cbf754faf282ffc69ccffc07b82f47a67",
+        "seconds": 0.5354090830078349
+      },
+      {
+        "object": "2m_temperature/1086978.0.0",
+        "bytes": 2351286,
+        "sha256": "aa5bbabdaac4af18dfae299cc6e34d04ec6f784a0af884bc46636743bbdc13da",
+        "seconds": 0.5264383329777047
+      },
+      {
+        "object": "2m_temperature/1086979.0.0",
+        "bytes": 2351591,
+        "sha256": "0495eb954aceab3e80734cbef4c89444b9a81cd02307cca921b7268eae2ebc35",
+        "seconds": 0.5512319169938564
+      },
+      {
+        "object": "2m_temperature/1086980.0.0",
+        "bytes": 2352349,
+        "sha256": "ff7419586f4fff985ab84ad243a3359288e3e33a8aad8f0a71b46f75b3e29a45",
+        "seconds": 0.6486155419843271
+      },
+      {
+        "object": "2m_temperature/1086981.0.0",
+        "bytes": 2348749,
+        "sha256": "701e25fcdf18dc3c1385eb829f94f3ba7684839da6c6e06239d92e3ecb25cb9b",
+        "seconds": 0.4864887500880286
+      },
+      {
+        "object": "2m_temperature/1086982.0.0",
+        "bytes": 2346414,
+        "sha256": "1c43a0874cdd3075a89840b5873cea01d41e74ea35f1f7574fa6a89a4f15e054",
+        "seconds": 0.46558274992275983
+      },
+      {
+        "object": "2m_temperature/1086983.0.0",
+        "bytes": 2346443,
+        "sha256": "35c79f98cedddc2b5613c7461710ca3ce3fbb0d8e8e915b5abbd6cc2915204dd",
+        "seconds": 0.49134120799135417
+      },
+      {
+        "object": "2m_temperature/1086984.0.0",
+        "bytes": 2345288,
+        "sha256": "ce7d55e6d8c5d71d769493f99ea6c75d735315dcc1629a627ed96072268a6b71",
+        "seconds": 0.4554910830920562
+      },
+      {
+        "object": "2m_temperature/1086985.0.0",
+        "bytes": 2344673,
+        "sha256": "a7057ea6e63987c2f7eef034b94bbbdead3b37b73c9c519af31c8129e1c48992",
+        "seconds": 0.5319474579300731
+      },
+      {
+        "object": "2m_temperature/1086986.0.0",
+        "bytes": 2343637,
+        "sha256": "3492cc4eadca63aea7fed74e152635552950256e535b2b73600e88572d70ec14",
+        "seconds": 0.43489583395421505
+      },
+      {
+        "object": "2m_temperature/1086987.0.0",
+        "bytes": 2342519,
+        "sha256": "772ab933ac211ec2f1968ec7091735d423b4b874f5e8bcf83eef705004d84f1b",
+        "seconds": 0.46898495906498283
+      },
+      {
+        "object": "2m_temperature/1086988.0.0",
+        "bytes": 2342003,
+        "sha256": "07c1ab8561a094cc7360d9c4b65d3d62679963eaa3d4499df41e050ed9b5b11a",
+        "seconds": 0.4617377499816939
+      },
+      {
+        "object": "2m_temperature/1086989.0.0",
+        "bytes": 2339923,
+        "sha256": "941e54f9a841b4022f0bf18647f6171e86cca781d6dde35918ae5c30e63fe34d",
+        "seconds": 0.48744541709311306
+      },
+      {
+        "object": "2m_temperature/1086990.0.0",
+        "bytes": 2337757,
+        "sha256": "46cf9c122f6c7ea04490e44ad5b97d92fd4a6648dc28dd25fe177f50df160760",
+        "seconds": 0.42321391706354916
+      },
+      {
+        "object": "2m_temperature/1086991.0.0",
+        "bytes": 2339700,
+        "sha256": "8abb67019b6c1238dc1c0ea77fb438f100bc699656cf3507024fe066bfe5cd51",
+        "seconds": 0.5157762499293312
+      },
+      {
+        "object": "2m_temperature/1086992.0.0",
+        "bytes": 2340075,
+        "sha256": "5ef47795558e46fdaa73cc8a7e4d38a5d229a8fa087eaf1a14c1358ada01fe2b",
+        "seconds": 0.5012155829463154
+      },
+      {
+        "object": "2m_temperature/1086993.0.0",
+        "bytes": 2339065,
+        "sha256": "35612d9e8cb9102d4e926cd994c5ecced426706e47d41a281aee93bfd5680f25",
+        "seconds": 0.47758966602850705
+      },
+      {
+        "object": "2m_temperature/1086994.0.0",
+        "bytes": 2342415,
+        "sha256": "ea73398a3dc5c87a37eae2b090d84bcdfee62b652218eba5d2f386c1e21630a9",
+        "seconds": 0.6269168750150129
+      },
+      {
+        "object": "2m_temperature/1086995.0.0",
+        "bytes": 2342890,
+        "sha256": "9404866db828226fef2ad2a57896cf8738e05aa70eb1c3bef71c21a1dc5c4a75",
+        "seconds": 0.5177868750179186
+      },
+      {
+        "object": "2m_temperature/1086996.0.0",
+        "bytes": 2343951,
+        "sha256": "e36197e6fd5ca8ccdc177da38b31fd28ee89c06fabd04e5773d8dfe03206085e",
+        "seconds": 0.4719229999464005
+      },
+      {
+        "object": "2m_temperature/1086997.0.0",
+        "bytes": 2343399,
+        "sha256": "b93e07476975019e57727b33b4834aa7cd992e228653fc1fdf34bc40033609d5",
+        "seconds": 0.47298641700763255
+      },
+      {
+        "object": "2m_temperature/1086998.0.0",
+        "bytes": 2344598,
+        "sha256": "4d307f8b0feb2423a848876db3a8462eb1c3f9c387b5054d311ed9f97112b24a",
+        "seconds": 0.47879937500692904
+      },
+      {
+        "object": "2m_temperature/1086999.0.0",
+        "bytes": 2347166,
+        "sha256": "0cbc52ac7568389cbe498e44a30cd123421dd1841ed6bc34af9822345257a1c0",
+        "seconds": 0.4815182499587536
+      },
+      {
+        "object": "2m_temperature/1087000.0.0",
+        "bytes": 2350093,
+        "sha256": "464aa865712fd499bf815100852754e84140fb00d739322a7bff58c59a097197",
+        "seconds": 0.5187711250036955
+      },
+      {
+        "object": "2m_temperature/1087001.0.0",
+        "bytes": 2350971,
+        "sha256": "1603bbc0fd5b87b01776392289085bf18b0f3b694b2fd33227ea55515753322a",
+        "seconds": 0.4326836250256747
+      },
+      {
+        "object": "2m_temperature/1087002.0.0",
+        "bytes": 2351546,
+        "sha256": "314325ce78620198c833d4b46592b42c3675bb7e447bb7e523de184c533f1892",
+        "seconds": 0.4497365830466151
+      },
+      {
+        "object": "2m_temperature/1087003.0.0",
+        "bytes": 2352775,
+        "sha256": "11ff4e60dbc0174b3821bc99c491325ecb93d6f69516be649ddaaf8145fb3299",
+        "seconds": 0.45460679195821285
+      },
+      {
+        "object": "2m_temperature/1087004.0.0",
+        "bytes": 2351730,
+        "sha256": "ab1374896960ad62c5ba2547775449e6be7c69040c9a8210ad502316885be008",
+        "seconds": 0.44371179200243205
+      },
+      {
+        "object": "2m_temperature/1087005.0.0",
+        "bytes": 2351748,
+        "sha256": "9cb1a4992dbe5d0e97280870b0da59b4771e53042065cfdb7ec8b57e30d6b5d5",
+        "seconds": 0.5231125419959426
+      },
+      {
+        "object": "2m_temperature/1087006.0.0",
+        "bytes": 2350804,
+        "sha256": "d224256271818f75c0925268247e9a866ed47d8f67a9741b210694f0ee9c4acf",
+        "seconds": 0.5247664169874042
+      },
+      {
+        "object": "2m_temperature/1087007.0.0",
+        "bytes": 2346877,
+        "sha256": "fd56515d64de05aeaa8f1f3c01dac2e753d6beedc76ba232546b4e5816c11a8b",
+        "seconds": 0.476920917048119
+      }
+    ],
+    "scope": "live_public_metadata_and_exact_samples"
+  },
+  "baseline_attempt_accounting": {
+    "journals": [
+      {
+        "requests": 19,
+        "elapsed_seconds": 144.2672991239233,
+        "received_transfer_bytes": 378946
+      },
+      {
+        "requests": 15,
+        "elapsed_seconds": 181.55228970793542,
+        "received_transfer_bytes": 377131
+      }
+    ],
+    "first_attempt_rejected_whole_request_on_unsupported_rh": true,
+    "resumed_reference_excludes_rh": true,
+    "initial_two_sources_reused": true,
+    "controlled_cold_speedup_ratio": "NOT_ESTABLISHED"
+  },
+  "one_month_live_status": "COMPLETE_WITH_EXPLICIT_PARTIAL_RH_SUPPORT",
+  "three_month_live_status": "COMPLETE_WITH_EXPLICIT_PARTIAL_RH_SUPPORT",
+  "one_month_optimized": {
+    "period": "month",
+    "bbox": [
+      -129.7,
+      45.9,
+      -121.5,
+      51.5
+    ],
+    "optimized_variables": [
+      "temperature",
+      "wind",
+      "relative_humidity",
+      "cloud_cover",
+      "pressure",
+      "precipitation",
+      "dewpoint"
+    ],
+    "baseline_excluded_variables": [],
+    "evidence_kind": "real_cds",
+    "measurements": {
+      "optimized": {
+        "seconds": 566.3772858750308,
+        "pipeline_seconds": 564.6762454170967,
+        "verification_seconds": 1.7010404579341412,
+        "pipeline_peak_rss_bytes": 323616768,
+        "current_execution": {
+          "provider_requests": 43,
+          "transferred_bytes": 10368880,
+          "stage_seconds": {
+            "submission_seconds": 2.467989166849293,
+            "client_observed_queue_job_seconds": 488.29979712492786,
+            "transfer_seconds": 3.0864213599124923,
+            "decode_normalize_seconds": 43.181771583040245,
+            "spatial_mapping_seconds": 0.00010120891965925694,
+            "aggregation_seconds": 19.09532490640413,
+            "parquet_write_seconds": 1.3188323427457362
+          },
+          "operation_counts": {
+            "submitted_jobs": 2,
+            "decodes": 2
+          },
+          "decodes": 2,
+          "peak_rss_bytes": 320897024,
+          "elapsed_seconds": 564.6674270000076
+        },
+        "decodes": 2,
+        "traversals": 2,
+        "rss_bytes": 367673344,
+        "provider_calls": null,
+        "source_jobs": null,
+        "payload_bytes": null,
+        "retained_bytes": 10340771,
+        "output_bytes": 11035907,
+        "rows": 329406
+      }
+    },
+    "numerical_parity": {
+      "compared_values": 0,
+      "max_absolute_difference": null
+    },
+    "baseline_revision": "daily strategy with shallow-attrs CPU fix; original full-area reduction interrupted after >20 minutes",
+    "rss_semantics": "20 ms process RSS sampling during pipeline only; use --only in a fresh process to avoid allocator carry-over",
+    "independent_regional_accuracy": "NOT_RUN"
+  },
+  "software_checks": {
+    "full_tests_passed": 524,
+    "skipped_opt_in_live_hrrr": 1,
+    "outside_checkout_wheel_backfill_tests_passed": 30,
+    "ruff": "PASS",
+    "build_and_twine": "PASS"
+  },
+  "three_month_optimized": {
+    "period": "three-month",
+    "bbox": [
+      -129.7,
+      45.9,
+      -121.5,
+      51.5
+    ],
+    "optimized_variables": [
+      "temperature",
+      "wind",
+      "relative_humidity",
+      "cloud_cover",
+      "pressure",
+      "precipitation",
+      "dewpoint"
+    ],
+    "baseline_excluded_variables": [],
+    "evidence_kind": "real_cds",
+    "measurements": {
+      "optimized": {
+        "seconds": 1002.6604573338991,
+        "pipeline_seconds": 997.6632993340027,
+        "verification_seconds": 4.997157999896444,
+        "pipeline_peak_rss_bytes": 328761344,
+        "current_execution": {
+          "provider_requests": 128,
+          "transferred_bytes": 30400231,
+          "stage_seconds": {
+            "submission_seconds": 10.52301925001666,
+            "client_observed_queue_job_seconds": 1621.4423377090134,
+            "transfer_seconds": 5.237851698999293,
+            "decode_normalize_seconds": 170.44777724996675,
+            "spatial_mapping_seconds": 0.0005197069840505719,
+            "aggregation_seconds": 63.01707392674871,
+            "parquet_write_seconds": 5.528312120237388
+          },
+          "operation_counts": {
+            "submitted_jobs": 4,
+            "decodes": 4
+          },
+          "decodes": 4,
+          "peak_rss_bytes": 319045632,
+          "elapsed_seconds": 997.6466180419084
+        },
+        "decodes": 4,
+        "traversals": 3,
+        "rss_bytes": 495845376,
+        "provider_calls": null,
+        "source_jobs": null,
+        "payload_bytes": null,
+        "retained_bytes": 30327495,
+        "output_bytes": 32377653,
+        "rows": 966966
+      }
+    },
+    "numerical_parity": {
+      "compared_values": 0,
+      "max_absolute_difference": null
+    },
+    "baseline_revision": "daily strategy with shallow-attrs CPU fix; original full-area reduction interrupted after >20 minutes",
+    "rss_semantics": "20 ms process RSS sampling during pipeline only; use --only in a fresh process to avoid allocator carry-over",
+    "independent_regional_accuracy": "NOT_RUN"
+  },
+  "warm_three_month_resume": {
+    "cache_hit": true,
+    "seconds": 4.83888683305122,
+    "execution": {
+      "provider_requests": 0,
+      "transferred_bytes": 0,
+      "decodes": 0
+    },
+    "row_count": 966966,
+    "status": "PARTIAL"
+  },
+  "implementation_commit": "658959c",
+  "ten_year_projection": {
+    "days": 3652,
+    "observed_three_month_days": 91,
+    "workers": 2,
+    "hours_at_observed_throughput": 11.121692213576853,
+    "planning_range_hours": [
+      12,
+      24
+    ],
+    "actual_decade_run": "NOT_RUN",
+    "provider_queue_stationarity": "NOT_ESTABLISHED"
+  }
+}
