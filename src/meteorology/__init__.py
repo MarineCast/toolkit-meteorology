@@ -124,14 +124,6 @@ def freeze_release(manifest_path: str | Path, output_root: str | Path) -> Path:
     return implementation(manifest_path, output_root)
 
 
-__all__ = [
-    "__version__", "load_config", "build_spatial_support", "download_surface_weather",
-    "build_surface_weather", "build_daylight", "build_lunar", "export_daily_matrix",
-    "acquire_hourly_weather", "build_hourly_weather", "validate_product", "freeze_release",
-    "export_weather_summary",
-]
-
-
 def get_weather(variables, start_date, end_date, bbox, data_source, **options):
     """Shared selective request; advanced options are keyword-only."""
     from .request import get_weather as implementation
@@ -211,7 +203,28 @@ def __getattr__(name):
     raise AttributeError(name)
 
 
-__all__ += ['get_weather','get_temperature','get_wind','get_cloud_cover','get_pressure',
-            'get_relative_humidity','get_dewpoint','get_visibility','get_precipitation',
-            'get_precip','get_snowfall','get_precipitation_estimate','WeatherResult']
-__all__ += ['backfill_weather']
+def get_data(start_date, end_date, **options):
+    """Default regional ERA5 source; publish wide hourly and daily H3 Parquets."""
+    from .regional import get_data as implementation
+    return implementation(start_date, end_date, **options)
+
+
+def get_metric(metric_name, start_date, end_date, **options):
+    """Publish a regional metric family or exact column for inclusive UTC dates."""
+    from .regional import get_metric as implementation
+    return implementation(metric_name, start_date, end_date, **options)
+
+
+# Explicit public surface, grouped by workflow. Implementations stay lazy.
+__all__ = [
+    "__version__",
+    "get_data", "get_metric",
+    "get_weather", "get_temperature", "get_wind", "get_cloud_cover", "get_pressure",
+    "get_relative_humidity", "get_dewpoint", "get_visibility", "get_precipitation",
+    "get_precip", "get_snowfall", "get_precipitation_estimate", "WeatherResult",
+    "backfill_weather",
+    "load_config", "build_spatial_support", "download_surface_weather",
+    "build_surface_weather", "acquire_hourly_weather", "build_hourly_weather",
+    "build_daylight", "build_lunar", "export_daily_matrix", "export_weather_summary",
+    "validate_product", "freeze_release",
+]

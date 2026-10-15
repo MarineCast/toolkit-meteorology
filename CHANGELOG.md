@@ -4,6 +4,15 @@ All notable changes to this package are recorded here. Software versions follow 
 
 ## Unreleased
 
+- Added the default ECMWF geographic ERA5 `get_data` / `get_metric` APIs with
+  reusable checksummed source chunks, wide hourly and daily H3 R5 Parquets and
+  a compact catalog. Recorded the completed 2009-01-01–2026-10-08 full-area run;
+  independent observational accuracy remains unqualified.
+- Removed unused internal configuration conveniences and unreachable regional
+  exporter code; consolidated public exports and organized default versus
+  alternative workflows. Existing explicit-source and family APIs are retained.
+- Added regional offline checks to macOS and outside-checkout wheel CI.
+
 - Added source-selective `get_weather` and variable getters with matching
   `meteorology get`, `sources` and source-specific `variables` commands. Requests
   retain UTC boundaries, native or qualified HRRR R5 support, explicit missingness,

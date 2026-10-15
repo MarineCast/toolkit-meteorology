@@ -1,5 +1,10 @@
 # toolkit-meteorology agent guidance
 
+Regional default API changes: read `docs/regional-api.md`; relevant offline checks
+are `python -m pytest -q tests/test_regional.py`, then the full suite, ordinary lint,
+strict docs, distribution and outside-checkout installed-wheel checks. Tests must
+never access ECMWF. User instructions to avoid execution override these commands.
+
 ## Scope and current state
 
 Historical and forecast meteorological data products.

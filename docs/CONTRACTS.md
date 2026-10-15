@@ -1,5 +1,11 @@
 # Meteorological environmental family
 
+The default historical `get_data` / `get_metric` interface uses ECMWF geographic
+ERA5 Zarr and publishes the [regional wide-table contract](regional-api.md), method
+`ecmwf-arco-wide-h3-utc-v1`. Its hourly and daily H3 R5 outputs are distinct from
+the legacy HRRR families and explicit CDS backfill below. Existing statements
+about canonical HRRR acquisition apply to those legacy families only.
+
 The meteorological family uses explicit acquisition, offline build, and inspection contracts.
 It intentionally uses full model-bounding-box atmospheric H3 support, including land and water;
 seascape's wet-cell universe is not a valid substitute.

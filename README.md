@@ -4,8 +4,29 @@
 
 [![Offline package checks](https://github.com/MarineCast/toolkit-meteorology/actions/workflows/tests.yml/badge.svg)](https://github.com/MarineCast/toolkit-meteorology/actions/workflows/tests.yml) · [Documentation](https://marinecast.github.io/toolkit-meteorology/) · [Scientific methodology](docs/methodology.md) · [Variable inventory](docs/reference/variables.md)
 
-Retrieve source-selective weather through `meteorology` Python functions or the
-matching CLI. This independent toolkit preserves source grids, units, coverage,
+The default historical Python API uses ECMWF's geographically chunked ERA5:
+
+```python
+from meteorology import get_data, get_metric
+
+result = get_data("2009-01-01", "2009-01-31")
+# Reuse the local source cache for a selected metric family:
+wind = get_metric("wind", "2009-01-01", "2009-01-31",
+                  output_dir="data/weather-wind")
+```
+
+Each call publishes `meteorology-hourly.parquet`, `meteorology-daily.parquet`, and
+`catalog.json`. Rows are H3 R5 × UTC hour/date, with weather metrics as columns.
+The default is the coastal study rectangle; `bbox`, `output_dir`, and `cache_dir`
+are configurable. Source chunks remain in a separate private cache. Calls replace
+the requested output set, rather than append to it. See the
+[regional API](docs/regional-api.md) for columns, timing and cache contracts.
+The full-area run for 2009-01-01 through 2026-10-08 produced both Parquets for
+1,761 cells. Its cached export took 12 minutes 52 seconds; this excludes source
+acquisition. See [run evidence and limitations](docs/regional-api.md#full-area-run-2026-10-15).
+
+Explicit-source weather APIs and the matching legacy CLI remain available.
+This independent toolkit preserves source grids, units, coverage,
 missingness and checksum-backed lineage. Python 3.11–3.13; macOS or Linux.
 
 ## Install from a clone
@@ -13,15 +34,16 @@ missingness and checksum-backed lineage. Python 3.11–3.13; macOS or Linux.
 ```sh
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install '.[native-pilot]'  # selective HRRR
-# For ERA5 instead: python -m pip install '.[era5]'
+python -m pip install .  # default ECMWF regional API
+# For selective HRRR: python -m pip install '.[native-pilot]'
+# For the explicit CDS GRIB alternative: python -m pip install '.[era5]'
 ```
 
 Core installation is `python -m pip install .`. HTML inspectors use the optional
 `.[visualization]` extra. Legacy Herbie acquisition uses `.[acquisition]`.
 These are local-source installation commands; no PyPI publication is claimed.
 
-## Retrieve with Python
+## Alternative: selective requests with Python
 
 ```python
 from meteorology import get_temperature
@@ -41,7 +63,7 @@ The four required arguments also work positionally. For several variables, use
 dependencies are acquired once. This bounded real-data example performs provider
 access; the new live path has not been executed during this refactor.
 
-## Retrieve with the CLI
+## Alternative: selective requests with the CLI
 
 ```sh
 meteorology get temperature --start-date 2024-01-01 --end-date 2024-01-01 \
@@ -54,7 +76,7 @@ hits, missing work and resource limits without network access or writes.
 `meteorology sources` and `meteorology variables --data-source era5` show support.
 Help and standalone queries require no initialized workspace or shared study.
 
-## Backfill ten years of ERA5
+## Alternative: monthly ERA5 CDS backfill
 
 Install `.[era5]`, create a [Copernicus CDS account](https://cds.climate.copernicus.eu/how-to-api),
 save its personal token locally in `~/.cdsapirc`, and manually accept the ERA5
@@ -92,7 +114,7 @@ scientific support and the [performance evidence](docs/era5-backfill-performance
 Live pilots support a provisional 12–24-hour decade planning range with two
 workers; a full decade has not been timed, and CDS queues can change.
 
-## Returned data
+## Selective request and CDS backfill results
 
 Daily output is long `DATE × H3_INDEX × METRIC` data for HRRR R5, or
 `DATE × source grid × native point × METRIC` for native output. Rows carry `VALUE`,
@@ -106,7 +128,7 @@ spatial method, time semantics, reductions and method/schema/producer versions.
 Compatible final-cache hits make zero provider requests; subsets read selected
 date/metric partitions. No legacy releases are rewritten.
 
-## Availability and limits
+## Selective request availability and limits
 
 | Variable | HRRR: R5 or native | ERA5: native |
 | --- | --- | --- |
@@ -164,13 +186,14 @@ and [migration history](docs/MIGRATION.md).
 ```sh
 python -m pip install -e '.[dev,native-pilot]'
 python -m pytest -q
-ruff check src tests benchmarks
+ruff check src tests benchmarks demo
 mkdocs build --strict
 python -m build
 python -m twine check dist/*
 ```
 
-See [cleanup inventory](docs/request-cleanup.md),
+See the [repository map](docs/ARCHITECTURE.md), [benchmark inventory](benchmarks/README.md),
+[cleanup inventory](docs/request-cleanup.md),
 [production readiness](PRODUCTION_READINESS.md) and [release checklist](docs/development/release-process.md).
 No merge, release publication, protected-branch change or data deletion accompanies
 this feature branch. Apache-2.0 software; [source rights](docs/DATA_SOURCES.md) apply

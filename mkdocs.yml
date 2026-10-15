@@ -47,6 +47,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Get started:
+      - Regional ERA5 API: regional-api.md
       - Weather requests: request-api.md
       - Historical ERA5 backfill: era5-backfill.md
       - Quickstart: getting-started/quickstart.md

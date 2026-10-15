@@ -1,6 +1,30 @@
 # Python API
 
-Historical multi-year ERA5 requests use
+## Default regional weather
+
+```python
+from meteorology import get_data, get_metric
+
+result = get_data("2009-01-01", "2009-01-31")
+result = get_metric("wind", "2009-01-01", "2009-01-31")
+```
+
+The [regional API](../regional-api.md) uses ECMWF geographic ERA5 Zarr and returns
+paths to wide hourly/daily H3 R5 Parquets and `catalog.json`. Source cache and
+publication controls live outside the three-file output directory. Dates are
+inclusive UTC days; each call replaces its selected output set.
+
+::: meteorology.regional.get_data
+    options:
+      show_source: false
+
+::: meteorology.regional.get_metric
+    options:
+      show_source: false
+
+## Explicit CDS historical alternative
+
+The existing monthly-job ERA5 interface is
 [`meteorology.backfill_weather`](../era5-backfill.md); the disk-backed result
 provides `metadata`, `iter_tables()`, bounded `to_pandas(max_rows=...)` and a
 streamed `to_parquet(path)` export. Its partition companions remain the

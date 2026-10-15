@@ -46,9 +46,12 @@ jobs:
       - name: Install wheel outside the checkout and run offline products
         run: |
           python -m venv /tmp/meteorology-wheel
-          /tmp/meteorology-wheel/bin/python -m pip install dist/*.whl
+          /tmp/meteorology-wheel/bin/python -m pip install dist/*.whl pytest
+          mkdir -p /tmp/meteorology-wheel-tests
+          cp tests/test_regional.py /tmp/meteorology-wheel-tests/
           cd /tmp
           /tmp/meteorology-wheel/bin/python -c 'import meteorology; print(meteorology.__version__)'
+          /tmp/meteorology-wheel/bin/python -m pytest -q /tmp/meteorology-wheel-tests/test_regional.py
           /tmp/meteorology-wheel/bin/python -c "import importlib.util; assert all(importlib.util.find_spec(m) is None for m in ('folium', 'branca', 'geopandas'))"
           /tmp/meteorology-wheel/bin/meteorology --help
           /tmp/meteorology-wheel/bin/meteorology sources
@@ -69,5 +72,5 @@ jobs:
           python-version: '3.12'
           cache: pip
       - run: python -m pip install '.[test,native-pilot]'
-      - run: python -m pytest -q tests/test_request_api.py tests/test_request_transport.py tests/test_hrrr_native_source.py tests/test_era5_resources.py tests/test_processing_scaling.py tests/test_concurrency.py tests/test_request_review.py tests/test_request_lineage.py tests/test_request_preflight.py tests/test_request_storage.py tests/test_request_lifecycle.py tests/test_request_commit.py tests/test_request_qualification.py tests/test_backfill.py
+      - run: python -m pytest -q tests/test_request_api.py tests/test_request_transport.py tests/test_hrrr_native_source.py tests/test_era5_resources.py tests/test_processing_scaling.py tests/test_concurrency.py tests/test_request_review.py tests/test_request_lineage.py tests/test_request_preflight.py tests/test_request_storage.py tests/test_request_lifecycle.py tests/test_request_commit.py tests/test_request_qualification.py tests/test_backfill.py tests/test_regional.py
       - run: meteorology get temperature --start-date 2024-01-01 --end-date 2024-01-01 --bbox -124 48 -123 48.5 --data-source hrrr --dry-run

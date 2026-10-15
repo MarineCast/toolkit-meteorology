@@ -6,16 +6,14 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Collection, Mapping, TypeVar
+from typing import Any, Collection, Mapping
 
 import yaml
-from pydantic import BaseModel
 
 from .paths import project_root, resolve_config_path
 
 _ENV_PATTERN = re.compile(r"^\$\{env:([A-Z][A-Z0-9_]*)\}$")
 _REF_PATTERN = re.compile(r"^\$\{([a-zA-Z_][a-zA-Z0-9_.-]*)\}$")
-ModelT = TypeVar("ModelT", bound=BaseModel)
 
 
 def _deep_merge(base: Mapping[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:
@@ -69,7 +67,7 @@ def _redact(value: Any, key: str = "") -> Any:
 
 @dataclass(frozen=True)
 class ConfigDocument:
-    """A fully composed, validated, hashable OrcaCast configuration."""
+    """A composed, hashable toolkit configuration."""
 
     source: Path
     data: Mapping[str, Any]
@@ -100,25 +98,9 @@ class ConfigDocument:
             config_hash=hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
         )
 
-    def resolve_path(self, value: str | Path) -> Path:
-        candidate = Path(value).expanduser()
-        return candidate if candidate.is_absolute() else (project_root() / candidate).resolve()
-
-    def validate_as(self, model: type[ModelT]) -> ModelT:
-        """Validate the resolved document through a strict Pydantic model."""
-        return model.model_validate(self.data)
-
     def redacted_data(self) -> dict[str, Any]:
         """Return manifest-safe configuration without secret values."""
         return _redact(self.data)
-
-    def to_metadata(self) -> dict[str, Any]:
-        return {
-            "source": str(self.source),
-            "include_chain": [str(path) for path in self.include_chain],
-            "config_hash": self.config_hash,
-            "resolved": self.redacted_data(),
-        }
 
 
 def _load_recursive(

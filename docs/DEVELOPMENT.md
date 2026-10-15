@@ -69,3 +69,9 @@ tests/test_request_storage.py`. These exercise real immutable caches, generated
 GRIB and mocked provider revisions; they make no provider requests.
 `python benchmarks/request_review.py after` reports deterministic operation
 counts and descriptive wall time/memory. There are no timing thresholds.
+
+For the default regional API, start with `python -m pytest -q tests/test_regional.py`.
+These tests inject local source fixtures and never contact ECMWF. CI also copies
+this test outside the checkout and runs it against the regular wheel installation.
+The [cleanup inventory](request-cleanup.md) records deletion/retention decisions;
+`benchmarks/README.md` in the repository indexes the optional benchmark scripts.
