@@ -1,5 +1,9 @@
 # Weather requests
 
+For multi-year ERA5 intervals use the separate
+[historical backfill interface](era5-backfill.md). The bounded getters described
+here retain their seven-day, source-support and publication contracts.
+
 Install from a clone with Python 3.11–3.13 on macOS/Linux:
 
 ```sh

@@ -6,6 +6,7 @@
 
 | Module | Responsibility |
 | --- | --- |
+| `regional`, `regional_source` | Default historical ECMWF geographic Zarr acquisition, private local archive, wide hourly/daily H3 Parquets and small catalog |
 | `cli` | Workspace selection, initialization and delegation to family commands |
 | `config` | Validated product configuration |
 | `study` | Optional portable shared-study v1 validation, selection and canonical provenance; no sibling imports |
@@ -24,6 +25,8 @@
 ## Data flow
 
 ```text
+ECMWF geographic ERA5 → private regional cache → hourly/daily wide H3 Parquets + catalog
+
 Configured bounds → atmospheric H3 support
                          ├→ HRRR download → validated R5 samples + inventory → daily weather
                          ├→ daylight integration → R4 daily + day-of-year lookup
@@ -56,13 +59,15 @@ identity. An ordinary wheel can have a null Git revision while retaining a sourc
 
 ```python
 from meteorology import (
+    get_data, get_metric,
     load_config, build_spatial_support, download_surface_weather,
     build_surface_weather, build_daylight, build_lunar,
     export_daily_matrix, validate_product, freeze_release,
 )
 ```
 
-Set `METEOROLOGY_WORKSPACE` before invoking these APIs outside the workspace. Loading configuration
+The regional APIs use explicit output/cache paths and need no initialized workspace.
+For the configured family APIs, set `METEOROLOGY_WORKSPACE` outside the workspace. Loading configuration
 and validation are read-only; build/download/freezing functions perform the same writes as their
 CLI counterparts. Prefer these public entry points over internal helpers. Unused inherited
 stage/artifact classes, H3 utilities and aliases, weather wrappers, and area-range helpers
@@ -81,7 +86,8 @@ study provenance; actual source coverage remains independent of requested dates.
 ## Standalone request path
 
 `capabilities` owns variable/input dependencies; `request` validates and plans
-explicit bbox/source/UTC requests. All root getters delegate to that path.
+explicit bbox/source/UTC requests. The explicit-source getters delegate to that path; `get_data` and `get_metric`
+use the separate regional path.
 `request_adapters` reuses strict native source decoders, bounded HTTP/job clients,
 point-block normalization and the existing validated HRRR nearest crosswalk.
 `request_cache` owns immutable source/result identities, locking and disk-backed
@@ -92,3 +98,20 @@ This separate v1 request method/schema does not change family publication or the
 shared-study/marine reporting gates. Only this checkout is affected. Full
 [request semantics](request-api.md) and the [cleanup inventory](request-cleanup.md)
 document compatibility and the retained advanced tools.
+
+## Historical ERA5 executor
+
+`backfill_plan` admits partial/monthly temporal selections and a single terminal
+accumulation boundary. `backfill` coordinates independently leased source jobs,
+bounded prefetch, immutable Parquet partitions and durable result pointers.
+`backfill_resources` extends limits only for this executor and shares persistent
+aggregate counters across workers. `backfill_compute` decodes once to bounded
+numeric scratch, reduces daily native-grid data, then applies an optional cached
+R5 crosswalk. `backfill_metrics` measures client job wait and transfer separately.
+`backfill_cli` invokes the public executor without a subprocess or global study
+environment changes. See [backfill contracts and recovery](era5-backfill.md).
+
+Source locks cover one exact selection, not the whole namespace. Run locks stop
+duplicate logical runs; publication locks cover a single partition. Output lives
+at the explicit destination or the study-derived Data root, independently of
+cache ownership. Existing HRRR/getter/family executors remain available.

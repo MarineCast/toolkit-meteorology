@@ -1,5 +1,10 @@
 # toolkit-meteorology agent guidance
 
+Regional default API changes: read `docs/regional-api.md`; relevant offline checks
+are `python -m pytest -q tests/test_regional.py`, then the full suite, ordinary lint,
+strict docs, distribution and outside-checkout installed-wheel checks. Tests must
+never access ECMWF. User instructions to avoid execution override these commands.
+
 ## Scope and current state
 
 Historical and forecast meteorological data products.
@@ -150,3 +155,20 @@ checks above. `python benchmarks/request_lifecycle.py` uses generated GRIB and
 mocked transport, asserting operation counts rather than timing thresholds.
 `demo/qualify_requests.py` defaults to offline planning; `--run` explicitly opts
 into bounded public-getter provider qualification after reference/terms setup.
+
+Historical backfill checks: `python -m pytest -q tests/test_backfill.py
+tests/test_request_lineage.py tests/test_era5_resources.py`, then the full checks
+above and a multi-year installed-wheel dry run. Read `docs/era5-backfill.md` before
+acquisition. `benchmarks/era5_backfill.py` defaults to generated GRIB/mock transport;
+`--live` requires configured CDS credentials and manually accepted terms.
+`benchmarks/era5_arco.py` performs bounded public metadata access by default and
+selected hourly transfers only with `--run`; its output is exploratory evidence,
+not an adopted backend or production qualification.
+`python benchmarks/era5_aggregation.py --help` describes a local retained-source
+replay with exact all-column/lineage comparison against an exported prior reducer;
+see `docs/era5-backfill-performance.md` for the bounded command and timing scope.
+Backend benchmark changes: `python -m pytest -q tests/test_backend_benchmark.py`,
+then the full suite and ordinary lint/docs/distribution checks. The live
+`benchmarks/era5_backend_comparison.py` phases are explicit acquisition: two UTC
+days, seven fields, four workers, separate processes and local caches. Read
+`docs/era5-backfill-performance.md` for caps, numerical comparison and limitations.

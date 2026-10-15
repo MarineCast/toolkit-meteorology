@@ -2,8 +2,14 @@
 
 [Documentation index](index.md)
 
+For the default historical workflow use the [regional ERA5 API](regional-api.md):
+`get_data(start_date, end_date)` or `get_metric(metric_name, start_date, end_date)`.
+Both produce wide hourly/daily H3 Parquets and one catalog, with source caching
+outside the public output directory. The following workflows remain explicit legacy alternatives.
+
 For a standalone bbox request use the [shared getters and matching CLI](request-api.md);
-no workspace initialization is needed. The advanced family examples below assume installation, an initialized workspace, and geography configured as described
+for retrospective multi-year ERA5 use [historical backfill](era5-backfill.md).
+Neither path requires workspace initialization. The advanced family examples below assume installation, an initialized workspace, and geography configured as described
 in [setup](SETUP.md) and [configuration](CONFIGURATION.md). Commands use an explicit short interval.
 They write products in the selected workspace.
 

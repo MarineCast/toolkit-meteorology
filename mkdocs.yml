@@ -47,7 +47,9 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Get started:
+      - Regional ERA5 API: regional-api.md
       - Weather requests: request-api.md
+      - Historical ERA5 backfill: era5-backfill.md
       - Quickstart: getting-started/quickstart.md
       - Installation: SETUP.md
       - Configuration: CONFIGURATION.md
@@ -79,6 +81,7 @@ nav:
       - Implementation tracker: IMPLEMENTATION_TRACKER.md
       - Request handoff: request-handoff.md
       - Request refactor evidence: request-refactor-evidence.md
+      - ERA5 backfill performance: era5-backfill-performance.md
       - Request review fixes: request-review-evidence.md
       - Cleanup inventory: request-cleanup.md
       - Architecture: ARCHITECTURE.md

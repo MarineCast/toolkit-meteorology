@@ -25,6 +25,14 @@ class TransportError(ValueError):
     pass
 
 
+class TransientTransportError(TransportError):
+    """Connection failure or explicitly transient provider HTTP status."""
+
+
+class RequestTooLarge(TransportError):
+    """Provider explicitly rejected request size; selection may be split."""
+
+
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
@@ -117,6 +125,10 @@ class CDSHTTPProvider:
             status = response.status
             if status not in (200, 201, 202):
                 response.close()
+                if status == 413:
+                    raise RequestTooLarge("Provider rejected request size; response body redacted.")
+                if status in (408, 429) or 500 <= status <= 599:
+                    raise TransientTransportError("Transient provider HTTP status; response body redacted.")
                 raise TransportError("Unexpected HTTP status; response body redacted.")
             encoding = response.headers.get("Content-Encoding", "identity")
             if encoding != "identity":
@@ -126,11 +138,15 @@ class CDSHTTPProvider:
         except HTTPError as exc:
             code = exc.code
             exc.close()
+            if code == 413:
+                raise RequestTooLarge("Provider rejected request size; address/body redacted.") from None
+            if code in (408, 429) or 500 <= code <= 599:
+                raise TransientTransportError(f"Provider HTTP {code}; address/body redacted.") from None
             raise TransportError(f"Provider HTTP {code}; address/body redacted.") from None
         except (TransportError, LimitExceeded):
             raise
         except Exception:
-            raise TransportError("Provider connection failed; details redacted.") from None
+            raise TransientTransportError("Provider connection failed; details redacted.") from None
 
     def _json(self, url, *, method="GET", payload=None):
         _qualified_url(url, ("cds.climate.copernicus.eu",), api=True)

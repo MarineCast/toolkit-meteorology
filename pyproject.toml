@@ -5,12 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "toolkit-meteorology"
 dynamic = ["version"]
-description = "Provenance-aware HRRR weather, daylight, lunar and atmospheric H3 products"
+description = "Regional ERA5 and HRRR weather, daylight, lunar and atmospheric H3 products"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 license = "Apache-2.0"
 authors = [{name = "MarineCast contributors"}]
-keywords = ["meteorology", "HRRR", "H3", "geospatial", "astronomy", "environmental modeling", "reproducible science"]
+keywords = ["meteorology", "ERA5", "HRRR", "H3", "geospatial", "astronomy", "environmental modeling", "reproducible science"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
@@ -24,7 +24,7 @@ classifiers = [
   "Topic :: Scientific/Engineering :: GIS",
 ]
 dependencies = [
-  "h3>=4", "numpy>=1.26", "pandas>=2.1",
+  "h3>=4", "numpy>=1.26", "numcodecs>=0.12,<0.18", "pandas>=2.1",
   "psutil>=5.9", "pyarrow>=14", "pydantic>=2", "pyproj>=3.6", "PyYAML>=6",
   "scikit-learn>=1.4", "shapely>=2", "xarray>=2024.1",
 ]

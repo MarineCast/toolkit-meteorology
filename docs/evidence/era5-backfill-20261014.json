@@ -1,0 +1,1222 @@
+{
+  "measured_date": "2026-10-14",
+  "two_day_generated_comparison": {
+    "period": "two-day",
+    "bbox": [
+      -129.7,
+      45.9,
+      -121.5,
+      51.5
+    ],
+    "evidence_kind": "generated_grib_mock_transport",
+    "measurements": {
+      "baseline": {
+        "seconds": 76.07224266696721,
+        "decodes": 4,
+        "traversals": 1,
+        "rss_bytes": 759562240,
+        "provider_calls": 18,
+        "source_jobs": 4,
+        "payload_bytes": 36504,
+        "retained_bytes": 31478866,
+        "rows": 13662,
+        "output_bytes": 0,
+        "total_retained_bytes": 31478866
+      },
+      "optimized": {
+        "seconds": 2.20659841701854,
+        "decodes": 2,
+        "traversals": 3,
+        "rss_bytes": 768770048,
+        "provider_calls": 10,
+        "source_jobs": 2,
+        "payload_bytes": 36396,
+        "retained_bytes": 58478,
+        "rows": 21252,
+        "output_bytes": 597919,
+        "total_retained_bytes": 656397
+      }
+    },
+    "numerical_parity": {
+      "compared_values": 13662,
+      "max_absolute_difference": 0.0
+    },
+    "independent_regional_accuracy": "NOT_RUN",
+    "rss_semantics": "Current RSS after parity materialization in the same warmed process; not a pipeline peak comparison."
+  },
+  "three_month_generated_fresh_optimized": {
+    "period": "three-month",
+    "bbox": [
+      -129.7,
+      45.9,
+      -121.5,
+      51.5
+    ],
+    "evidence_kind": "generated_grib_mock_transport",
+    "measurements": {
+      "optimized": {
+        "seconds": 139.18990862497594,
+        "pipeline_seconds": 135.3355822500307,
+        "verification_seconds": 3.854326374945231,
+        "pipeline_peak_rss_bytes": 451887104,
+        "current_execution": {
+          "provider_requests": 18,
+          "transferred_bytes": 1651212,
+          "stage_seconds": {
+            "submission_seconds": 46.390790959005244,
+            "submitted_jobs": 4,
+            "client_observed_queue_job_seconds": 0.1019429579610005,
+            "transfer_seconds": 0.001883207238279283,
+            "decode_normalize_seconds": 91.01098162599374,
+            "decodes": 4,
+            "spatial_mapping_seconds": 0.0001640410628169775,
+            "aggregation_seconds": 43.830795585992746,
+            "parquet_write_seconds": 3.3583521470427513
+          },
+          "peak_rss_bytes": 439500800,
+          "elapsed_seconds": 135.32995941699483
+        },
+        "decodes": 4,
+        "traversals": 3,
+        "rss_bytes": 699973632,
+        "provider_calls": 18,
+        "source_jobs": 4,
+        "payload_bytes": 1651212,
+        "retained_bytes": 1700731,
+        "output_bytes": 26054752,
+        "rows": 966966,
+        "total_retained_bytes": 27755483
+      }
+    },
+    "numerical_parity": {
+      "compared_values": 0,
+      "max_absolute_difference": null
+    },
+    "baseline_revision": "daily strategy with shallow-attrs CPU fix; original full-area reduction interrupted after >20 minutes",
+    "rss_semantics": "20 ms process RSS sampling during pipeline only; use --only in a fresh process to avoid allocator carry-over",
+    "independent_regional_accuracy": "NOT_RUN"
+  },
+  "arco_live_temperature_two_day": {
+    "source": "https://storage.googleapis.com/gcp-public-data-arco-era5/ar/full_37-1h-0p25deg-chunk-1.zarr-v3",
+    "collection": {
+      "valid_time_start": "1940-01-01",
+      "last_updated": "2026-10-14 03:42:18.714749+00:00",
+      "valid_time_stop": "2026-06-30",
+      "valid_time_stop_era5t": "2026-10-08"
+    },
+    "variables": {
+      "2m_temperature": {
+        "array": {
+          "chunks": [
+            1,
+            721,
+            1440
+          ],
+          "compressor": {
+            "blocksize": 0,
+            "clevel": 5,
+            "cname": "lz4",
+            "id": "blosc",
+            "shuffle": 1
+          },
+          "dtype": "<f4",
+          "fill_value": "NaN",
+          "filters": null,
+          "order": "C",
+          "shape": [
+            1323648,
+            721,
+            1440
+          ],
+          "zarr_format": 2
+        },
+        "attrs": {
+          "_ARRAY_DIMENSIONS": [
+            "time",
+            "latitude",
+            "longitude"
+          ],
+          "long_name": "2 metre temperature",
+          "short_name": "t2m",
+          "units": "K"
+        }
+      },
+      "2m_dewpoint_temperature": {
+        "array": {
+          "chunks": [
+            1,
+            721,
+            1440
+          ],
+          "compressor": {
+            "blocksize": 0,
+            "clevel": 5,
+            "cname": "lz4",
+            "id": "blosc",
+            "shuffle": 1
+          },
+          "dtype": "<f4",
+          "fill_value": "NaN",
+          "filters": null,
+          "order": "C",
+          "shape": [
+            1323648,
+            721,
+            1440
+          ],
+          "zarr_format": 2
+        },
+        "attrs": {
+          "_ARRAY_DIMENSIONS": [
+            "time",
+            "latitude",
+            "longitude"
+          ],
+          "long_name": "2 metre dewpoint temperature",
+          "short_name": "d2m",
+          "units": "K"
+        }
+      },
+      "10m_u_component_of_wind": {
+        "array": {
+          "chunks": [
+            1,
+            721,
+            1440
+          ],
+          "compressor": {
+            "blocksize": 0,
+            "clevel": 5,
+            "cname": "lz4",
+            "id": "blosc",
+            "shuffle": 1
+          },
+          "dtype": "<f4",
+          "fill_value": "NaN",
+          "filters": null,
+          "order": "C",
+          "shape": [
+            1323648,
+            721,
+            1440
+          ],
+          "zarr_format": 2
+        },
+        "attrs": {
+          "_ARRAY_DIMENSIONS": [
+            "time",
+            "latitude",
+            "longitude"
+          ],
+          "long_name": "10 metre U wind component",
+          "short_name": "u10",
+          "units": "m s**-1"
+        }
+      },
+      "10m_v_component_of_wind": {
+        "array": {
+          "chunks": [
+            1,
+            721,
+            1440
+          ],
+          "compressor": {
+            "blocksize": 0,
+            "clevel": 5,
+            "cname": "lz4",
+            "id": "blosc",
+            "shuffle": 1
+          },
+          "dtype": "<f4",
+          "fill_value": "NaN",
+          "filters": null,
+          "order": "C",
+          "shape": [
+            1323648,
+            721,
+            1440
+          ],
+          "zarr_format": 2
+        },
+        "attrs": {
+          "_ARRAY_DIMENSIONS": [
+            "time",
+            "latitude",
+            "longitude"
+          ],
+          "long_name": "10 metre V wind component",
+          "short_name": "v10",
+          "units": "m s**-1"
+        }
+      },
+      "mean_sea_level_pressure": {
+        "array": {
+          "chunks": [
+            1,
+            721,
+            1440
+          ],
+          "compressor": {
+            "blocksize": 0,
+            "clevel": 5,
+            "cname": "lz4",
+            "id": "blosc",
+            "shuffle": 1
+          },
+          "dtype": "<f4",
+          "fill_value": "NaN",
+          "filters": null,
+          "order": "C",
+          "shape": [
+            1323648,
+            721,
+            1440
+          ],
+          "zarr_format": 2
+        },
+        "attrs": {
+          "_ARRAY_DIMENSIONS": [
+            "time",
+            "latitude",
+            "longitude"
+          ],
+          "long_name": "Mean sea level pressure",
+          "short_name": "msl",
+          "standard_name": "air_pressure_at_mean_sea_level",
+          "units": "Pa"
+        }
+      },
+      "total_cloud_cover": {
+        "array": {
+          "chunks": [
+            1,
+            721,
+            1440
+          ],
+          "compressor": {
+            "blocksize": 0,
+            "clevel": 5,
+            "cname": "lz4",
+            "id": "blosc",
+            "shuffle": 1
+          },
+          "dtype": "<f4",
+          "fill_value": "NaN",
+          "filters": null,
+          "order": "C",
+          "shape": [
+            1323648,
+            721,
+            1440
+          ],
+          "zarr_format": 2
+        },
+        "attrs": {
+          "_ARRAY_DIMENSIONS": [
+            "time",
+            "latitude",
+            "longitude"
+          ],
+          "long_name": "Total cloud cover",
+          "short_name": "tcc",
+          "standard_name": "cloud_area_fraction",
+          "units": "(0 - 1)"
+        }
+      },
+      "total_precipitation": {
+        "array": {
+          "chunks": [
+            1,
+            721,
+            1440
+          ],
+          "compressor": {
+            "blocksize": 0,
+            "clevel": 5,
+            "cname": "lz4",
+            "id": "blosc",
+            "shuffle": 1
+          },
+          "dtype": "<f4",
+          "fill_value": "NaN",
+          "filters": null,
+          "order": "C",
+          "shape": [
+            1323648,
+            721,
+            1440
+          ],
+          "zarr_format": 2
+        },
+        "attrs": {
+          "_ARRAY_DIMENSIONS": [
+            "time",
+            "latitude",
+            "longitude"
+          ],
+          "long_name": "Total precipitation",
+          "short_name": "tp",
+          "units": "m"
+        }
+      },
+      "snowfall": {
+        "array": {
+          "chunks": [
+            1,
+            721,
+            1440
+          ],
+          "compressor": {
+            "blocksize": 0,
+            "clevel": 5,
+            "cname": "lz4",
+            "id": "blosc",
+            "shuffle": 1
+          },
+          "dtype": "<f4",
+          "fill_value": "NaN",
+          "filters": null,
+          "order": "C",
+          "shape": [
+            1323648,
+            721,
+            1440
+          ],
+          "zarr_format": 2
+        },
+        "attrs": {
+          "_ARRAY_DIMENSIONS": [
+            "time",
+            "latitude",
+            "longitude"
+          ],
+          "long_name": "Snowfall",
+          "short_name": "sf",
+          "standard_name": "lwe_thickness_of_snowfall_amount",
+          "units": "m of water equivalent"
+        }
+      }
+    },
+    "requested_variables": [
+      "2m_temperature"
+    ],
+    "bbox": [
+      -129.7,
+      45.9,
+      -121.5,
+      51.5
+    ],
+    "start": "2024-01-01",
+    "end": "2024-01-02",
+    "scientific_equivalence": "NOT_RUN_REQUIRES_CDS_NUMERICAL_AND_ACCUMULATION_COMPARISON",
+    "preferred_backend": false,
+    "reason": "global spatial chunks and unqualified message-level provenance",
+    "regional_samples": {
+      "2m_temperature": {
+        "shape": [
+          48,
+          23,
+          33
+        ],
+        "minimum": 261.30999755859375,
+        "maximum": 285.5157470703125,
+        "mean": 278.7837219238281
+      }
+    },
+    "decode_crop_seconds": 0.1605856621172279,
+    "received_bytes": 112734309,
+    "provider_requests": 52,
+    "peak_rss_bytes": 113360896,
+    "total_seconds": 30.21343545790296,
+    "receipts": [
+      {
+        "object": ".zmetadata",
+        "bytes": 132785,
+        "sha256": "2a414847a800690c34146b48e40ba50da3218a7e4b2da4be9d5d82e5c607d81f",
+        "seconds": 0.33636333409231156
+      },
+      {
+        "object": "latitude/0",
+        "bytes": 844,
+        "sha256": "ad2559188f8603a7a136eb4b81c1e96a4a78549a184b6e09def2a60a78631c25",
+        "seconds": 0.12243454193230718
+      },
+      {
+        "object": "longitude/0",
+        "bytes": 1587,
+        "sha256": "7942ebac63ba4e69e05575019aaebe2b2ebb927b316590cac1dcfc7eb08f09ee",
+        "seconds": 0.12825566704850644
+      },
+      {
+        "object": "time/16",
+        "bytes": 3581,
+        "sha256": "c36f63e9bd0eeb9248494981bce06637366f25e6e16010235596b2a2516b05d8",
+        "seconds": 0.15296275005675852
+      },
+      {
+        "object": "2m_temperature/1086960.0.0",
+        "bytes": 2349921,
+        "sha256": "af4daccb5a7e9aa5b7caa8521d9de9e045e627a6bbce7c0e08a1e276a8198807",
+        "seconds": 0.8008163750637323
+      },
+      {
+        "object": "2m_temperature/1086961.0.0",
+        "bytes": 2349441,
+        "sha256": "c4152a387802d1dc6b76ad590fb6c2bfce31f3a18fdff4a4db67d9125ae44091",
+        "seconds": 0.6722634170437232
+      },
+      {
+        "object": "2m_temperature/1086962.0.0",
+        "bytes": 2346844,
+        "sha256": "7c2b909466604fbc487de2b79d71b57071e20fcc9c77a8707467b5bc3ad866a1",
+        "seconds": 0.6227631659712642
+      },
+      {
+        "object": "2m_temperature/1086963.0.0",
+        "bytes": 2344997,
+        "sha256": "176db3d9a933183e59c9a36e0ae324871d7362b9d33d3dc360f9a513da9c0a6b",
+        "seconds": 0.8999733329983428
+      },
+      {
+        "object": "2m_temperature/1086964.0.0",
+        "bytes": 2343655,
+        "sha256": "b0dd9b5ac3997fef6c82dfd27d1e6928b80624febec7a3ffafee1dec17b7109c",
+        "seconds": 0.5218585421098396
+      },
+      {
+        "object": "2m_temperature/1086965.0.0",
+        "bytes": 2342436,
+        "sha256": "fbdb0fb8e72e237eff3f086faf7193b443cd4527f0c9c063a4a827f2b1edff16",
+        "seconds": 0.5287380840163678
+      },
+      {
+        "object": "2m_temperature/1086966.0.0",
+        "bytes": 2341169,
+        "sha256": "b724ccab84d69b799587392b7d3ab7d58ef252facff4097cfc33dcb32eca288b",
+        "seconds": 0.5359997920459136
+      },
+      {
+        "object": "2m_temperature/1086967.0.0",
+        "bytes": 2341729,
+        "sha256": "6a6f263a08e0230ea68cff55325c10debeac432ea80618d9c199f836f0a56dcb",
+        "seconds": 0.627128958934918
+      },
+      {
+        "object": "2m_temperature/1086968.0.0",
+        "bytes": 2341581,
+        "sha256": "079fcdd62f77ca927eb1ceeeeeeb39d37d8cd13c5bc1c2d2c966574ea55a8253",
+        "seconds": 0.6211685830494389
+      },
+      {
+        "object": "2m_temperature/1086969.0.0",
+        "bytes": 2341704,
+        "sha256": "bf6dec08abe66a5ce6bd9343ca42ff1fdfaca7b109c0f028bedb45b6bfdd6958",
+        "seconds": 0.49423129204660654
+      },
+      {
+        "object": "2m_temperature/1086970.0.0",
+        "bytes": 2343888,
+        "sha256": "058892e0a6a1a4f4a18328fb0c02c419bece5a4f5f9eee7edcf49036fc24e820",
+        "seconds": 0.5540270840283483
+      },
+      {
+        "object": "2m_temperature/1086971.0.0",
+        "bytes": 2344176,
+        "sha256": "b911c68d4e7842e0c32d9f210a1bbe398dcbd885621b124411942fecb51b89f0",
+        "seconds": 0.4803819579537958
+      },
+      {
+        "object": "2m_temperature/1086972.0.0",
+        "bytes": 2344463,
+        "sha256": "1854556c70a877f77d099d496c443e66f87eaba6ff27d30f925c053b734ba638",
+        "seconds": 0.6174839579034597
+      },
+      {
+        "object": "2m_temperature/1086973.0.0",
+        "bytes": 2344632,
+        "sha256": "c76641587c364d3dff60a789d71fdf5d5050343fad4d68e07b4db3fef82b95c5",
+        "seconds": 1.103317999979481
+      },
+      {
+        "object": "2m_temperature/1086974.0.0",
+        "bytes": 2346555,
+        "sha256": "d47f3e0078800d88228b23ab68b62edc80052ee0f4ad0e7bf630c23357c3e23d",
+        "seconds": 0.6663710409775376
+      },
+      {
+        "object": "2m_temperature/1086975.0.0",
+        "bytes": 2347208,
+        "sha256": "bbf4b84fea3cdf52b8370530440f84b2695569e6ac1c1fb40ff71b34fff1665c",
+        "seconds": 0.5378554579801857
+      },
+      {
+        "object": "2m_temperature/1086976.0.0",
+        "bytes": 2348803,
+        "sha256": "9cf84622ca584702168ce8b85bd9b48d83eb19718fe39a08acb5b4df5a7fa480",
+        "seconds": 0.6154573339736089
+      },
+      {
+        "object": "2m_temperature/1086977.0.0",
+        "bytes": 2349875,
+        "sha256": "35c2542ad802819214446ac2dbd7707cbf754faf282ffc69ccffc07b82f47a67",
+        "seconds": 0.7728661668952554
+      },
+      {
+        "object": "2m_temperature/1086978.0.0",
+        "bytes": 2351286,
+        "sha256": "aa5bbabdaac4af18dfae299cc6e34d04ec6f784a0af884bc46636743bbdc13da",
+        "seconds": 0.5913918330334127
+      },
+      {
+        "object": "2m_temperature/1086979.0.0",
+        "bytes": 2351591,
+        "sha256": "0495eb954aceab3e80734cbef4c89444b9a81cd02307cca921b7268eae2ebc35",
+        "seconds": 0.5098028340144083
+      },
+      {
+        "object": "2m_temperature/1086980.0.0",
+        "bytes": 2352349,
+        "sha256": "ff7419586f4fff985ab84ad243a3359288e3e33a8aad8f0a71b46f75b3e29a45",
+        "seconds": 0.5526021670084447
+      },
+      {
+        "object": "2m_temperature/1086981.0.0",
+        "bytes": 2348749,
+        "sha256": "701e25fcdf18dc3c1385eb829f94f3ba7684839da6c6e06239d92e3ecb25cb9b",
+        "seconds": 0.5849104169756174
+      },
+      {
+        "object": "2m_temperature/1086982.0.0",
+        "bytes": 2346414,
+        "sha256": "1c43a0874cdd3075a89840b5873cea01d41e74ea35f1f7574fa6a89a4f15e054",
+        "seconds": 0.8520361670525745
+      },
+      {
+        "object": "2m_temperature/1086983.0.0",
+        "bytes": 2346443,
+        "sha256": "35c79f98cedddc2b5613c7461710ca3ce3fbb0d8e8e915b5abbd6cc2915204dd",
+        "seconds": 0.47975079203024507
+      },
+      {
+        "object": "2m_temperature/1086984.0.0",
+        "bytes": 2345288,
+        "sha256": "ce7d55e6d8c5d71d769493f99ea6c75d735315dcc1629a627ed96072268a6b71",
+        "seconds": 0.4750320410821587
+      },
+      {
+        "object": "2m_temperature/1086985.0.0",
+        "bytes": 2344673,
+        "sha256": "a7057ea6e63987c2f7eef034b94bbbdead3b37b73c9c519af31c8129e1c48992",
+        "seconds": 0.5267531670397148
+      },
+      {
+        "object": "2m_temperature/1086986.0.0",
+        "bytes": 2343637,
+        "sha256": "3492cc4eadca63aea7fed74e152635552950256e535b2b73600e88572d70ec14",
+        "seconds": 0.4698799999896437
+      },
+      {
+        "object": "2m_temperature/1086987.0.0",
+        "bytes": 2342519,
+        "sha256": "772ab933ac211ec2f1968ec7091735d423b4b874f5e8bcf83eef705004d84f1b",
+        "seconds": 0.6723889999557287
+      },
+      {
+        "object": "2m_temperature/1086988.0.0",
+        "bytes": 2342003,
+        "sha256": "07c1ab8561a094cc7360d9c4b65d3d62679963eaa3d4499df41e050ed9b5b11a",
+        "seconds": 0.4924063329817727
+      },
+      {
+        "object": "2m_temperature/1086989.0.0",
+        "bytes": 2339923,
+        "sha256": "941e54f9a841b4022f0bf18647f6171e86cca781d6dde35918ae5c30e63fe34d",
+        "seconds": 0.5649711670121178
+      },
+      {
+        "object": "2m_temperature/1086990.0.0",
+        "bytes": 2337757,
+        "sha256": "46cf9c122f6c7ea04490e44ad5b97d92fd4a6648dc28dd25fe177f50df160760",
+        "seconds": 0.5222582499263808
+      },
+      {
+        "object": "2m_temperature/1086991.0.0",
+        "bytes": 2339700,
+        "sha256": "8abb67019b6c1238dc1c0ea77fb438f100bc699656cf3507024fe066bfe5cd51",
+        "seconds": 0.5690677079837769
+      },
+      {
+        "object": "2m_temperature/1086992.0.0",
+        "bytes": 2340075,
+        "sha256": "5ef47795558e46fdaa73cc8a7e4d38a5d229a8fa087eaf1a14c1358ada01fe2b",
+        "seconds": 0.5546978750498965
+      },
+      {
+        "object": "2m_temperature/1086993.0.0",
+        "bytes": 2339065,
+        "sha256": "35612d9e8cb9102d4e926cd994c5ecced426706e47d41a281aee93bfd5680f25",
+        "seconds": 0.7947919580619782
+      },
+      {
+        "object": "2m_temperature/1086994.0.0",
+        "bytes": 2342415,
+        "sha256": "ea73398a3dc5c87a37eae2b090d84bcdfee62b652218eba5d2f386c1e21630a9",
+        "seconds": 0.5642854169709608
+      },
+      {
+        "object": "2m_temperature/1086995.0.0",
+        "bytes": 2342890,
+        "sha256": "9404866db828226fef2ad2a57896cf8738e05aa70eb1c3bef71c21a1dc5c4a75",
+        "seconds": 0.7034685830585659
+      },
+      {
+        "object": "2m_temperature/1086996.0.0",
+        "bytes": 2343951,
+        "sha256": "e36197e6fd5ca8ccdc177da38b31fd28ee89c06fabd04e5773d8dfe03206085e",
+        "seconds": 0.5668137499596924
+      },
+      {
+        "object": "2m_temperature/1086997.0.0",
+        "bytes": 2343399,
+        "sha256": "b93e07476975019e57727b33b4834aa7cd992e228653fc1fdf34bc40033609d5",
+        "seconds": 0.5612732500303537
+      },
+      {
+        "object": "2m_temperature/1086998.0.0",
+        "bytes": 2344598,
+        "sha256": "4d307f8b0feb2423a848876db3a8462eb1c3f9c387b5054d311ed9f97112b24a",
+        "seconds": 0.6240885419538245
+      },
+      {
+        "object": "2m_temperature/1086999.0.0",
+        "bytes": 2347166,
+        "sha256": "0cbc52ac7568389cbe498e44a30cd123421dd1841ed6bc34af9822345257a1c0",
+        "seconds": 0.5551813340280205
+      },
+      {
+        "object": "2m_temperature/1087000.0.0",
+        "bytes": 2350093,
+        "sha256": "464aa865712fd499bf815100852754e84140fb00d739322a7bff58c59a097197",
+        "seconds": 0.5164744580397382
+      },
+      {
+        "object": "2m_temperature/1087001.0.0",
+        "bytes": 2350971,
+        "sha256": "1603bbc0fd5b87b01776392289085bf18b0f3b694b2fd33227ea55515753322a",
+        "seconds": 0.4678318329388276
+      },
+      {
+        "object": "2m_temperature/1087002.0.0",
+        "bytes": 2351546,
+        "sha256": "314325ce78620198c833d4b46592b42c3675bb7e447bb7e523de184c533f1892",
+        "seconds": 0.5512637499487028
+      },
+      {
+        "object": "2m_temperature/1087003.0.0",
+        "bytes": 2352775,
+        "sha256": "11ff4e60dbc0174b3821bc99c491325ecb93d6f69516be649ddaaf8145fb3299",
+        "seconds": 0.6791935419896618
+      },
+      {
+        "object": "2m_temperature/1087004.0.0",
+        "bytes": 2351730,
+        "sha256": "ab1374896960ad62c5ba2547775449e6be7c69040c9a8210ad502316885be008",
+        "seconds": 0.5321654169820249
+      },
+      {
+        "object": "2m_temperature/1087005.0.0",
+        "bytes": 2351748,
+        "sha256": "9cb1a4992dbe5d0e97280870b0da59b4771e53042065cfdb7ec8b57e30d6b5d5",
+        "seconds": 0.5708867920329794
+      },
+      {
+        "object": "2m_temperature/1087006.0.0",
+        "bytes": 2350804,
+        "sha256": "d224256271818f75c0925268247e9a866ed47d8f67a9741b210694f0ee9c4acf",
+        "seconds": 0.5279892499092966
+      },
+      {
+        "object": "2m_temperature/1087007.0.0",
+        "bytes": 2346877,
+        "sha256": "fd56515d64de05aeaa8f1f3c01dac2e753d6beedc76ba232546b4e5816c11a8b",
+        "seconds": 0.9068694580346346
+      }
+    ],
+    "scope": "live_public_metadata_and_exact_samples"
+  },
+  "original_source_report_sha256": {
+    "PERFORMANCE.json": "34404624131baaa750f38d00db7c23a942ff341794045c0ee85808721df9e624",
+    "meteorology-backfill-optimized-three-month-final/PERFORMANCE.json": "e2a90ec5b3c7b5c31c5fe9cf27e3151b0ac9ed79c3ff11a74d36d22f7f3c8d4d",
+    "meteorology-backfill-arco-two-day-temperature.json": "64fb8fa3b6bd5be276832dfdf4e999bd337889220513e16024ad724ffbe43106"
+  },
+  "cds_live_two_day_month_three_month": "NOT_RUN_CREDENTIALS_ABSENT",
+  "independent_regional_accuracy": "NOT_RUN",
+  "backend_equivalence": "NOT_RUN",
+  "month_generated_fresh_optimized": {
+    "period": "month",
+    "bbox": [
+      -129.7,
+      45.9,
+      -121.5,
+      51.5
+    ],
+    "evidence_kind": "generated_grib_mock_transport",
+    "measurements": {
+      "optimized": {
+        "seconds": 86.89737587503623,
+        "pipeline_seconds": 85.49165641702712,
+        "verification_seconds": 1.4057194580091164,
+        "pipeline_peak_rss_bytes": 326926336,
+        "current_execution": {
+          "provider_requests": 10,
+          "transferred_bytes": 562572,
+          "stage_seconds": {
+            "submission_seconds": 11.029931208933704,
+            "client_observed_queue_job_seconds": 0.09627991693560034,
+            "transfer_seconds": 0.0005604169564321637,
+            "decode_normalize_seconds": 53.629958250094205,
+            "spatial_mapping_seconds": 0.00011216697748750448,
+            "aggregation_seconds": 15.774122683680616,
+            "parquet_write_seconds": 1.1987449972657487
+          },
+          "operation_counts": {
+            "submitted_jobs": 2,
+            "decodes": 2
+          },
+          "decodes": 2,
+          "peak_rss_bytes": 327155712,
+          "elapsed_seconds": 85.48194120801054
+        },
+        "decodes": 2,
+        "traversals": 3,
+        "rss_bytes": 451035136,
+        "provider_calls": 10,
+        "source_jobs": 2,
+        "payload_bytes": 562572,
+        "retained_bytes": 587629,
+        "output_bytes": 8875138,
+        "rows": 329406,
+        "total_retained_bytes": 9462767
+      }
+    },
+    "numerical_parity": {
+      "compared_values": 0,
+      "max_absolute_difference": null
+    },
+    "baseline_revision": "daily strategy with shallow-attrs CPU fix; original full-area reduction interrupted after >20 minutes",
+    "rss_semantics": "20 ms process RSS sampling during pipeline only; use --only in a fresh process to avoid allocator carry-over",
+    "independent_regional_accuracy": "NOT_RUN"
+  },
+  "arco_alternate_store_live_metadata": [
+    {
+      "store": "https://storage.googleapis.com/gcp-public-data-arco-era5/co/single-level-reanalysis.zarr-v2",
+      "metadata_bytes": 181026,
+      "sha256": "536389b58b417f7eefda7cf820636f96dece558e6b578675695149dfaaa2bcf1",
+      "seconds": 0.30946187500376254,
+      "attrs": {
+        "Conventions": "CF-1.7",
+        "GRIB_centre": "ecmf",
+        "GRIB_centreDescription": "European Centre for Medium-Range Weather Forecasts",
+        "GRIB_edition": 1,
+        "GRIB_subCentre": 0,
+        "history": "2023-08-27T15:04 GRIB to CDM+CF via cfgrib-0.9.10.4/ecCodes-2.20.0 with {\"source\": \"tmp/tmpg7y0c1z6.grib\", \"filter_by_keys\": {}, \"encode_cf\": [\"parameter\", \"time\", \"geography\", \"vertical\"]}",
+        "institution": "European Centre for Medium-Range Weather Forecasts",
+        "pangeo-forge:inputs_hash": "89c3caaaaf19eb0f6e9749dbde6c93972d64419137e2c8e92e164f1d748cbaed",
+        "pangeo-forge:recipe_hash": "09c22f5fffc2fbe3742fbb38c8c2c761e1b41b50570f09fb65c07216fb9fcd33",
+        "pangeo-forge:version": "0.9.5.dev2+gd43015b",
+        "valid_time_start": "1940-01-01",
+        "last_updated": "2026-10-12 07:29:54.570832+00:00",
+        "valid_time_stop": "2026-06-30",
+        "valid_time_stop_era5t": "2026-09-30"
+      },
+      "arrays": {
+        "d2m": {
+          "chunks": [
+            1,
+            542080
+          ],
+          "shape": [
+            1323648,
+            542080
+          ],
+          "dtype": "<f4"
+        },
+        "latitude": {
+          "chunks": [
+            542080
+          ],
+          "shape": [
+            542080
+          ],
+          "dtype": "<f8"
+        },
+        "longitude": {
+          "chunks": [
+            542080
+          ],
+          "shape": [
+            542080
+          ],
+          "dtype": "<f8"
+        },
+        "msl": {
+          "chunks": [
+            1,
+            542080
+          ],
+          "shape": [
+            1323648,
+            542080
+          ],
+          "dtype": "<f4"
+        },
+        "step": {
+          "chunks": [],
+          "shape": [],
+          "dtype": "<i8"
+        },
+        "t2m": {
+          "chunks": [
+            1,
+            542080
+          ],
+          "shape": [
+            1323648,
+            542080
+          ],
+          "dtype": "<f4"
+        },
+        "tcc": {
+          "chunks": [
+            1,
+            542080
+          ],
+          "shape": [
+            1323648,
+            542080
+          ],
+          "dtype": "<f4"
+        },
+        "time": {
+          "chunks": [
+            1323648
+          ],
+          "shape": [
+            1323648
+          ],
+          "dtype": "<i8"
+        },
+        "u10": {
+          "chunks": [
+            1,
+            542080
+          ],
+          "shape": [
+            1323648,
+            542080
+          ],
+          "dtype": "<f4"
+        },
+        "v10": {
+          "chunks": [
+            1,
+            542080
+          ],
+          "shape": [
+            1323648,
+            542080
+          ],
+          "dtype": "<f4"
+        },
+        "valid_time": {
+          "chunks": [
+            1323648
+          ],
+          "shape": [
+            1323648
+          ],
+          "dtype": "<i8"
+        }
+      }
+    },
+    {
+      "store": "https://storage.googleapis.com/gcp-public-data-arco-era5/co/single-level-forecast.zarr-v2",
+      "metadata_bytes": 97308,
+      "sha256": "ab9f65ea310bc01a57a3a45a4f4b4b1c534a3d884c73a87ccbeac11ef5f4b171",
+      "seconds": 0.28475837502628565,
+      "attrs": {
+        "Conventions": "CF-1.7",
+        "GRIB_centre": "ecmf",
+        "GRIB_centreDescription": "European Centre for Medium-Range Weather Forecasts",
+        "GRIB_subCentre": 0,
+        "institution": "European Centre for Medium-Range Weather Forecasts",
+        "valid_time_start": "1940-01-01",
+        "last_updated": "2026-10-12 07:28:14.920528+00:00",
+        "valid_time_stop": "2026-06-30",
+        "valid_time_stop_era5t": "2026-09-30"
+      },
+      "arrays": {
+        "latitude": {
+          "chunks": [
+            542080
+          ],
+          "shape": [
+            542080
+          ],
+          "dtype": "<f8"
+        },
+        "longitude": {
+          "chunks": [
+            542080
+          ],
+          "shape": [
+            542080
+          ],
+          "dtype": "<f8"
+        },
+        "sf": {
+          "chunks": [
+            1,
+            1,
+            542080
+          ],
+          "shape": [
+            110304,
+            19,
+            542080
+          ],
+          "dtype": "<f4"
+        },
+        "step": {
+          "chunks": [
+            1
+          ],
+          "shape": [
+            19
+          ],
+          "dtype": "<f8"
+        },
+        "time": {
+          "chunks": [
+            110304
+          ],
+          "shape": [
+            110304
+          ],
+          "dtype": "<i8"
+        },
+        "tp": {
+          "chunks": [
+            1,
+            1,
+            542080
+          ],
+          "shape": [
+            110304,
+            19,
+            542080
+          ],
+          "dtype": "<f4"
+        },
+        "valid_time": {
+          "chunks": [
+            1,
+            19
+          ],
+          "shape": [
+            110304,
+            19
+          ],
+          "dtype": "<i8"
+        }
+      }
+    }
+  ],
+  "three_month_generated_committed_optimized": {
+    "period": "three-month",
+    "bbox": [
+      -129.7,
+      45.9,
+      -121.5,
+      51.5
+    ],
+    "evidence_kind": "generated_grib_mock_transport",
+    "measurements": {
+      "optimized": {
+        "seconds": 180.97904508397914,
+        "pipeline_seconds": 176.96551379200537,
+        "verification_seconds": 4.013531291973777,
+        "pipeline_peak_rss_bytes": 425246720,
+        "current_execution": {
+          "provider_requests": 18,
+          "transferred_bytes": 1651212,
+          "stage_seconds": {
+            "submission_seconds": 66.21978579205461,
+            "client_observed_queue_job_seconds": 0.29917324986308813,
+            "transfer_seconds": 0.008675208664499223,
+            "decode_normalize_seconds": 140.16625920694787,
+            "spatial_mapping_seconds": 0.00018324912525713444,
+            "aggregation_seconds": 46.49673991824966,
+            "parquet_write_seconds": 3.436561497976072
+          },
+          "operation_counts": {
+            "submitted_jobs": 4,
+            "decodes": 4
+          },
+          "decodes": 4,
+          "peak_rss_bytes": 415367168,
+          "elapsed_seconds": 176.9561995830154
+        },
+        "decodes": 4,
+        "traversals": 3,
+        "rss_bytes": 748339200,
+        "provider_calls": 18,
+        "source_jobs": 4,
+        "payload_bytes": 1651212,
+        "retained_bytes": 1700786,
+        "output_bytes": 26054881,
+        "rows": 966966,
+        "total_retained_bytes": 27755667
+      }
+    },
+    "numerical_parity": {
+      "compared_values": 0,
+      "max_absolute_difference": null
+    },
+    "baseline_revision": "daily strategy with shallow-attrs CPU fix; original full-area reduction interrupted after >20 minutes",
+    "rss_semantics": "20 ms process RSS sampling during pipeline only; use --only in a fresh process to avoid allocator carry-over",
+    "independent_regional_accuracy": "NOT_RUN",
+    "implementation_commit": "3e7eabc"
+  },
+  "month_generated_completed_baseline_prefix_parity": {
+    "evidence_kind": "generated_grib_mock_transport",
+    "compared_values": 143451,
+    "max_absolute_difference": 0.0,
+    "baseline_completed_days": [
+      "2024-01-01",
+      "2024-01-02",
+      "2024-01-03",
+      "2024-01-04",
+      "2024-01-05",
+      "2024-01-06",
+      "2024-01-07",
+      "2024-01-08",
+      "2024-01-09",
+      "2024-01-10",
+      "2024-01-11",
+      "2024-01-12",
+      "2024-01-13",
+      "2024-01-14",
+      "2024-01-15",
+      "2024-01-16",
+      "2024-01-17",
+      "2024-01-18",
+      "2024-01-19",
+      "2024-01-20",
+      "2024-01-21"
+    ],
+    "baseline_manifest_refs": [
+      {
+        "path": "/private/tmp/meteorology-backfill-benchmark-month/baseline/real/results/b8034bbfd91ea133516e6f83eca89246e9afcc477364dd9ce9880a722068cae8/MANIFEST.json",
+        "sha256": "8988ec67b790fc52545b392d55c76dce5af62cb95384a971e2532eeebd669cd2"
+      },
+      {
+        "path": "/private/tmp/meteorology-backfill-benchmark-month/baseline/real/results/a39caf98e24281b1bba414f7f63a57a2114c80fb09ed1d0abf572e282a440cea/MANIFEST.json",
+        "sha256": "d744de97713650684fece6aa3aa015788c898941426b22cca5ed4c8dadc7d7c2"
+      },
+      {
+        "path": "/private/tmp/meteorology-backfill-benchmark-month/baseline/real/results/7c5ddd2b3be3940b03e77ce18246404c0bb0f7dbd1ef6caa5b1c177d761f33da/MANIFEST.json",
+        "sha256": "61f9e6a80e9acb86ed93f3e761ca345c78ab7c3ae4bf47658899dd76f9c9f394"
+      }
+    ],
+    "optimized_active_manifest_sha256": "be9396b000fac679da7fbe187053695aaa0437504dc7ee4dd3259def0fa9c892",
+    "partial_baseline_comparison": true,
+    "independent_regional_accuracy": "NOT_RUN"
+  },
+  "bounded_daily_strategy_baselines": [
+    {
+      "period": "month",
+      "evidence_kind": "generated_grib_mock_transport",
+      "status": "INTERRUPTED_AT_MANUAL_BOUNDED_CUTOFF",
+      "elapsed_lower_bound_seconds": 1620,
+      "completed_days": [
+        "2024-01-01",
+        "2024-01-02",
+        "2024-01-03",
+        "2024-01-04",
+        "2024-01-05",
+        "2024-01-06",
+        "2024-01-07",
+        "2024-01-08",
+        "2024-01-09",
+        "2024-01-10",
+        "2024-01-11",
+        "2024-01-12",
+        "2024-01-13",
+        "2024-01-14",
+        "2024-01-15",
+        "2024-01-16",
+        "2024-01-17",
+        "2024-01-18",
+        "2024-01-19",
+        "2024-01-20",
+        "2024-01-21",
+        "2024-01-22",
+        "2024-01-23",
+        "2024-01-24",
+        "2024-01-25",
+        "2024-01-26",
+        "2024-01-27",
+        "2024-01-28"
+      ],
+      "completed_daily_source_jobs": 58,
+      "retained_cache_bytes": 454551980,
+      "aggregate_journal_requests": 261,
+      "active_pointer_sha256": "feb2fd8b17b3cb40f8efd6d7eff9c5d58013eeb3adc34aa97749287f2947f8ac",
+      "full_period_result": "NOT_COMPLETED",
+      "interruption_log": "/private/tmp/meteorology-backfill-benchmark-month.log"
+    },
+    {
+      "period": "three-month",
+      "evidence_kind": "generated_grib_mock_transport",
+      "status": "INTERRUPTED_AT_MANUAL_BOUNDED_CUTOFF",
+      "elapsed_lower_bound_seconds": 1200,
+      "completed_days": [
+        "2024-01-01",
+        "2024-01-02",
+        "2024-01-03",
+        "2024-01-04",
+        "2024-01-05",
+        "2024-01-06",
+        "2024-01-07",
+        "2024-01-08",
+        "2024-01-09",
+        "2024-01-10",
+        "2024-01-11",
+        "2024-01-12",
+        "2024-01-13",
+        "2024-01-14"
+      ],
+      "completed_daily_source_jobs": 42,
+      "retained_cache_bytes": 321573516,
+      "aggregate_journal_requests": 189,
+      "active_pointer_sha256": "ccd9524ce96ea119a65976075961ed44d18671885d8b036348303620da9e8ef8",
+      "full_period_result": "NOT_COMPLETED",
+      "interruption_log": "/private/tmp/meteorology-backfill-benchmark-three-month.log"
+    }
+  ],
+  "software_validation": {
+    "implementation_commit": "3e7eabc",
+    "full_suite_passed": 523,
+    "full_suite_skipped": 1,
+    "skip": "opt-in live HRRR",
+    "installed_wheel_backfill_tests_passed": 29,
+    "targeted_tests_passed": 49,
+    "ruff": "PASS",
+    "strict_docs": "PASS",
+    "catalog_and_feature_policy": "PASS",
+    "wheel_and_sdist_build_twine": "PASS",
+    "outside_checkout_core_wheel_and_legacy_offline_family": "PASS",
+    "hosted_ci": "NOT_RUN_BRANCH_LOCAL"
+  }
+}

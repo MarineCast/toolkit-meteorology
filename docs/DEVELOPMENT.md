@@ -1,5 +1,13 @@
 # Development
 
+Historical backfill regressions: `python -m pytest -q tests/test_backfill.py`.
+`python benchmarks/era5_backfill.py --period two-day --bbox -125.25 49 -125 49.25`
+is a small deterministic generated-GRIB comparison. Full-area/monthly runs are
+manual performance evidence, without CI timing thresholds. Add `--only optimized`
+in a fresh process for isolated pipeline peak RAM. Live CDS and public ARCO probe
+commands, scope and unrun gates are in the
+[backfill performance report](era5-backfill-performance.md).
+
 Install `.[dev,native-pilot]`, then run `python -m pytest -q`,
 `ruff check src tests benchmarks demo`,
 `meteorology catalog --check`, `meteorology feature-policy --check`,
@@ -61,3 +69,9 @@ tests/test_request_storage.py`. These exercise real immutable caches, generated
 GRIB and mocked provider revisions; they make no provider requests.
 `python benchmarks/request_review.py after` reports deterministic operation
 counts and descriptive wall time/memory. There are no timing thresholds.
+
+For the default regional API, start with `python -m pytest -q tests/test_regional.py`.
+These tests inject local source fixtures and never contact ECMWF. CI also copies
+this test outside the checkout and runs it against the regular wheel installation.
+The [cleanup inventory](request-cleanup.md) records deletion/retention decisions;
+`benchmarks/README.md` in the repository indexes the optional benchmark scripts.

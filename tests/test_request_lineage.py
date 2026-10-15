@@ -184,3 +184,44 @@ def test_legacy_lineage_is_pin_only_and_retains_contract_identity(tmp_path):
     current = get_temperature("2024-01-01", "2024-01-01", BBOX, "era5", frequency="hourly", **opts)
     assert not current.cache_hit
     assert current.metadata["request"]["schema"].endswith("v2")
+
+
+def test_large_support_attrs_are_not_copied_per_scalar_and_caller_is_unchanged(tmp_path):
+    from meteorology.request import plan_weather
+    from meteorology.request_adapters import era5_day, reduce_day
+    from meteorology.request_storage import RequestBudget
+    from meteorology.era5.resources import Limits
+    from .request_fixtures import era5_grib
+
+    copied = []
+
+    class Marker:
+        def __deepcopy__(self, memo):
+            copied.append(1)
+            return self
+
+    file = era5_grib(tmp_path / "source.grib", parameters=("t2m",))
+    plan = plan_weather(
+        ["temperature"], "2024-01-01", "2024-01-01", (-125.25, 49, -125, 49.25), "era5"
+    )
+    budget = RequestBudget(
+        Limits(memory_bytes=1024**3, requests=1024), namespace=tmp_path, run_root=tmp_path / "run"
+    )
+    hourly, _ = era5_day(
+        plan,
+        "2024-01-01",
+        tmp_path,
+        tmp_path / "run",
+        budget,
+        source_files=[file],
+        retrieved_at_utc="2026-01-01T00:00:00+00:00",
+    )
+    original = hourly.attrs["source_forecast_support"]
+    expected = reduce_day(hourly, plan, "2024-01-01")[0][1]
+    hourly.attrs["catalog_marker"] = Marker()
+    actual = reduce_day(hourly, plan, "2024-01-01")[0][1]
+    assert len(copied) <= 2
+    assert hourly.attrs["source_forecast_support"] is original
+    import pandas as pd
+
+    pd.testing.assert_frame_equal(actual, expected)

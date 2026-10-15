@@ -4,6 +4,27 @@ Use Python 3.11–3.13 on macOS or Linux. Selective requests use explicit dates,
 bounds and source, without workspace initialization. The separate family example
 uses a one-day Pacific Northwest configuration shipped in the wheel.
 
+## Default: regional ERA5 Parquets
+
+Install the core package with `python -m pip install .` from a clone, then configure
+CDS credentials as described in the [regional guide](../regional-api.md).
+
+```python
+from meteorology import get_data
+
+result = get_data("2009-01-01", "2009-01-31", output_dir="data/weather")
+print(result.hourly_path, result.daily_path, result.catalog_path)
+```
+
+This acquires real ECMWF data and writes two wide H3 R5 Parquets plus a catalog.
+Dates are inclusive UTC days. The default coastal bbox is configurable; source
+chunks remain in a private sibling cache. Each call replaces the output set.
+Use `get_metric` for selected metrics. See the guide for complete coverage,
+precipitation boundaries, cache reuse and resource limits.
+
+The remaining examples use the explicit-source APIs and their separate long-table
+contracts. These remain available for HRRR and CDS GRIB workflows.
+
 ## Install and inspect
 
 From a clone:
@@ -17,7 +38,7 @@ meteorology sources
 meteorology variables --data-source hrrr
 ```
 
-For ERA5 use `python -m pip install '.[era5]'`. Core-only family processing needs
+For the CDS GRIB alternative use `python -m pip install '.[era5]'`. Core-only family processing needs
 `python -m pip install .`; HTML inspectors additionally use `.[visualization]`.
 A locally built wheel can be installed with `python -m pip install
 /path/to/toolkit_meteorology-0.1.0-py3-none-any.whl`. Installed commands run outside

@@ -27,3 +27,24 @@ Core imports, planning, offline acquisition-fixture processing and package help 
 verified without visualization dependencies in the fresh-wheel check. The core
 still needs scientific array/Arrow/H3/projection/geometry libraries for processing;
 this is not a claim that all geospatial dependencies are optional.
+
+## Regional default cleanup, 2026-10-15
+
+The repository-wide Python definition/reference scan was checked against imports,
+root exports, CLI dispatch, module entry points, tests, docs and packaged resources.
+The local Graphify index predates the regional code, so current source searches
+were authoritative. No generated products or private caches are part of this cleanup.
+
+| Candidate | Decision and evidence |
+| --- | --- |
+| `ConfigDocument.resolve_path`, `validate_as`, `to_metadata` | Remove unused inherited conveniences: no callers in this package, exports, tests, docs or configured dispatch. Retain composition, redaction and configuration hashes used by actual loaders. |
+| `regional.wide_day` hourly assembly after its hourly early return | Remove unreachable branch and redundant hourly-shaped allocation; hourly export remains in `hourly_day`. Existing all-column reference comparisons exercise both grains. |
+| Repeated root `__all__` extensions | Consolidate into one list grouped by workflow, preserving all public names and lazy imports. |
+| `PublishedArtifact`, publisher `staged_artifact` and `recover_tree` | Retain: exposed publication helpers may have external callers; lack of internal callers alone is insufficient to remove this compatibility surface. |
+| HRRR families, CDS requests/backfill, native pilots, scientific validation and Google benchmarks | Retain active APIs, CLI/test entry points and reproducible evidence. A new default does not retire explicit alternatives. |
+| Configuration copies and historical evidence | Retain enforced package/checkout parity and measured evidence; do not mistake these for duplicate disposable data. |
+
+README and quickstart now distinguish regional wide products from the explicit-source
+long-table alternatives. The architecture includes the regional path; the benchmark
+inventory labels offline/local/live behavior. Regional checks also run in the macOS
+CI job and against the installed wheel outside the checkout.

@@ -2,7 +2,12 @@
 
 # Reproducible context for environmental modeling
 
-`toolkit-meteorology` retrieves selected weather variables through Python getters
+The default historical interface is the [regional ERA5 API](regional-api.md):
+`get_data(start_date, end_date)` and `get_metric(metric_name, start_date, end_date)`.
+It uses ECMWF's geographic Zarr store and publishes wide hourly/daily H3 R5
+Parquets plus one small catalog.
+
+The toolkit also retrieves selected weather variables through explicit-source Python getters
 and the `meteorology get` command. Choose HRRR or ERA5 explicitly, preview a bounded
 request, then retain daily or hourly data with units, coverage, nulls and
 checksum-backed source lineage. The package also builds independently versioned
@@ -12,6 +17,11 @@ Start with the [quickstart](getting-started/quickstart.md) and
 [weather request guide](request-api.md). Python 3.11–3.13 on macOS/Linux is supported.
 The [Python API](reference/api.md) and [CLI reference](reference/cli.md) document
 both selective requests and existing family workflows.
+
+For the explicit CDS monthly-job alternative, use the
+[ERA5 backfill API and CLI](era5-backfill.md). It plans monthly regional jobs,
+resumes valid completed work and writes daily native-grid or optional sampled
+R5 features. See the [measured performance and remaining qualification gates](era5-backfill-performance.md).
 
 <div class="grid cards" markdown>
 
