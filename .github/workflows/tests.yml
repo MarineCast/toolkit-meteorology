@@ -47,11 +47,12 @@ jobs:
         run: |
           python -m venv /tmp/meteorology-wheel
           /tmp/meteorology-wheel/bin/python -m pip install dist/*.whl pytest
-          mkdir -p /tmp/meteorology-wheel-tests
-          cp tests/test_regional.py /tmp/meteorology-wheel-tests/
+          mkdir -p /tmp/meteorology_wheel_tests
+          cp tests/test_regional.py tests/test_coastal.py tests/test_weather_api.py /tmp/meteorology_wheel_tests/
+          touch /tmp/meteorology_wheel_tests/__init__.py
           cd /tmp
           /tmp/meteorology-wheel/bin/python -c 'import meteorology; print(meteorology.__version__)'
-          /tmp/meteorology-wheel/bin/python -m pytest -q /tmp/meteorology-wheel-tests/test_regional.py
+          /tmp/meteorology-wheel/bin/python -m pytest -q --import-mode=importlib /tmp/meteorology_wheel_tests
           /tmp/meteorology-wheel/bin/python -c "import importlib.util; assert all(importlib.util.find_spec(m) is None for m in ('folium', 'branca', 'geopandas'))"
           /tmp/meteorology-wheel/bin/meteorology --help
           /tmp/meteorology-wheel/bin/meteorology sources

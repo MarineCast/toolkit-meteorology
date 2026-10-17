@@ -242,3 +242,27 @@ def test_vector_hourly_matches_reference_reducer_with_missing_invalid_and_calm()
     for name, blocks in expected.items():
         np.testing.assert_array_equal(actual[name].to_numpy(), np.concatenate(blocks))
     assert counts == expected_counts
+
+
+def test_missing_terminal_midnight_is_explicit_partial_not_zero():
+    archive = Archive.__new__(Archive)
+    archive.snapshot = 'fixture'
+    stamps = pd.date_range('2009-01-01', periods=24, freq='h', tz='UTC').as_unit('ns')
+    archive.times = stamps.asi8 // 10**9
+    archive.coords = np.array([[48., -124.]])
+    archive.block = lambda p, i: np.full((24, 1), 273.15 if p == 't2m' else .001)
+    with pytest.raises(ValueError, match='boundary'):
+        archive.cube(stamps[0].date(), ['t2m', 'tp'])
+    cube = archive.cube(stamps[0].date(), ['t2m', 'tp'], allow_missing_boundary=True)
+    spatial = (np.array([0]), ['cell'], np.zeros(1), 'fixture')
+    specs = regional.metric_specs('daily')
+    counts = {}
+    table = regional.wide_day(cube, stamps[0].date(),
+        {k: v for k, v in specs.items() if v['variable'] in ('temperature', 'precipitation')},
+        'daily', spatial, counts)
+    assert table['TEMPERATURE_2M_C_MEAN'].to_pylist() == pytest.approx([0.])
+    assert table['PRECIPITATION_MM'].to_pylist() == [None]
+    assert counts['PRECIPITATION_MM'] == {'PARTIAL': 1}
+    archive.times = archive.times[:-1]
+    with pytest.raises(ValueError, match='boundary'):
+        archive.cube(stamps[0].date(), ['tp'], allow_missing_boundary=True)

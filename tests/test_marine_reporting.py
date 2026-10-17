@@ -344,3 +344,27 @@ def test_exact_file_mask_rejects_directory(tmp_path):
         load_reporting_membership(
             study, mask_path=directory, mask_hash_policy="sha256_exact_file_bytes"
         )
+
+
+def test_declared_mask_and_manifest_supply_exact_witness(tmp_path):
+    original, study, mask, _ = registry(tmp_path)
+    config = json.loads(study.read_text())
+    declared = config["grid_registry"]
+    declared.update(
+        mask_relative_path="../Data/mask.fixture",
+        mask_hash_policy="sha256_exact_file_bytes",
+        manifest_relative_path="../Data/mask-manifest.json",
+    )
+    manifest = {
+        field: declared[field]
+        for field in ["mask_revision", "mask_sha256", "mask_hash_policy", "memberships"]
+    }
+    manifest_path = tmp_path / "Data/mask-manifest.json"
+    manifest_path.write_text(json.dumps(manifest))
+    declared["manifest_sha256"] = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    study.write_text(json.dumps(config))
+    member = load_reporting_membership(study)
+    assert member.cells == original.cells
+    manifest_path.write_bytes(b"tampered")
+    with pytest.raises(ValueError, match="manifest SHA256"):
+        load_reporting_membership(study)

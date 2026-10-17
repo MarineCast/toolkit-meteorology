@@ -72,7 +72,10 @@
               "minLength": 1
             },
             "scope": {
-              "const": "rectangular_selection_only"
+              "enum": [
+                "rectangular_selection_only",
+                "source_relative_coastal_geometry"
+              ]
             },
             "statement": {
               "type": "string",
@@ -267,6 +270,10 @@
             },
             "retain_native": {
               "const": true
+            },
+            "catalog_relative_path": {
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [
@@ -492,6 +499,21 @@
             ],
             "additionalProperties": false
           }
+        },
+        "mask_relative_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mask_hash_policy": {
+          "const": "sha256_exact_file_bytes"
+        },
+        "manifest_relative_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
         }
       },
       "required": [

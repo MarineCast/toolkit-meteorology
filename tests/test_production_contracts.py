@@ -53,6 +53,12 @@ def test_download_range_requires_explicit_intent_before_network(tmp_path: Path) 
     import yaml
 
     config = yaml.safe_load(Path("config/data/environment_meteorological.yaml").read_text())
+    # This test exercises the preflight gate, never the checkout's shared raw cache.
+    config['surface_weather']['raw'] = {
+        key: str(tmp_path / 'raw' / Path(value).name)
+        for key, value in config['surface_weather']['raw'].items()
+    }
+    config['surface_weather']['raw']['root_dir'] = str(tmp_path / 'raw')
     path = tmp_path / "meteorological.yaml"
     path.write_text(yaml.safe_dump(config), encoding="utf-8")
     preview = download_surface_weather(path, start_date="2024-01-02", end_date="2024-01-10", dry_run=True)

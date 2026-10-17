@@ -1,6 +1,31 @@
 # Python API
 
-## Default regional weather
+## Approved coastal weather
+
+```python
+from meteorology import get_weather, ALLOWED_VARIABLES, check_weather
+
+result = get_weather("2009-01-01", "2009-01-02", ALLOWED_VARIABLES,
+                     study_config="/path/to/config/study.v1.json",
+                     output_dir="scratch/weather", cache_dir="/path/to/source-cache")
+check_weather(result.catalog_path, study_config="/path/to/config/study.v1.json")
+```
+
+`MARINECAST_STUDY_CONFIG` can supply the study instead of the keyword. The allowed
+families are `temperature`, `dewpoint`, `relative_humidity`, `wind`, `cloud_cover`,
+`pressure`, and `precipitation`. The return value exposes three file paths; it does
+not load the full history into a DataFrame. See [coverage, cache and scientific
+contracts](../regional-api.md#approved-coastal-api).
+
+::: meteorology.regional.get_weather
+    options:
+      show_source: false
+
+::: meteorology.regional.check_weather
+    options:
+      show_source: false
+
+## Rectangle compatibility API
 
 ```python
 from meteorology import get_data, get_metric
@@ -39,9 +64,9 @@ same planner, dependency selection, executor and cache. Read the
 [source support matrix and scientific semantics](../request-api.md) before use.
 
 ```python
-from meteorology import get_weather
+from meteorology import get_weather_request
 
-preview = get_weather(
+preview = get_weather_request(
     variables=["temperature", "wind"],
     start_date="2024-01-01", end_date="2024-01-01",
     bbox=(-124.0, 48.0, -123.0, 48.5), data_source="hrrr",
@@ -58,7 +83,7 @@ combinations fail before acquisition.
 ::: meteorology
     options:
       members:
-        - get_weather
+        - get_weather_request
         - get_temperature
         - get_wind
         - get_cloud_cover

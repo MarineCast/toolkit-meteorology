@@ -2,11 +2,32 @@
 
 [Documentation index](index.md)
 
+## Supported coastal path
+
+`get_weather` → approved study/registry → `regional_source.Archive` →
+`backfill_compute` reductions → `regional` publication → `check_weather`.
+
+The three existing pipeline modules handle acquisition/cache, scientific reduction,
+and API/output/checks. Shared `marine_reporting` validates the registry and mask;
+`core.artifacts` provides recoverable publication. Exact membership is selected
+before tables are written, so no rectangular output is required. The wheel imports
+no sibling toolkit. The approved owner study/registry is an explicit external input.
+
+The public API returns paths to two Parquets and a catalog. Source evidence and
+pinned arrays live in a separate private cache. `check_weather` streams complete
+UTC days; passing the study also verifies external membership. The current archive
+uses two source vintages, so exact historical replay requires both retained caches.
+There is no automatic source-epoch coordinator or retry policy. See the
+[primary contract](regional-api.md#approved-coastal-api).
+
+The modules below retain compatibility workflows; their generic family-manifest
+claims do not imply that every field exists in a coastal catalog.
+
 ## Package organization
 
 | Module | Responsibility |
 | --- | --- |
-| `regional`, `regional_source` | Default historical ECMWF geographic Zarr acquisition, private local archive, wide hourly/daily H3 Parquets and small catalog |
+| `regional`, `regional_source` | Primary coastal API/checks and ECMWF geographic Zarr acquisition, private local archive, wide hourly/daily H3 Parquets and small catalog |
 | `cli` | Workspace selection, initialization and delegation to family commands |
 | `config` | Validated product configuration |
 | `study` | Optional portable shared-study v1 validation, selection and canonical provenance; no sibling imports |

@@ -15,7 +15,7 @@ def test_warm_era5_source_reaggregation_under_one_request_cap(tmp_path, monkeypa
 
 def test_hrrr_partial_cache_counts_only_missing_dependencies(tmp_path, monkeypatch):
     from functools import partial
-    from meteorology import get_temperature, get_wind, get_weather
+    from meteorology import get_temperature, get_wind, get_weather_request as get_weather
     from .test_request_transport import hrrr_http_fixture
     import meteorology.hourly_weather.native_day as nd
     import meteorology.hourly_weather.native_source as ns
@@ -95,7 +95,7 @@ def test_corrupt_retained_source_rejected_in_preflight(tmp_path, monkeypatch):
 
 
 def test_era5_does_not_reuse_a_different_job_selection(tmp_path, monkeypatch):
-    from meteorology import get_weather
+    from meteorology import get_weather_request as get_weather
 
     provider = install_provider(tmp_path, monkeypatch)
     cache = tmp_path / "cache"

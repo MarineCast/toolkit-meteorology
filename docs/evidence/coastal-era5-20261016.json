@@ -1,0 +1,542 @@
+{
+  "status": "COMPLETE_VALIDATED",
+  "product_directory": "/Users/tylerstevenson/Documents/Code_Repos/MarineCast/Data/Meteorology",
+  "start_date": "2009-01-01",
+  "end_date": "2026-10-10",
+  "reporting_cells": 463,
+  "h3_resolution": 5,
+  "mask_revision": "coastal-source-research-20261016-v3",
+  "membership_sha256": "b587b4b5eefa78d19ce4a7320a1bed8d295f82f68709a9a08047fa82de80aa7c",
+  "products": {
+    "daily": {
+      "bytes": 187864120,
+      "columns": [
+        {
+          "dtype": "string",
+          "name": "H3_INDEX",
+          "units": null
+        },
+        {
+          "dtype": "date32[day]",
+          "name": "DATE",
+          "units": null
+        },
+        {
+          "dtype": "double",
+          "name": "TEMPERATURE_2M_C_MEAN",
+          "units": "degC"
+        },
+        {
+          "dtype": "double",
+          "name": "TEMPERATURE_2M_C_MIN",
+          "units": "degC"
+        },
+        {
+          "dtype": "double",
+          "name": "TEMPERATURE_2M_C_MAX",
+          "units": "degC"
+        },
+        {
+          "dtype": "double",
+          "name": "DEWPOINT_2M_C_MEAN",
+          "units": "degC"
+        },
+        {
+          "dtype": "double",
+          "name": "RELATIVE_HUMIDITY_2M_PCT_MEAN",
+          "units": "percent"
+        },
+        {
+          "dtype": "double",
+          "name": "U_WIND_10M_MS_MEAN",
+          "units": "m/s"
+        },
+        {
+          "dtype": "double",
+          "name": "V_WIND_10M_MS_MEAN",
+          "units": "m/s"
+        },
+        {
+          "dtype": "double",
+          "name": "WIND_SPEED_10M_MS_MEAN",
+          "units": "m/s"
+        },
+        {
+          "dtype": "double",
+          "name": "WIND_SPEED_10M_MS_MAX",
+          "units": "m/s"
+        },
+        {
+          "dtype": "double",
+          "name": "WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR",
+          "units": "degrees"
+        },
+        {
+          "dtype": "double",
+          "name": "TOTAL_CLOUD_COVER_PCT_MEAN",
+          "units": "percent"
+        },
+        {
+          "dtype": "double",
+          "name": "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN",
+          "units": "hPa"
+        },
+        {
+          "dtype": "double",
+          "name": "MEAN_SEA_LEVEL_PRESSURE_HPA_MIN",
+          "units": "hPa"
+        },
+        {
+          "dtype": "double",
+          "name": "PRECIPITATION_MM",
+          "units": "mm"
+        }
+      ],
+      "file": "meteorology-daily.parquet",
+      "null_counts": {
+        "DEWPOINT_2M_C_MEAN": 0,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN": 0,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MIN": 0,
+        "PRECIPITATION_MM": 463,
+        "RELATIVE_HUMIDITY_2M_PCT_MEAN": 8749,
+        "TEMPERATURE_2M_C_MAX": 0,
+        "TEMPERATURE_2M_C_MEAN": 0,
+        "TEMPERATURE_2M_C_MIN": 0,
+        "TOTAL_CLOUD_COVER_PCT_MEAN": 0,
+        "U_WIND_10M_MS_MEAN": 0,
+        "V_WIND_10M_MS_MEAN": 0,
+        "WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR": 0,
+        "WIND_SPEED_10M_MS_MAX": 0,
+        "WIND_SPEED_10M_MS_MEAN": 0
+      },
+      "rows": 3005796,
+      "sha256": "476d0eb388c244edd1ed4f065ca3ed1d471058ddf32f64d44336c40e251bc094",
+      "value_status_counts": {
+        "DEWPOINT_2M_C_MEAN": {
+          "COMPLETE": 3005796
+        },
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN": {
+          "COMPLETE": 3005796
+        },
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MIN": {
+          "COMPLETE": 3005796
+        },
+        "PRECIPITATION_MM": {
+          "COMPLETE": 3005333,
+          "PARTIAL": 463
+        },
+        "RELATIVE_HUMIDITY_2M_PCT_MEAN": {
+          "COMPLETE": 2997047,
+          "OUTSIDE_SUPPORTED_RH_DOMAIN": 8749
+        },
+        "TEMPERATURE_2M_C_MAX": {
+          "COMPLETE": 3005796
+        },
+        "TEMPERATURE_2M_C_MEAN": {
+          "COMPLETE": 3005796
+        },
+        "TEMPERATURE_2M_C_MIN": {
+          "COMPLETE": 3005796
+        },
+        "TOTAL_CLOUD_COVER_PCT_MEAN": {
+          "COMPLETE": 3005796
+        },
+        "U_WIND_10M_MS_MEAN": {
+          "COMPLETE": 3005796
+        },
+        "V_WIND_10M_MS_MEAN": {
+          "COMPLETE": 3005796
+        },
+        "WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR": {
+          "COMPLETE": 3005796
+        },
+        "WIND_SPEED_10M_MS_MAX": {
+          "COMPLETE": 3005796
+        },
+        "WIND_SPEED_10M_MS_MEAN": {
+          "COMPLETE": 3005796
+        }
+      }
+    },
+    "hourly": {
+      "bytes": 2627567916,
+      "columns": [
+        {
+          "dtype": "string",
+          "name": "H3_INDEX",
+          "units": null
+        },
+        {
+          "dtype": "timestamp[us, tz=UTC]",
+          "name": "DATETIME",
+          "units": null
+        },
+        {
+          "dtype": "double",
+          "name": "TEMPERATURE_2M_C",
+          "units": "degC"
+        },
+        {
+          "dtype": "double",
+          "name": "DEWPOINT_2M_C",
+          "units": "degC"
+        },
+        {
+          "dtype": "double",
+          "name": "RELATIVE_HUMIDITY_2M_PCT",
+          "units": "percent"
+        },
+        {
+          "dtype": "double",
+          "name": "U_WIND_10M_MS",
+          "units": "m/s"
+        },
+        {
+          "dtype": "double",
+          "name": "V_WIND_10M_MS",
+          "units": "m/s"
+        },
+        {
+          "dtype": "double",
+          "name": "WIND_SPEED_10M_MS",
+          "units": "m/s"
+        },
+        {
+          "dtype": "double",
+          "name": "WIND_DIRECTION_10M_DEG_FROM",
+          "units": "degrees"
+        },
+        {
+          "dtype": "double",
+          "name": "TOTAL_CLOUD_COVER_PCT",
+          "units": "percent"
+        },
+        {
+          "dtype": "double",
+          "name": "MEAN_SEA_LEVEL_PRESSURE_HPA",
+          "units": "hPa"
+        },
+        {
+          "dtype": "double",
+          "name": "PRECIPITATION_MM",
+          "units": "mm"
+        }
+      ],
+      "file": "meteorology-hourly.parquet",
+      "null_counts": {
+        "DEWPOINT_2M_C": 0,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA": 0,
+        "PRECIPITATION_MM": 463,
+        "RELATIVE_HUMIDITY_2M_PCT": 10139,
+        "TEMPERATURE_2M_C": 0,
+        "TOTAL_CLOUD_COVER_PCT": 0,
+        "U_WIND_10M_MS": 0,
+        "V_WIND_10M_MS": 0,
+        "WIND_DIRECTION_10M_DEG_FROM": 0,
+        "WIND_SPEED_10M_MS": 0
+      },
+      "rows": 72139104,
+      "sha256": "71c559b89d3f41d41ed954c5487cd4d4685d631df054fa30a8b511419d6a93e9",
+      "value_status_counts": {
+        "DEWPOINT_2M_C": {
+          "COMPLETE": 72139104
+        },
+        "MEAN_SEA_LEVEL_PRESSURE_HPA": {
+          "COMPLETE": 72139104
+        },
+        "PRECIPITATION_MM": {
+          "COMPLETE": 72138641,
+          "UNAVAILABLE": 463
+        },
+        "RELATIVE_HUMIDITY_2M_PCT": {
+          "COMPLETE": 72128965,
+          "OUTSIDE_SUPPORTED_RH_DOMAIN": 10139
+        },
+        "TEMPERATURE_2M_C": {
+          "COMPLETE": 72139104
+        },
+        "TOTAL_CLOUD_COVER_PCT": {
+          "COMPLETE": 72139104
+        },
+        "U_WIND_10M_MS": {
+          "COMPLETE": 72139104
+        },
+        "V_WIND_10M_MS": {
+          "COMPLETE": 72139104
+        },
+        "WIND_DIRECTION_10M_DEG_FROM": {
+          "COMPLETE": 72139104
+        },
+        "WIND_SPEED_10M_MS": {
+          "COMPLETE": 72139104
+        }
+      }
+    }
+  },
+  "source_epochs": [
+    {
+      "catalog_sha256": "4fcf3faf46a82a509e90803283e73c99dcd097a22949d666ec362c9de3a07038",
+      "end_date": "2026-10-08",
+      "evidence_sha256": "661c67d2749a39f094372ec492ede69ad00a29febb34eda7f8ba0c074080d017",
+      "metadata_sha256": "1f4ef2da414afc97f31512ac2e016efb1e22724668e601d833a4b77f1732f785",
+      "retained_directory": "/Users/tylerstevenson/Documents/Code_Repos/MarineCast/Data/.meteorology-update/retained-rectangle-20261015",
+      "source_coverage_end": "2026-10-09T23:00:00",
+      "source_method": "ecmwf-arco-wide-h3-utc-v1",
+      "start_date": "2009-01-01"
+    },
+    {
+      "catalog_sha256": "337aa5d3f23ca8b46c4aac095e171b5384c9ea6a6068f4b06db4bf6790b8b8e0",
+      "end_date": "2026-10-10",
+      "evidence_sha256": "f41d1652cf5f155d95d5624ccbb0def5e338acc443cae59d7833976d35983fee",
+      "metadata_sha256": "f1f11b233cfd92bc30160370df0b2a6955290d4b0a5fbce6495ef0681b15a76e",
+      "retained_directory": "/Users/tylerstevenson/Documents/Code_Repos/MarineCast/Data/.meteorology-update/tail",
+      "source_coverage_end": "2026-10-10T23:00:00",
+      "source_method": "ecmwf-arco-wide-h3-utc-v1",
+      "start_date": "2026-10-09"
+    }
+  ],
+  "latest_complete_all_metric_day": "2026-10-09",
+  "partial_metric_coverage": [
+    {
+      "date": "2026-10-10",
+      "expected_hours": 24,
+      "metric": "PRECIPITATION_MM",
+      "missing_interval_end_utc": "2026-10-11T00:00:00Z",
+      "valid_hours": 23,
+      "value_status": "PARTIAL"
+    }
+  ],
+  "unavailable_interval": {
+    "end": "2026-12-31",
+    "reason": "No complete source UTC day with required next-midnight accumulation at acquisition",
+    "start": "2026-10-11"
+  },
+  "final_frontier_confirmation": {
+    "checked_at_utc": "2026-10-16T22:24:56.351933+00:00",
+    "metadata_sha256": "f1f11b233cfd92bc30160370df0b2a6955290d4b0a5fbce6495ef0681b15a76e",
+    "source_end": "2026-10-10T23:00:00",
+    "shape": [
+      760680
+    ]
+  },
+  "historical_product_days_reused": 6490,
+  "acquisition_seconds": 282.4402730829315,
+  "acquisition": {
+    "requests": 463,
+    "response_bytes": 265789774
+  },
+  "workers": 2,
+  "transfer_cap_bytes": 4294967296,
+  "refreshed_provider_chunk_time_range": [
+    "2024-10-22T00:00:00Z",
+    "2026-10-10T23:00:00Z"
+  ],
+  "acquisition_overlap_note": "Changed compressed tail chunks include older hours; retained historical product/source vintage unchanged.",
+  "publication_seconds": 368.58046399999876,
+  "validation": {
+    "checked_at_utc": "2026-10-16T22:15:14.950284+00:00",
+    "products": {
+      "daily": {
+        "rows": 3005796,
+        "days": 6492,
+        "sha256": "476d0eb388c244edd1ed4f065ca3ed1d471058ddf32f64d44336c40e251bc094",
+        "nulls": {
+          "TEMPERATURE_2M_C_MEAN": 0,
+          "TEMPERATURE_2M_C_MIN": 0,
+          "TEMPERATURE_2M_C_MAX": 0,
+          "DEWPOINT_2M_C_MEAN": 0,
+          "RELATIVE_HUMIDITY_2M_PCT_MEAN": 8749,
+          "U_WIND_10M_MS_MEAN": 0,
+          "V_WIND_10M_MS_MEAN": 0,
+          "WIND_SPEED_10M_MS_MEAN": 0,
+          "WIND_SPEED_10M_MS_MAX": 0,
+          "WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR": 0,
+          "TOTAL_CLOUD_COVER_PCT_MEAN": 0,
+          "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN": 0,
+          "MEAN_SEA_LEVEL_PRESSURE_HPA_MIN": 0,
+          "PRECIPITATION_MM": 463
+        },
+        "ranges": {
+          "TEMPERATURE_2M_C_MEAN": [
+            -26.12014300028481,
+            31.919497426350933
+          ],
+          "TEMPERATURE_2M_C_MIN": [
+            -29.01567687988279,
+            25.462976074218773
+          ],
+          "TEMPERATURE_2M_C_MAX": [
+            -23.20647277832029,
+            42.65993652343752
+          ],
+          "DEWPOINT_2M_C_MEAN": [
+            -31.628824615478493,
+            21.302676137288433
+          ],
+          "RELATIVE_HUMIDITY_2M_PCT_MEAN": [
+            17.426084685968174,
+            99.99751560979506
+          ],
+          "U_WIND_10M_MS_MEAN": [
+            -17.237150192260742,
+            15.892183939615885
+          ],
+          "V_WIND_10M_MS_MEAN": [
+            -18.007443110148113,
+            17.757710774739582
+          ],
+          "WIND_SPEED_10M_MS_MEAN": [
+            0.21867649870146047,
+            20.86400441100274
+          ],
+          "WIND_SPEED_10M_MS_MAX": [
+            0.4494537249495144,
+            29.849618920949684
+          ],
+          "WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR": [
+            7.522774087852174e-05,
+            359.99944853268903
+          ],
+          "TOTAL_CLOUD_COVER_PCT_MEAN": [
+            0.0,
+            100.0
+          ],
+          "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN": [
+            973.4319791666666,
+            1045.6108854166666
+          ],
+          "MEAN_SEA_LEVEL_PRESSURE_HPA_MIN": [
+            962.44625,
+            1043.03875
+          ],
+          "PRECIPITATION_MM": [
+            0.0,
+            196.20418548583984
+          ]
+        }
+      },
+      "hourly": {
+        "rows": 72139104,
+        "days": 6492,
+        "sha256": "71c559b89d3f41d41ed954c5487cd4d4685d631df054fa30a8b511419d6a93e9",
+        "nulls": {
+          "TEMPERATURE_2M_C": 0,
+          "DEWPOINT_2M_C": 0,
+          "RELATIVE_HUMIDITY_2M_PCT": 10139,
+          "U_WIND_10M_MS": 0,
+          "V_WIND_10M_MS": 0,
+          "WIND_SPEED_10M_MS": 0,
+          "WIND_DIRECTION_10M_DEG_FROM": 0,
+          "TOTAL_CLOUD_COVER_PCT": 0,
+          "MEAN_SEA_LEVEL_PRESSURE_HPA": 0,
+          "PRECIPITATION_MM": 463
+        },
+        "ranges": {
+          "TEMPERATURE_2M_C": [
+            -29.01567687988279,
+            42.65993652343752
+          ],
+          "DEWPOINT_2M_C": [
+            -34.7971252441406,
+            25.570275878906273
+          ],
+          "RELATIVE_HUMIDITY_2M_PCT": [
+            3.319826958593175,
+            100.00999973873952
+          ],
+          "U_WIND_10M_MS": [
+            -24.446014404296875,
+            24.674606323242188
+          ],
+          "V_WIND_10M_MS": [
+            -21.015884399414062,
+            25.175262451171875
+          ],
+          "WIND_SPEED_10M_MS": [
+            0.0004054361039912849,
+            29.849618920949684
+          ],
+          "WIND_DIRECTION_10M_DEG_FROM": [
+            0.0,
+            359.9999096996077
+          ],
+          "TOTAL_CLOUD_COVER_PCT": [
+            0.0,
+            100.0
+          ],
+          "MEAN_SEA_LEVEL_PRESSURE_HPA": [
+            962.44625,
+            1048.240625
+          ],
+          "PRECIPITATION_MM": [
+            0.0,
+            15.549659729003906
+          ]
+        }
+      }
+    },
+    "daily_hourly_comparisons": {
+      "2009-01-01": "all 14 daily metrics match independent hourly recomputation",
+      "2012-02-29": "all 14 daily metrics match independent hourly recomputation",
+      "2016-12-31": "all 14 daily metrics match independent hourly recomputation",
+      "2024-02-29": "all 14 daily metrics match independent hourly recomputation",
+      "2026-10-08": "all 14 daily metrics match independent hourly recomputation",
+      "2026-10-09": "all 14 daily metrics match independent hourly recomputation",
+      "2026-10-10": "all 14 daily metrics match independent hourly recomputation"
+    },
+    "retained_source_equality": "exact on all seven sampled dates and all daily metrics",
+    "native_samples": {
+      "2009-01-01": "native temperature/dewpoint Kelvin-to-C, pressure Pa-to-hPa, cloud fraction-to-percent, mean hourly wind magnitude, and 01-through-next-00 precipitation m-to-mm match",
+      "2012-02-29": "native temperature/dewpoint Kelvin-to-C, pressure Pa-to-hPa, cloud fraction-to-percent, mean hourly wind magnitude, and 01-through-next-00 precipitation m-to-mm match",
+      "2016-12-31": "native temperature/dewpoint Kelvin-to-C, pressure Pa-to-hPa, cloud fraction-to-percent, mean hourly wind magnitude, and 01-through-next-00 precipitation m-to-mm match",
+      "2024-02-29": "native temperature/dewpoint Kelvin-to-C, pressure Pa-to-hPa, cloud fraction-to-percent, mean hourly wind magnitude, and 01-through-next-00 precipitation m-to-mm match",
+      "2026-10-08": "native temperature/dewpoint Kelvin-to-C, pressure Pa-to-hPa, cloud fraction-to-percent, mean hourly wind magnitude, and 01-through-next-00 precipitation m-to-mm match",
+      "2026-10-09": "native temperature/dewpoint Kelvin-to-C, pressure Pa-to-hPa, cloud fraction-to-percent, mean hourly wind magnitude, and 01-through-next-00 precipitation m-to-mm match",
+      "2026-10-10": "native temperature/dewpoint Kelvin-to-C, pressure Pa-to-hPa, cloud fraction-to-percent, mean hourly wind magnitude, and 01-through-next-00 precipitation m-to-mm match"
+    },
+    "native_sampling_crosswalk": {
+      "path": "/Users/tylerstevenson/Documents/Code_Repos/MarineCast/Data/.meteorology-update/native-sampling-crosswalk.parquet",
+      "sha256": "00f6ed4a13ad8264608109cb83f474959cff7e55dc650ef25434d832a0bd8f52",
+      "cells": 463,
+      "native_points": 243
+    },
+    "result": "PASS",
+    "catalog_sha256": "32df1b56d974cc0e3b9cb73dd631423822cadb38a00e94d025bad9582cf8fa08"
+  },
+  "checks": {
+    "full_suite": "544 passed, 1 optional NOAA test skipped",
+    "clean_core_installed_wheel": "42 passed; optional Folium/Branca/GeoPandas absent",
+    "dependency_check": "PASS",
+    "core_offline_products": "PASS (explicit synthetic fixture)",
+    "multi_year_installed_plan": "PASS (offline)",
+    "lint": "PASS",
+    "strict_docs": "PASS",
+    "wheel_sdist": "PASS",
+    "twine": "PASS",
+    "catalog_policy_variables": "PASS",
+    "git_diff_check": "PASS"
+  },
+  "code_head": "73e4f6c463726772c8d59f03f85cfab39b58fed6",
+  "code_sha256": {
+    "src/meteorology/coastal.py": "6084c99d305c7888f484e0ebd92b553167488023262aab74a8b0605e694d9e88",
+    "src/meteorology/regional.py": "021035ef45cfdf04e555e89253fd616e536eba0fbf7320786b07ce4c68ab7f9b",
+    "src/meteorology/regional_source.py": "762459324fae6d0b4355355576b6e730d36ea7c078a0df4a7d710d7cb41e1dcb",
+    "src/meteorology/backfill_compute.py": "2ef36ae7d16e28f51c0fb3e30f3f06095455b2159d517e607ec7d0ae71619058",
+    "src/meteorology/marine_reporting.py": "978d172ecd628958831b7a36b99ff17a2ccda206a8083f7b424479ee592af71e",
+    "src/meteorology/study.py": "279866935d43da816ab49c22f30f038999ab432223e58ace94293583cf454caa",
+    "tests/test_coastal.py": "65d80b07b11de84151f4d55998b35e1f8cae4ab3e5a0e97b2a0ce5cf74cb7478",
+    "tests/test_regional.py": "5bf4f0199aa8c9b5eff5eb95c2a8cb1a08e70d266ba6258f21d2ddfcb73dba16"
+  },
+  "limitations": [
+    "Retrospective ERA5, not historical forecast availability.",
+    "Historical publication time, forecast init/lead, and final ERA5 versus ERA5T identity are unavailable in this source representation.",
+    "243 native sampling points shared by 463 H3 cells; H3 adds no independent atmospheric detail.",
+    "Source/software consistency checked; independent observational accuracy not established.",
+    "Seven-field product excludes visibility/fog, radiation, gusts, snowfall and astronomy.",
+    "Original rectangle files and source caches preserved; no preexisting data deleted."
+  ],
+  "source_references": [
+    "https://confluence.ecmwf.int/spaces/CKB/pages/505390919/ERA5+hourly+Analysis+Ready+Cloud+Optimised+ARCO+data+on+single+levels+from+1940+to+present+Product+User+Guide+PUG",
+    "https://confluence.ecmwf.int/spaces/CKB/pages/76414402/ERA5+data+documentation"
+  ]
+}

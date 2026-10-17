@@ -124,10 +124,17 @@ def freeze_release(manifest_path: str | Path, output_root: str | Path) -> Path:
     return implementation(manifest_path, output_root)
 
 
-def get_weather(variables, start_date, end_date, bbox, data_source, **options):
+def get_weather_request(variables, start_date, end_date, bbox, data_source, **options):
     """Shared selective request; advanced options are keyword-only."""
     from .request import get_weather as implementation
     return implementation(variables,start_date,end_date,bbox,data_source,**options)
+
+
+def get_weather(start_date, end_date, variable_list=None, **options):
+    """Approved coastal ERA5 product; inclusive UTC dates and allowed variable families."""
+    from .regional import ALLOWED_VARIABLES, get_weather as implementation
+    return implementation(start_date, end_date,
+                          ALLOWED_VARIABLES if variable_list is None else variable_list, **options)
 
 
 def backfill_weather(start_date=None, end_date=None, bbox=None, data_source="era5", **options):
@@ -138,47 +145,47 @@ def backfill_weather(start_date=None, end_date=None, bbox=None, data_source="era
 
 def get_temperature(start_date, end_date, bbox, data_source, **options):
     """Retrieve temperature through the shared source-selective request."""
-    return get_weather(['temperature'],start_date,end_date,bbox,data_source,**options)
+    return get_weather_request(['temperature'],start_date,end_date,bbox,data_source,**options)
 
 
 def get_wind(start_date, end_date, bbox, data_source, **options):
     """Retrieve wind through the shared source-selective request."""
-    return get_weather(['wind'],start_date,end_date,bbox,data_source,**options)
+    return get_weather_request(['wind'],start_date,end_date,bbox,data_source,**options)
 
 
 def get_cloud_cover(start_date, end_date, bbox, data_source, **options):
     """Retrieve cloud cover through the shared source-selective request."""
-    return get_weather(['cloud_cover'],start_date,end_date,bbox,data_source,**options)
+    return get_weather_request(['cloud_cover'],start_date,end_date,bbox,data_source,**options)
 
 
 def get_pressure(start_date, end_date, bbox, data_source, **options):
     """Retrieve pressure through the shared source-selective request."""
-    return get_weather(['pressure'],start_date,end_date,bbox,data_source,**options)
+    return get_weather_request(['pressure'],start_date,end_date,bbox,data_source,**options)
 
 
 def get_relative_humidity(start_date, end_date, bbox, data_source, **options):
     """Retrieve relative humidity through the shared source-selective request."""
-    return get_weather(['relative_humidity'],start_date,end_date,bbox,data_source,**options)
+    return get_weather_request(['relative_humidity'],start_date,end_date,bbox,data_source,**options)
 
 
 def get_dewpoint(start_date, end_date, bbox, data_source, **options):
     """Retrieve dewpoint through the shared source-selective request."""
-    return get_weather(['dewpoint'],start_date,end_date,bbox,data_source,**options)
+    return get_weather_request(['dewpoint'],start_date,end_date,bbox,data_source,**options)
 
 
 def get_visibility(start_date, end_date, bbox, data_source, **options):
     """Retrieve visibility through the shared source-selective request."""
-    return get_weather(['visibility'],start_date,end_date,bbox,data_source,**options)
+    return get_weather_request(['visibility'],start_date,end_date,bbox,data_source,**options)
 
 
 def get_precipitation(start_date, end_date, bbox, data_source, **options):
     """Retrieve precipitation through the shared source-selective request."""
-    return get_weather(['precipitation'],start_date,end_date,bbox,data_source,**options)
+    return get_weather_request(['precipitation'],start_date,end_date,bbox,data_source,**options)
 
 
 def get_snowfall(start_date, end_date, bbox, data_source, **options):
     """Retrieve snowfall through the shared source-selective request."""
-    return get_weather(['snowfall'],start_date,end_date,bbox,data_source,**options)
+    return get_weather_request(['snowfall'],start_date,end_date,bbox,data_source,**options)
 
 
 get_precip = get_precipitation
@@ -197,6 +204,9 @@ def get_precipitation_estimate(start_date, end_date, bbox, data_source, **option
 
 
 def __getattr__(name):
+    if name == 'ALLOWED_VARIABLES':
+        from .regional import ALLOWED_VARIABLES
+        return ALLOWED_VARIABLES
     if name == 'WeatherResult':
         from .request_cache import WeatherResult
         return WeatherResult
@@ -209,6 +219,12 @@ def get_data(start_date, end_date, **options):
     return implementation(start_date, end_date, **options)
 
 
+def check_weather(catalog_path, **options):
+    """Read-only checks for the approved wide weather files."""
+    from .regional import check_weather as implementation
+    return implementation(catalog_path, **options)
+
+
 def get_metric(metric_name, start_date, end_date, **options):
     """Publish a regional metric family or exact column for inclusive UTC dates."""
     from .regional import get_metric as implementation
@@ -218,8 +234,8 @@ def get_metric(metric_name, start_date, end_date, **options):
 # Explicit public surface, grouped by workflow. Implementations stay lazy.
 __all__ = [
     "__version__",
-    "get_data", "get_metric",
-    "get_weather", "get_temperature", "get_wind", "get_cloud_cover", "get_pressure",
+    "get_data", "get_metric", "check_weather",
+    "get_weather", "ALLOWED_VARIABLES", "get_weather_request", "get_temperature", "get_wind", "get_cloud_cover", "get_pressure",
     "get_relative_humidity", "get_dewpoint", "get_visibility", "get_precipitation",
     "get_precip", "get_snowfall", "get_precipitation_estimate", "WeatherResult",
     "backfill_weather",

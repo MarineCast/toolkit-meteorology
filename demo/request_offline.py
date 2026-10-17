@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from meteorology import get_weather
+from meteorology import get_weather_request as get_weather
 
 
 def main():

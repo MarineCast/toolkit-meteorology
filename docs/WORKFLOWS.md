@@ -2,10 +2,15 @@
 
 [Documentation index](index.md)
 
-For the default historical workflow use the [regional ERA5 API](regional-api.md):
-`get_data(start_date, end_date)` or `get_metric(metric_name, start_date, end_date)`.
-Both produce wide hourly/daily H3 Parquets and one catalog, with source caching
-outside the public output directory. The following workflows remain explicit legacy alternatives.
+For the supported coastal product use [get_weather](regional-api.md#approved-coastal-api):
+select the approved study, request inclusive UTC dates and allowed variable families,
+then run `check_weather` with the same study. The API writes exact approved cells
+and both time grains directly, reusing the private fast regional source cache.
+See the [quickstart](getting-started/quickstart.md) for executable examples and the
+[current product](coastal-product.md) for retained-vintage replay. No separate
+support build or intermediate rectangular export is required.
+
+The following workflows remain explicit legacy alternatives.
 
 For a standalone bbox request use the [shared getters and matching CLI](request-api.md);
 for retrospective multi-year ERA5 use [historical backfill](era5-backfill.md).

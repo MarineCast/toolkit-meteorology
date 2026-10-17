@@ -1,12 +1,20 @@
 # Meteorological environmental family
 
-The default historical `get_data` / `get_metric` interface uses ECMWF geographic
+The supported `get_weather(start_date, end_date, variable_list)` contract is the
+[approved coastal product](regional-api.md#approved-coastal-api): exact approved
+R5 membership, inclusive UTC dates, two wide Parquets and a catalog. It retains
+method `era5-retained-exact-coastal-r5-v1` and identifies the direct regional
+producer in `source_method`. Registry/mask validation precedes acquisition.
+Source availability, rainfall boundaries, units and null rules are documented in
+that contract; ERA5/ERA5T revision and historical operational availability remain unknown.
+
+The rectangle compatibility `get_data` / `get_metric` interface uses ECMWF geographic
 ERA5 Zarr and publishes the [regional wide-table contract](regional-api.md), method
 `ecmwf-arco-wide-h3-utc-v1`. Its hourly and daily H3 R5 outputs are distinct from
 the legacy HRRR families and explicit CDS backfill below. Existing statements
 about canonical HRRR acquisition apply to those legacy families only.
 
-The meteorological family uses explicit acquisition, offline build, and inspection contracts.
+The legacy meteorological family below uses explicit acquisition, offline build, and inspection contracts.
 It intentionally uses full model-bounding-box atmospheric H3 support, including land and water;
 seascape's wet-cell universe is not a valid substitute.
 
@@ -273,3 +281,10 @@ source missingness. Daily RH requires all 24 supported derivations. Temperature,
 dewpoint and unrelated metrics retain their own support. No value is clipped.
 Existing short getters retain their strict rejection behavior. Immutable v1
 artifacts and their original method/schema remain unchanged.
+
+A shared registry may declare `mask_relative_path`, `mask_hash_policy=sha256_exact_file_bytes`,
+`manifest_relative_path` and `manifest_sha256`. `load_reporting_membership(study_config)` then
+resolves the exact witnesses under the configured Data root, verifies manifest/membership/mask
+agreement and consumes native R5 IDs. Explicit witness arguments remain supported for older
+callers; conflicts with declared witnesses fail. A planning rectangle is never a reporting-cell
+fallback, and source-native sampling/stencil coverage remains independently required.

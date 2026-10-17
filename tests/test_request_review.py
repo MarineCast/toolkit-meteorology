@@ -1,5 +1,5 @@
 import pytest
-from meteorology import get_weather, get_temperature
+from meteorology import get_weather_request as get_weather, get_temperature
 from .test_request_api import BBOX
 from .request_provider import install_provider
 

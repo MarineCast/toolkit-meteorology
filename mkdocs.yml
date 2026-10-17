@@ -1,5 +1,5 @@
 site_name: Meteorology Toolkit
-site_description: Source-selective weather requests and reproducible meteorological and astronomical products
+site_description: Approved coastal ERA5 weather with a small Python API and reproducible checks
 site_url: https://marinecast.github.io/toolkit-meteorology/
 repo_url: https://github.com/MarineCast/toolkit-meteorology
 repo_name: MarineCast/toolkit-meteorology
@@ -47,9 +47,10 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Get started:
-      - Regional ERA5 API: regional-api.md
-      - Weather requests: request-api.md
-      - Historical ERA5 backfill: era5-backfill.md
+      - Coastal weather API: regional-api.md
+      - Coastal ERA5 product: coastal-product.md
+      - Legacy weather requests: request-api.md
+      - Legacy CDS backfill: era5-backfill.md
       - Quickstart: getting-started/quickstart.md
       - Installation: SETUP.md
       - Configuration: CONFIGURATION.md

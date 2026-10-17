@@ -1,6 +1,6 @@
 """Simple historical weather API: ECMWF ARCO to wide hourly/daily H3 Parquets."""
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 import hashlib
 import json
 from pathlib import Path
@@ -21,6 +21,8 @@ DEFAULT_BBOX = (-129.7, 45.9, -121.5, 51.5)
 VARIABLES = ('temperature', 'dewpoint', 'relative_humidity', 'wind',
              'cloud_cover', 'pressure', 'precipitation')
 METHOD = 'ecmwf-arco-wide-h3-utc-v1'
+COASTAL_METHOD = 'era5-retained-exact-coastal-r5-v1'
+ALLOWED_VARIABLES = VARIABLES
 
 
 @dataclass(frozen=True)
@@ -168,7 +170,8 @@ def hourly_day(cube, day, specs, spatial, counters):
 
 def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteorology',
              cache_dir=None, workers=4, transfer_bytes=8 * 1024**3, max_seconds=3600,
-             metric_name=None):
+             metric_name=None, allow_incomplete_final_day=False,
+             variable_list=None, membership=None):
     """Acquire/reuse regional ERA5 and publish hourly/daily wide H3 R5 Parquets.
 
     Inclusive UTC dates. Output contains exactly two Parquets and catalog.json in
@@ -177,6 +180,12 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
     """
     first, last, bbox = validate(start_date, end_date, bbox, workers, transfer_bytes, max_seconds)
     selected = selections(metric_name)
+    if variable_list is not None:
+        if metric_name is not None:
+            raise ValueError('Choose variable_list or metric_name, not both.')
+        variables = allowed_variables(variable_list)
+        selected = {f: {k: v for k, v in specs.items() if v['variable'] in variables}
+                    for f, specs in selected.items()}
     parameters = sorted({p for specs in selected.values() for spec in specs.values()
                          for p in spec['parameters']})
     output = Path(output_dir).expanduser().resolve()
@@ -199,12 +208,21 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                           max_seconds=max_seconds)
         end_second = int(pd.Timestamp(last, tz='UTC').timestamp()) + 86400
         start_second = int(pd.Timestamp(first, tz='UTC').timestamp())
-        if start_second < archive.times[0] or end_second > archive.times[-1]:
+        boundary = end_second - (3600 if allow_incomplete_final_day or 'tp' not in parameters else 0)
+        if start_second < archive.times[0] or boundary > archive.times[-1]:
             raise ValueError('Dates plus precipitation boundary exceed cached source coverage; '
                              'use a fresh cache to discover a newer vintage.')
         grid = dict(coordinates=archive.coords,
                     metadata=dict(grid_hash=hashlib.sha256(archive.coords.tobytes()).hexdigest()))
         spatial = mapping(grid, bbox, 'h3', cache / 'mapping')
+        if membership is not None:
+            ids, cells, distances, method = spatial
+            lookup = {cell: i for i, cell in enumerate(cells)}
+            if not set(membership.cells) <= lookup.keys():
+                raise ValueError('Approved reporting cells extend outside the source envelope.')
+            positions = [lookup[cell] for cell in membership.cells]
+            spatial = (np.asarray(ids)[positions], list(membership.cells),
+                       np.asarray(distances)[positions], method)
         counts = {'hourly': {}, 'daily': {}}
         rows = {'hourly': 0, 'daily': 0}
         static = dict(method=METHOD, software_version=__version__, source=URL,
@@ -218,6 +236,16 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                       daily_time='DATE is UTC calendar day',
                       null_policy='complete support required; unsupported RH and calm direction are null',
                       attribution='Copernicus Climate Change Service / ECMWF, ERA5, CC BY 4.0')
+        if membership is not None:
+            static.update(method=COASTAL_METHOD, source_method=METHOD,
+                          study_identity=membership.study_identity,
+                          reporting_cell_count=len(membership.cells),
+                          membership_sha256=membership.artifact_sha256,
+                          mask_sha256=membership.mask_sha256, mask_revision=membership.mask_revision,
+                          selection='exact approved R5 membership; direct native source reduction',
+                          availability=dict(kind='retrospective_reanalysis',
+                              historical_available_at_utc=None,
+                              forecast_eligibility='not established'))
         with TransactionalFamilyPublisher(control) as publisher:
             paths = {'hourly': publisher.stage_path(result.hourly_path),
                      'daily': publisher.stage_path(result.daily_path)}
@@ -226,14 +254,22 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                 for stamp in pd.date_range(first, last, freq='D'):
                     archive.checkpoint()
                     day = stamp.date()
-                    cube = archive.cube(day, parameters)
+                    if allow_incomplete_final_day or ('tp' not in parameters and end_second > archive.times[-1]):
+                        cube = archive.cube(day, parameters, allow_missing_boundary=True)
+                    else:
+                        cube = archive.cube(day, parameters)
                     for frequency in ('hourly', 'daily'):
                         table = wide_day(cube, day, selected[frequency], frequency, spatial,
                                          counts[frequency])
                         metadata = dict(static, frequency=frequency,
                                         columns={k: v['units'] for k, v in selected[frequency].items()})
-                        table = table.replace_schema_metadata(
-                            {b'meteorology': json.dumps(metadata, sort_keys=True).encode()})
+                        schema_metadata = {b'meteorology': json.dumps(metadata, sort_keys=True).encode()}
+                        if membership is not None:
+                            schema_metadata[b'coastal_reporting'] = json.dumps(dict(
+                                mask_revision=membership.mask_revision,
+                                membership_sha256=membership.artifact_sha256,
+                                policy='exact approved R5 membership')).encode()
+                        table = table.replace_schema_metadata(schema_metadata)
                         if shutil.disk_usage(control).free < table.nbytes * 2 + 64 * 1024**2:
                             raise ValueError('Insufficient disk to stage the regional output.')
                         if frequency not in writers:
@@ -262,8 +298,15 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
             catalog = dict(schema_version=1, run_date_utc=utcnow(), start_date=str(first),
                            end_date=str(last), **static, source_evidence_sha256=evidence_hash,
                            source_coverage_end=str(archive.times[-1].astype('datetime64[s]')),
-                           products=products, acquisition=dict(requests=archive.requests,
+                           products=products, incomplete_final_day=bool('tp' in parameters and end_second > archive.times[-1]),
+                           acquisition=dict(requests=archive.requests,
                                                               response_bytes=archive.bytes))
+            catalog['latest_complete_all_metric_day'] = str(
+                last - timedelta(days=int(catalog['incomplete_final_day'])))
+            catalog['partial_metric_coverage'] = ([dict(date=str(last), metric='PRECIPITATION_MM',
+                expected_hours=24, valid_hours=23, value_status='PARTIAL',
+                missing_interval_end_utc=str(last + timedelta(days=1)) + 'T00:00:00Z')]
+                if catalog['incomplete_final_day'] else [])
             publisher.stage_manifest(result.catalog_path, catalog)
             publisher.publish()
     return result
@@ -272,3 +315,165 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
 def get_metric(metric_name, start_date, end_date, **options):
     """Publish one metric family or exact catalog column using the same local cache."""
     return get_data(start_date, end_date, metric_name=metric_name, **options)
+
+
+def allowed_variables(variable_list):
+    """Reject misspellings and unsupported families before opening a source/cache."""
+    if isinstance(variable_list, str):
+        raise ValueError('variable_list must be a nonempty list of allowed variable names.')
+    values = list(variable_list)
+    if not values or any(not isinstance(v, str) or v not in VARIABLES for v in values):
+        raise ValueError('Allowed variables: ' + ', '.join(VARIABLES))
+    if len(set(values)) != len(values):
+        raise ValueError('variable_list contains duplicates.')
+    return values
+
+
+def get_weather(start_date, end_date, variable_list=ALLOWED_VARIABLES, *, study_config=None,
+                output_dir='data/meteorology', cache_dir=None, workers=4,
+                transfer_bytes=8 * 1024**3, max_seconds=3600,
+                allow_incomplete_final_day=False):
+    """Publish approved coastal ERA5 weather for inclusive UTC dates.
+
+    Configure MARINECAST_STUDY_CONFIG once, or pass study_config explicitly.
+    All seven allowed families produce the approved 14 daily / 10 hourly fields.
+    Reuses pinned geographic chunks; processes one UTC day at a time.
+    """
+    from .marine_reporting import load_reporting_membership
+
+    variables = allowed_variables(variable_list)
+    member = load_reporting_membership(study_config)
+    study = member.study_identity['study_config']
+    first, last, _ = validate(start_date, end_date, study['domain']['bbox_wgs84'],
+                              workers, transfer_bytes, max_seconds)
+    if str(first) < study['time']['start'] or str(last) >= study['time']['end_exclusive']:
+        raise ValueError('Dates must lie inside the approved study interval.')
+    return get_data(first, last, bbox=study['domain']['bbox_wgs84'],
+                    output_dir=output_dir, cache_dir=cache_dir, workers=workers,
+                    transfer_bytes=transfer_bytes, max_seconds=max_seconds,
+                    variable_list=variables, membership=member,
+                    allow_incomplete_final_day=allow_incomplete_final_day)
+
+
+def check_weather(catalog_path, *, study_config=None):
+    """Read-only, one-day-at-a-time checks of current or newly generated products.
+
+    Checks exact UTC keys, metric schemas/units, file hashes and null/status totals.
+    Pass study_config to additionally verify the approved membership and mask.
+    This is structural/source-contract validation, not independent weather truth.
+    """
+    from .marine_reporting import load_reporting_membership
+
+    path = Path(catalog_path)
+    catalog = json.loads(path.read_text())
+    if catalog.get('method') not in (METHOD, COASTAL_METHOD) or catalog.get('timezone') != 'UTC':
+        raise ValueError('Unsupported weather method or timezone.')
+    member = load_reporting_membership(study_config) if study_config is not None else None
+    if member is not None and any(catalog.get(k) != getattr(member, a) for k, a in (
+            ('membership_sha256', 'artifact_sha256'), ('mask_sha256', 'mask_sha256'),
+            ('mask_revision', 'mask_revision'))):
+        raise ValueError('Catalog differs from approved membership or mask.')
+    first = date.fromisoformat(catalog['start_date'])
+    last = date.fromisoformat(catalog['end_date'])
+    days = (last - first).days + 1
+    if days <= 0:
+        raise ValueError('Invalid catalog date range.')
+    expected_cells = set(member.cells) if member is not None else None
+    summary = {}
+    for frequency, key, periods, dtype in (
+            ('daily', 'DATE', 1, pa.date32()),
+            ('hourly', 'DATETIME', 24, pa.timestamp('us', tz='UTC'))):
+        product = catalog['products'][frequency]
+        if product['file'] != f'meteorology-{frequency}.parquet':
+            raise ValueError('Unexpected weather filename.')
+        source = path.parent / product['file']
+        if source.stat().st_size != product['bytes'] or checksum_path(source) != product['sha256']:
+            raise ValueError('Weather file size/checksum mismatch.')
+        parquet = pq.ParquetFile(source)
+        schema = parquet.schema_arrow
+        specs = metric_specs(frequency)
+        names = schema.names[2:]
+        expected_schema = pa.schema([('H3_INDEX', pa.string()), (key, dtype)] +
+                                   [(name, pa.float64()) for name in names])
+        if (not names or any(name not in specs for name in names) or
+                not schema.equals(expected_schema, check_metadata=False) or
+                len(set(schema.names)) != len(schema.names)):
+            raise ValueError('Unexpected weather Arrow schema.')
+        declared = [dict(name=f.name, dtype=str(f.type), units=specs.get(f.name, {}).get('units'))
+                    for f in schema]
+        if declared != product['columns']:
+            raise ValueError('Catalog columns/types/units differ from metric contract.')
+        metadata = json.loads((schema.metadata or {}).get(b'meteorology', b'{}'))
+        if metadata.get('method') != catalog['method'] or metadata.get('timezone') != 'UTC':
+            raise ValueError('Parquet metadata differs from catalog.')
+        if catalog['method'] == COASTAL_METHOD:
+            coastal = json.loads((schema.metadata or {}).get(b'coastal_reporting', b'{}'))
+            if any(coastal.get(k) != catalog[k] for k in ('membership_sha256', 'mask_revision')):
+                raise ValueError('Parquet membership differs from catalog.')
+        if parquet.num_row_groups != days:
+            raise ValueError('Expected one complete UTC day per row group.')
+        nulls = dict.fromkeys(names, 0)
+        rows = 0
+        for i in range(days):
+            table = parquet.read_row_group(i)
+            frame = table.select(['H3_INDEX', key]).to_pandas()
+            cells = set(frame.H3_INDEX)
+            if expected_cells is None:
+                expected_cells = cells
+            day = first + timedelta(days=i)
+            stamps = ({day} if periods == 1 else
+                      set(pd.date_range(day, periods=24, freq='h', tz='UTC')))
+            if (cells != expected_cells or len(frame) != len(cells) * periods or
+                    set(frame[key]) != stamps or frame.duplicated().any()):
+                raise ValueError('Missing, duplicate or off-grid UTC reporting keys.')
+            if catalog.get('reporting_cell_count', len(cells)) != len(cells):
+                raise ValueError('Reporting cell count differs from catalog.')
+            for name in names:
+                values = table[name].to_numpy(zero_copy_only=False)
+                if np.isinf(values).any() or int(np.isnan(values).sum()) != table[name].null_count:
+                    raise ValueError('Nonfinite weather values must be Arrow nulls.')
+                nulls[name] += table[name].null_count
+            rows += len(table)
+        if rows != product['rows']:
+            raise ValueError('Weather row count differs from catalog.')
+        for name, missing in nulls.items():
+            statuses = product['value_status_counts'][name]
+            if (any(type(v) is not int or v < 0 for v in statuses.values()) or
+                    sum(statuses.values()) != rows or statuses.get('COMPLETE', 0) != rows - missing):
+                raise ValueError('Weather status counts disagree with actual nulls.')
+        if 'null_counts' in product and product['null_counts'] != nulls:
+            raise ValueError('Weather null counts differ from catalog.')
+        summary[frequency] = dict(rows=rows, metrics=len(names), null_counts=nulls)
+    return dict(valid=True, method=catalog['method'], start_date=str(first), end_date=str(last),
+                reporting_cell_count=len(expected_cells), membership_verified=member is not None,
+                products=summary)
+
+
+def main():
+    """Small date-range CLI for the same API and read-only checks."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Approved coastal ERA5 weather')
+    commands = parser.add_subparsers(dest='command', required=True)
+    get = commands.add_parser('get')
+    get.add_argument('start_date')
+    get.add_argument('end_date')
+    get.add_argument('--variables', nargs='+', choices=VARIABLES, default=VARIABLES)
+    get.add_argument('--study-config')
+    get.add_argument('--output-dir', default='data/meteorology')
+    get.add_argument('--cache-dir')
+    get.add_argument('--allow-incomplete-final-day', action='store_true')
+    check = commands.add_parser('check')
+    check.add_argument('catalog_path')
+    check.add_argument('--study-config')
+    options = vars(parser.parse_args())
+    command = options.pop('command')
+    if command == 'check':
+        print(json.dumps(check_weather(**options), indent=2))
+    else:
+        options['variable_list'] = options.pop('variables')
+        print(get_weather(**options).catalog_path)
+
+
+if __name__ == '__main__':
+    main()

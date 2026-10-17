@@ -4,7 +4,7 @@ import re
 
 import pytest
 
-from meteorology import get_temperature, get_weather, get_wind
+from meteorology import get_temperature, get_weather_request as get_weather, get_wind
 from .request_fixtures import era5_grib
 from .test_request_api import BBOX
 

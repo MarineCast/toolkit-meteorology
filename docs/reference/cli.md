@@ -1,6 +1,27 @@
 # Command reference
 
-## Historical ERA5 backfill
+## Approved coastal weather
+
+```sh
+export MARINECAST_STUDY_CONFIG=/path/to/config/study.v1.json
+python -m meteorology.regional get 2009-01-01 2009-01-02 --variables temperature wind --output-dir scratch/weather --cache-dir /path/to/source-cache
+python -m meteorology.regional check scratch/weather/catalog.json --study-config /path/to/config/study.v1.json
+```
+
+`get` takes inclusive start/end dates. Omit `--variables` for all seven allowed
+families. Both commands accept `--study-config`; acquisition also accepts
+`--output-dir`, `--cache-dir` and `--allow-incomplete-final-day`. The latter permits
+only a missing final rainfall boundary hour, leaving its daily total null.
+The output defaults to `data/meteorology`, with a separate sibling private cache.
+`check` is read-only; pass its study option for external registry/mask verification.
+Without it, the result states `membership_verified=False`.
+
+The Python API additionally exposes worker, transfer-byte and elapsed-time caps.
+This module command has no dry-run option. The older `meteorology get` command
+below uses a different request contract and remains a compatibility interface.
+See the [primary API](../regional-api.md#approved-coastal-api).
+
+## Legacy historical ERA5 backfill
 
 ```sh
 meteorology backfill --start-date 2009-01-01 --end-date 2018-12-31 \

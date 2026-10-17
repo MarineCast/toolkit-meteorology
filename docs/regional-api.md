@@ -1,6 +1,74 @@
-# Regional ERA5 API
+# Coastal weather API
 
-The default historical source for `get_data` and `get_metric` is ECMWF's
+## Approved coastal API
+
+`get_weather(start_date, end_date, variable_list)` is the supported coastal entry
+point. Set `MARINECAST_STUDY_CONFIG=/path/to/config/study.v1.json` once, or pass
+`study_config=...`. The approved registry and mask are verified before acquisition;
+there is no implicit developer checkout path or regenerated membership. The current
+approved registry has 463 cells. Installing the wheel does not install owner data.
+
+```python
+from meteorology import get_weather, ALLOWED_VARIABLES, check_weather
+
+result = get_weather("2026-10-09", "2026-10-10", ALLOWED_VARIABLES,
+    study_config="/path/to/config/study.v1.json",
+    cache_dir="/path/to/Data/.meteorology-cache-20261016",
+    output_dir="/path/to/scratch/weather", allow_incomplete_final_day=True)
+check_weather(result.catalog_path, study_config="/path/to/config/study.v1.json")
+```
+
+The allowed list is `temperature`, `dewpoint`, `relative_humidity`, `wind`,
+`cloud_cover`, `pressure`, and `precipitation`. Empty, duplicate or unknown names
+fail before source access. Omit the list for all fields. Only selected
+parameters are fetched. There is no rectangular intermediate export: source
+samples are selected to the exact registry before hourly/daily tables are written.
+The existing scientific method, Arrow schemas, UTC reductions and null rules are
+preserved. `era5-retained-exact-coastal-r5-v1` identifies that same coastal product
+contract; `source_method` identifies the direct regional producer. Direct catalogs
+pin source metadata and object-evidence hashes. Source and output caches stay
+separate. Completed downloads survive a failed run; rerun the same call to resume.
+
+By default a precipitation request needs the next midnight accumulation. Opting
+into `allow_incomplete_final_day` permits only the final missing boundary hour:
+October 10 in the retained 2026-10-16 source has 23 valid precipitation hours,
+null daily precipitation and a null 23:00 hourly value. October 9 is its latest
+complete day. Instantaneous-only requests do not require next midnight. Requests
+beyond the pinned source cutoff fail; dates are never silently shortened. ERA5
+and ERA5T remain retrospective, their historical operational availability unknown.
+
+A single cache pins one source vintage. The current approved full archive uses
+two retained vintages (through October 8, then October 9–10). Replaying each epoch
+with its original cache and combining with `meteorology.coastal` preserves that
+history; a fresh source vintage may revise values. The compact baseline in
+MarineCast/Reports records the exact original hashes. No full archive rebuild is
+part of bounded verification, and changing the source vintage cannot promise
+byte-identical historical files.
+
+```sh
+python -m meteorology.regional get 2026-10-09 2026-10-10 --variables temperature wind --study-config /path/to/study.v1.json --output-dir /path/to/scratch/weather --cache-dir /path/to/cache
+python -m meteorology.regional check /path/to/Data/Meteorology/catalog.json --study-config /path/to/study.v1.json
+```
+
+`check_weather` streams one row group/day at a time. It verifies file hashes,
+Arrow types and units, exact dates and hour-start UTC keys, uniqueness, metric
+null/status totals, catalog metadata and, with `study_config`, exact approved
+membership. It also accepts the existing published coastal catalog. These checks
+establish the output contract, not independent observational accuracy. The generic
+`validate_product` now recognizes these catalogs too. Without `study_config`,
+checks establish consistent membership across files but do not revalidate the
+external registry/mask; the result states `membership_verified=False`.
+
+Regression checks: `python -m pytest -q tests/test_weather_api.py tests/test_regional.py
+ tests/test_coastal.py`. Ordinary tests are offline. Old explicit-source examples
+use `get_weather_request`; HRRR, CDS/GRIB, astronomy and modeling routes are not
+needed to create this approved product and remain compatibility code for a
+separately scoped retirement.
+
+
+## Rectangle compatibility API
+
+The retained rectangular source for `get_data` and `get_metric` is ECMWF's
 geographically chunked ERA5 single-level Zarr store (CC BY 4.0 attribution:
 Copernicus Climate Change Service / ECMWF). Existing explicit-source and HRRR
 APIs retain their contracts. This is reanalysis, not historical forecast availability.
@@ -112,3 +180,8 @@ The final suite passed 541 tests, with the opt-in NOAA test skipped; the install
 wheel passed all 10 regional tests outside the checkout. Lint, strict docs,
 distributions and dependency checks passed. See the
 [machine-readable run evidence](evidence/ecmwf-regional-live-20261015.json).
+
+For a materialized coastal shared study, `load_reporting_membership(study_config)` can obtain its
+mask witness from the pinned registry declaration. Mask and manifest checks precede native R5
+mapping. The explicit-mask API remains available and rejects a witness that conflicts with the
+study. This selection does not trigger acquisition or reconstruct missing source dates.

@@ -4,26 +4,32 @@
 
 [![Offline package checks](https://github.com/MarineCast/toolkit-meteorology/actions/workflows/tests.yml/badge.svg)](https://github.com/MarineCast/toolkit-meteorology/actions/workflows/tests.yml) · [Documentation](https://marinecast.github.io/toolkit-meteorology/) · [Scientific methodology](docs/methodology.md) · [Variable inventory](docs/reference/variables.md)
 
-The default historical Python API uses ECMWF's geographically chunked ERA5:
+The supported product is the approved coastal R5 ERA5 weather dataset. Configure
+`MARINECAST_STUDY_CONFIG` with the approved `study.v1.json`, then:
 
 ```python
-from meteorology import get_data, get_metric
+from meteorology import get_weather, ALLOWED_VARIABLES, check_weather
 
-result = get_data("2009-01-01", "2009-01-31")
-# Reuse the local source cache for a selected metric family:
-wind = get_metric("wind", "2009-01-01", "2009-01-31",
-                  output_dir="data/weather-wind")
+result = get_weather("2009-01-01", "2009-01-31", ALLOWED_VARIABLES)
+check_weather(result.catalog_path, study_config="/path/to/config/study.v1.json")
 ```
 
-Each call publishes `meteorology-hourly.parquet`, `meteorology-daily.parquet`, and
-`catalog.json`. Rows are H3 R5 × UTC hour/date, with weather metrics as columns.
-The default is the coastal study rectangle; `bbox`, `output_dir`, and `cache_dir`
-are configurable. Source chunks remain in a separate private cache. Calls replace
-the requested output set, rather than append to it. See the
-[regional API](docs/regional-api.md) for columns, timing and cache contracts.
-The full-area run for 2009-01-01 through 2026-10-08 produced both Parquets for
-1,761 cells. Its cached export took 12 minutes 52 seconds; this excludes source
-acquisition. See [run evidence and limitations](docs/regional-api.md#full-area-run-2026-10-15).
+Allowed families: `temperature`, `dewpoint`, `relative_humidity`, `wind`,
+`cloud_cover`, `pressure`, `precipitation`. All seven give 14 daily and 10 hourly
+fields. Each call writes `meteorology-hourly.parquet`, `meteorology-daily.parquet`
+and `catalog.json` directly for the approved cells. The fast ECMWF geographic
+chunk source is cached and reused; only selected source fields are fetched.
+Dates are inclusive UTC dates. Use `output_dir` for a separate output and
+`cache_dir` to reuse a pinned vintage. Calls replace the requested output range.
+See the [primary API and checks](docs/regional-api.md#approved-coastal-api).
+
+The primary pipeline is three existing Python modules: `regional.py` (API,
+publication and checks), `regional_source.py` (bounded source/cache), and
+`backfill_compute.py` (shared scientific reductions), plus shared registry and
+transaction utilities. No new pipeline framework or intermediate rectangle export
+is required. Older routes remain compatibility tools, outside the supported
+coastal workflow. The former five-argument `get_weather` is now explicitly named
+`get_weather_request`; its calculations are unchanged.
 
 Explicit-source weather APIs and the matching legacy CLI remain available.
 This independent toolkit preserves source grids, units, coverage,
@@ -59,7 +65,7 @@ print(result.metadata)
 ```
 
 The four required arguments also work positionally. For several variables, use
-`get_weather(variables=["temperature", "wind", "cloud_cover"], ...)`: their input
+`get_weather_request(variables=["temperature", "wind", "cloud_cover"], ...)`: their input
 dependencies are acquired once. This bounded real-data example performs provider
 access; the new live path has not been executed during this refactor.
 

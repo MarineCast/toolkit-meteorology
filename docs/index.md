@@ -1,134 +1,48 @@
 ![Engraved weather station amid clouds, rain, mountains, and pressure systems](assets/banner.png)
 
-# Reproducible context for environmental modeling
+# Coastal ERA5 weather
 
-The default historical interface is the [regional ERA5 API](regional-api.md):
-`get_data(start_date, end_date)` and `get_metric(metric_name, start_date, end_date)`.
-It uses ECMWF's geographic Zarr store and publishes wide hourly/daily H3 R5
-Parquets plus one small catalog.
-
-The toolkit also retrieves selected weather variables through explicit-source Python getters
-and the `meteorology get` command. Choose HRRR or ERA5 explicitly, preview a bounded
-request, then retain daily or hourly data with units, coverage, nulls and
-checksum-backed source lineage. The package also builds independently versioned
-weather, daylight and lunar families.
-
-Start with the [quickstart](getting-started/quickstart.md) and
-[weather request guide](request-api.md). Python 3.11–3.13 on macOS/Linux is supported.
-The [Python API](reference/api.md) and [CLI reference](reference/cli.md) document
-both selective requests and existing family workflows.
-
-For the explicit CDS monthly-job alternative, use the
-[ERA5 backfill API and CLI](era5-backfill.md). It plans monthly regional jobs,
-resumes valid completed work and writes daily native-grid or optional sampled
-R5 features. See the [measured performance and remaining qualification gates](era5-backfill-performance.md).
-
-<div class="grid cards" markdown>
-
-- :material-weather-partly-cloudy: **Selective weather**<br>
-  Request only supported quantities. HRRR offers R5 or native support; ERA5 retains its native distribution grid.
-
-- :material-clock-outline: **Daily and hourly results**<br>
-  Actual UTC samples, complete-day reductions, explicit missingness and disk-backed exports with reusable caches.
-
-- :material-weather-sunny: **Daylight**<br>
-  Deterministic solar context at R4, including a compact 365/366-day lookup and explicit polar missingness.
-
-- :material-moon-waning-crescent: **Lunar context**<br>
-  Approximate phase, illumination and geometrical moon visibility at R5. Actual surface illumination is outside the method.
-
-- :material-file-check-outline: **Validated releases**<br>
-  Checksummed tables and manifests identify software, method, execution and content release independently.
-
-</div>
-
-## Preview a request
-
-```bash
-python -m pip install '.[native-pilot]'  # from a clone, for selective HRRR
-meteorology sources
-meteorology variables --data-source hrrr
-meteorology get temperature --start-date 2024-01-01 --end-date 2024-01-01 \
-  --bbox -124 48 -123 48.5 --data-source hrrr --dry-run
-```
-
-The preview makes no provider requests or writes and requires no initialized
-workspace. It reports dependencies, UTC boundaries, support, cache status and
-resource caps. Replace `--dry-run` with `--cache-dir ./weather-cache --output
-temperature.parquet` to acquire the selected fields and export the result.
+The supported product is hourly and daily weather for the approved coastal H3 R5
+registry. One API uses ECMWF's fast geographically chunked ERA5 archive and writes
+two Parquets plus `catalog.json` directly for the approved cells.
 
 ```python
-from meteorology import get_temperature
+from meteorology import get_weather, ALLOWED_VARIABLES, check_weather
 
-preview = get_temperature(
-    "2024-01-01", "2024-01-01", (-124.0, 48.0, -123.0, 48.5), "hrrr",
-    dry_run=True,
-)
+# Configure MARINECAST_STUDY_CONFIG with the approved study.v1.json first.
+result = get_weather("2009-01-01", "2009-01-31", ALLOWED_VARIABLES)
+check_weather(result.catalog_path, study_config="/path/to/config/study.v1.json")
 ```
 
-Without `dry_run=True`, a getter returns `WeatherResult`: `.to_pandas()` loads the
-selected rows and `.to_parquet(path)` streams an export with durable metadata.
-Dates are inclusive UTC days. Source support and accumulation rules are detailed
-in the [request guide](request-api.md).
+The seven allowed families are temperature, dewpoint, relative humidity, wind,
+cloud cover, pressure and precipitation. All seven produce 14 daily and 10 hourly
+metric columns. The current approved product has 463 cells. Dates are inclusive
+UTC days; precipitation requires the following midnight accumulation. Unsupported
+values remain null. This is retrospective reanalysis, with historical operational
+availability unknown; no forecast qualification is implied.
 
-## Try the software offline
+Start with the [quickstart](getting-started/quickstart.md), then the
+[coastal API and checks](regional-api.md#approved-coastal-api).
+The [current product](coastal-product.md) documents the original source vintages,
+coverage and partial final day. [Python](reference/api.md) and
+[command](reference/cli.md) references describe the installed interfaces.
 
-From a clone, the request demo uses generated ERA5 GRIB through the public getter:
+The primary path uses three existing modules: source/cache, scientific reduction,
+and API/publication/checks, plus shared registry and transaction utilities. It
+processes one day at a time and reuses checksummed cached source chunks. Each call
+replaces its requested output range; use a scratch output directory for experiments.
 
-```bash
-python -m pip install '.[era5]'
-python demo/request_offline.py --output ./request-demo
-```
+## Compatibility workflows
 
-For a core-only installed-package example, use a fresh workspace:
+The [rectangle exporter](regional-api.md#rectangle-compatibility-api),
+[explicit-source requests](request-api.md), [CDS backfill](era5-backfill.md),
+[HRRR families](hourly-weather.md), daylight and lunar workflows remain available
+for existing callers. They are not required to produce the approved coastal files.
+The former five-argument `get_weather` is named `get_weather_request`.
+See [architecture](ARCHITECTURE.md) for the retained modules and
+[contracts](CONTRACTS.md) for their separate scientific semantics.
 
-```bash
-meteorology --workspace ./weather-demo init
-meteorology --workspace ./weather-demo example-offline
-meteorology --workspace ./weather-demo validate \
-  --daily-matrix ./weather-demo/outputs/synthetic-daily-matrix.parquet
-```
-
-Both examples label their inputs **synthetic** and make no provider requests.
-Generated-GRIB and mocked-HTTP checks establish software behavior; new live
-NOAA/CDS query compatibility and independent regional accuracy remain unverified
-in this refactor. See the [implementation tracker](IMPLEMENTATION_TRACKER.md) and
-[measured refactor evidence](request-refactor-evidence.md).
-
-## One week of real weather
-
-The [live one-week demo](live-week-demo.md) builds hourly H3 releases and compact
-daily/weekly H3 and regional summaries, with explicit transfer budgets, resumption
-and resource accounting. Observational accuracy and future forecast skill remain
-separate acceptance gates.
-
-## Existing family products
-
-The original daily weather family uses six local-day HRRR `sfc/f00` analyses and
-matched `sfc/f01` precipitation-rate forecasts. `PRECIP_MM_DAY_ESTIMATE` remains an
-estimate from six snapshots, separate from the selective ERA5 hourly accumulation
-totals. The [hourly H3 family](hourly-weather.md) retains distinct f00 values at
-each actual UTC hour. These family workflows preserve their original local-day,
-DST, method and release contracts.
-
-```mermaid
-flowchart LR
-  H[HRRR f00 and f01] --> A[Acquisition and identity validation]
-  A --> S[Nearest grid to H3 R5]
-  S --> W[Strict six-snapshot daily weather]
-  D[Solar geometry] --> DL[R4 daylight]
-  M[Lunar geometry] --> L[R5 lunar context]
-  W --> P[Schema, checksums and manifest]
-  DL --> P
-  L --> P
-  P --> X[Optional native-resolution daily matrix]
-  X --> V[Validation and inspection]
-```
-
-Solar and lunar products require H3 support, but no HRRR acquisition. The optional daily matrix retains R4 and R5 rows separately; unsupported component columns remain null.
-
-Weather, daylight and lunar context do not measure species occurrence, observer access, reporting, or detection probability. Read the [scientific methodology](methodology.md) and [limitations](limitations.md) before using these values as predictors.
-
-Use [shared-study configuration](shared-study.md) and
-[marine reporting integration](marine-reporting.md) for production study outputs;
-their geometry, registry and publication gates remain separate from a bbox query.
+Python 3.11–3.13 on macOS/Linux is supported by package configuration. See the
+[verification record](coastal-product.md#primary-api-verification-2026-10-17) for
+the environment and checks actually exercised. Weather context does not measure
+species occurrence, reporting or detection probability.

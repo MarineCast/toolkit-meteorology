@@ -7,7 +7,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from meteorology import (
-    get_weather,
+    get_weather_request as get_weather,
     get_temperature,
     get_precip,
     get_precipitation,

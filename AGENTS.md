@@ -172,3 +172,7 @@ then the full suite and ordinary lint/docs/distribution checks. The live
 `benchmarks/era5_backend_comparison.py` phases are explicit acquisition: two UTC
 days, seven fields, four workers, separate processes and local caches. Read
 `docs/era5-backfill-performance.md` for caps, numerical comparison and limitations.
+
+Coastal retained-product publication: `python -m pytest -q tests/test_coastal.py tests/test_regional.py tests/test_marine_reporting.py`, then the full suite and ordinary lint/docs/distribution/installed-wheel checks. Read `docs/coastal-product.md` before current-product updates; preserve retained sources and exact approved registry membership.
+
+Primary coastal API: `python -m pytest -q tests/test_weather_api.py tests/test_regional.py tests/test_coastal.py`, then full suite, lint, strict docs and installed-wheel checks. See docs/regional-api.md#approved-coastal-api. Never overwrite approved Data outputs for tests.

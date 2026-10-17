@@ -211,18 +211,24 @@ class Archive:
         self.blocks[key] = array
         return array
 
-    def cube(self, day, parameters):
+    def cube(self, day, parameters, *, allow_missing_boundary=False):
         import pandas as pd
         stamps = pd.date_range(day, periods=25, freq='h', tz='UTC').as_unit('ns')
         seconds = stamps.asi8 // 10**9
         positions = np.searchsorted(self.times, seconds)
-        if (positions[-1] >= len(self.times)
-                or not np.array_equal(self.times[positions], seconds)):
-            raise ValueError('Requested dates/boundary hour exceed the pinned ERA5 coverage.')
+        supported = positions < len(self.times)
+        if not supported.all():
+            if (not allow_missing_boundary or not supported[:-1].all()
+                    or supported[-1] or seconds[-1] != self.times[-1] + 3600):
+                raise ValueError('Requested dates/boundary hour exceed the pinned ERA5 coverage.')
+        if not np.array_equal(self.times[positions[supported]], seconds[supported]):
+            raise ValueError('Requested source time coordinates differ.')
         values = []
         evidence = {}
         for p in parameters:
-            rows = [self.block(p, int(h // 67584))[h % 67584] for h in positions]
+            rows = [self.block(p, int(h // 67584))[h % 67584] if good
+                    else np.full(len(self.coords), np.nan)
+                    for h, good in zip(positions, supported)]
             values.append(np.array(rows, dtype=np.float64))
             for h, stamp in enumerate(stamps):
                 evidence[f'{len(values) - 1}/{h}'] = dict(

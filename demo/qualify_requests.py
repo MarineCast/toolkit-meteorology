@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
-from meteorology import get_weather
+from meteorology import get_weather_request as get_weather
 from meteorology.era5.resources import Limits
 
 

@@ -18,7 +18,7 @@ These commands install local source. This task does not establish PyPI publicati
 ## Python and CLI
 
 ```python
-from meteorology import get_temperature, get_weather
+from meteorology import get_temperature, get_weather_request
 
 result = get_temperature("2024-01-01", "2024-01-01",
                          (-124.0, 48.0, -123.0, 48.5), "hrrr",
@@ -27,7 +27,7 @@ df = result.to_pandas()
 result.to_parquet("temperature.parquet")
 print(result.metadata)
 
-mixed = get_weather(variables=["temperature", "wind", "cloud_cover"],
+mixed = get_weather_request(variables=["temperature", "wind", "cloud_cover"],
                     start_date="2024-01-01", end_date="2024-01-01",
                     bbox=(-124.0, 48.0, -123.0, 48.5), data_source="hrrr",
                     frequency="daily", h3_resolution=5, cache_dir="./weather-cache")
@@ -382,7 +382,7 @@ result pins remain available for inspecting historical evidence.
 
 ## Opt-in qualification through public getters
 
-`demo/qualify_requests.py` uses `get_weather`, native support and one exact UTC day.
+`demo/qualify_requests.py` uses `get_weather_request`, native support and one exact UTC day.
 Its default is offline planning. Caps are explicit: memory 1 GiB, staging 2 GiB,
 transfer 512 MiB, elapsed 1800 seconds; HRRR has 128 request reservations and ERA5
 32. Retries/polling remain charged. No case, bbox or cap is widened automatically.

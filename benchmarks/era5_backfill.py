@@ -18,7 +18,7 @@ import numpy as np
 import psutil
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
-from meteorology import get_weather, backfill_weather
+from meteorology import get_weather_request as get_weather, backfill_weather
 from meteorology.backfill_plan import DEFAULT_VARIABLES
 from tests.test_backfill import Provider
 import meteorology.era5.source as source

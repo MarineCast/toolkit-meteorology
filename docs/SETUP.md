@@ -19,7 +19,13 @@ python -m pip install -e '.[test]'
 python -m pytest -q
 ```
 
-For selective HRRR requests install `.[native-pilot]`; ERA5 uses `.[era5]`.
+For the primary coastal API, core installation is sufficient. Set
+`MARINECAST_STUDY_CONFIG` to the approved owner study configuration and retain its
+registry/mask inputs. Configure CDS credentials only for uncached ECMWF access;
+see the [quickstart](getting-started/quickstart.md). No `meteorology init` is required.
+
+For selective HRRR requests install `.[native-pilot]`; the legacy CDS/GRIB ERA5
+route uses `.[era5]`.
 HTML map inspectors use `.[visualization]`. Generic getters need no workspace
 initialization; see [weather requests](request-api.md). For legacy live Herbie
 acquisition, install `.[acquisition]` instead, or combine extras as

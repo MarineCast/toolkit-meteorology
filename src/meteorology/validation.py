@@ -111,6 +111,9 @@ def validate_product(manifest_path: str | Path) -> dict[str, Any]:
     # The filename is configurable. A frozen release has its own immutable copy
     # and can be validated without creating a lock file in the archive.
     preview = json.loads(path.read_text(encoding="utf-8"))
+    if preview.get('method') in ('ecmwf-arco-wide-h3-utc-v1', 'era5-retained-exact-coastal-r5-v1'):
+        from .regional import check_weather
+        return check_weather(path)
     if preview.get("product") == "meteorological.weather_summary":
         from .weather_summary import validate_weather_summary
         from .core.artifacts import TransactionalFamilyPublisher

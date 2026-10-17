@@ -1,29 +1,51 @@
 # Quickstart
 
-Use Python 3.11–3.13 on macOS or Linux. Selective requests use explicit dates,
-bounds and source, without workspace initialization. The separate family example
-uses a one-day Pacific Northwest configuration shipped in the wheel.
+Use Python 3.11–3.13 on macOS or Linux. Install the core package from a clone with
+`python -m pip install .`; this workflow does not require GRIB/HRRR extras.
 
-## Default: regional ERA5 Parquets
+## Approved coastal weather
 
-Install the core package with `python -m pip install .` from a clone, then configure
-CDS credentials as described in the [regional guide](../regional-api.md).
+Select the approved owner-managed study and its registry once:
 
-```python
-from meteorology import get_data
-
-result = get_data("2009-01-01", "2009-01-31", output_dir="data/weather")
-print(result.hourly_path, result.daily_path, result.catalog_path)
+```sh
+export MARINECAST_STUDY_CONFIG=/path/to/config/study.v1.json
 ```
 
-This acquires real ECMWF data and writes two wide H3 R5 Parquets plus a catalog.
-Dates are inclusive UTC days. The default coastal bbox is configurable; source
-chunks remain in a private sibling cache. Each call replaces the output set.
-Use `get_metric` for selected metrics. See the guide for complete coverage,
-precipitation boundaries, cache reuse and resource limits.
+For uncached acquisition, configure `CDSAPI_KEY`, `CDSAPI_RC`, or `~/.cdsapirc`
+as described in the [source guide](../regional-api.md). A complete retained-cache
+replay requires no credential or provider request.
 
-The remaining examples use the explicit-source APIs and their separate long-table
-contracts. These remain available for HRRR and CDS GRIB workflows.
+```python
+from meteorology import get_weather, ALLOWED_VARIABLES, check_weather
+
+result = get_weather("2009-01-01", "2009-01-02", ALLOWED_VARIABLES,
+                     output_dir="scratch/weather", cache_dir="/path/to/source-cache")
+print(result.hourly_path, result.daily_path, result.catalog_path)
+check_weather(result.catalog_path, study_config="/path/to/config/study.v1.json")
+```
+
+Use a list such as `["temperature", "wind"]` to fetch only those families.
+Omitting the list selects all seven. Unknown, duplicate and empty selections fail.
+Dates are inclusive UTC days inside the approved study. Output is exact approved
+R5 membership, with no rectangular intermediate. Each call replaces the output
+range and columns; it does not append. Keep source cache and output separate.
+
+The source cache pins a vintage. Rerun a failed call to reuse completed source
+objects; use a fresh cache only when deliberately discovering a newer vintage.
+Requests beyond cached source coverage fail. Full-day rainfall needs next midnight;
+`allow_incomplete_final_day=True` permits only the missing final boundary hour,
+retaining null daily rainfall. Read the [API contract](../regional-api.md#approved-coastal-api)
+before selecting that option. This API produces retrospective reanalysis.
+
+```sh
+python -m meteorology.regional get 2009-01-01 2009-01-02 --variables temperature wind --output-dir scratch/weather --cache-dir /path/to/source-cache
+python -m meteorology.regional check scratch/weather/catalog.json --study-config /path/to/config/study.v1.json
+```
+
+## Compatibility examples
+
+The remaining examples use separate explicit-source and legacy family contracts;
+they are unnecessary for the approved coastal product.
 
 ## Install and inspect
 
@@ -83,7 +105,7 @@ result.to_parquet("temperature.parquet")
 `WeatherResult` stays on disk until materialization is requested. Daily long rows
 include date, support identity, metric, value, units, status and coverage. A
 temperature mean requires 24 finite UTC samples; incomplete days remain null.
-Use `get_weather(variables=["temperature", "wind"], ...)` to acquire shared inputs
+Use `get_weather_request(variables=["temperature", "wind"], ...)` to acquire shared inputs
 once, or `frequency="hourly"` to keep hourly values. Consult the
 [source support matrix, credentials and error guide](../request-api.md) before
 changing source, quantity or support.

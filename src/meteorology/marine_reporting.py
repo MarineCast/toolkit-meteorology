@@ -54,7 +54,11 @@ def _parse_membership_ids(raw: bytes) -> tuple[str, ...]:
 
 
 def load_reporting_membership(
-    study_config, *, mask_path: str | Path, mask_hash_policy: str, resolution: int = 5
+    study_config,
+    *,
+    mask_path: str | Path | None = None,
+    mask_hash_policy: str | None = None,
+    resolution: int = 5,
 ) -> ReportingMembership:
     """Consume exact owner-declared R5 support after production gates.
 
@@ -70,6 +74,31 @@ def load_reporting_membership(
     if resolution != identity["study_config"]["products"]["meteorology"]["h3_resolution"]:
         raise ValueError("Meteorology marine reporting uses the configured R5 registry only.")
     registry = identity["study_config"]["grid_registry"]
+    root = Path(identity["resolved_data_root"])
+    if "mask_relative_path" in registry:
+        relative_mask = Path(registry["mask_relative_path"])
+        declared_mask = (selected.parent / relative_mask).resolve()
+        if relative_mask.is_absolute() or not declared_mask.is_relative_to(root):
+            raise ValueError("Declared mask must remain beneath shared Data root.")
+        if mask_path is not None and Path(mask_path).resolve() != declared_mask:
+            raise ValueError("Explicit mask differs from the shared declaration.")
+        mask_path = declared_mask
+        if mask_hash_policy is not None and mask_hash_policy != registry["mask_hash_policy"]:
+            raise ValueError("Explicit mask hash policy differs from the shared declaration.")
+        mask_hash_policy = registry["mask_hash_policy"]
+        relative_manifest = Path(registry["manifest_relative_path"])
+        manifest_path = (selected.parent / relative_manifest).resolve()
+        if relative_manifest.is_absolute() or not manifest_path.is_relative_to(root):
+            raise ValueError("Mask manifest must remain beneath shared Data root.")
+        manifest_raw = manifest_path.read_bytes()
+        if hashlib.sha256(manifest_raw).hexdigest() != registry["manifest_sha256"]:
+            raise ValueError("Mask manifest SHA256 mismatch.")
+        from .study import parse_json_bytes
+
+        manifest = parse_json_bytes(manifest_raw)
+        for field in ("mask_revision", "mask_sha256", "mask_hash_policy", "memberships"):
+            if manifest[field] != registry[field]:
+                raise ValueError("Mask manifest differs from shared registry.")
     entries = [
         m
         for m in registry["memberships"]
@@ -95,7 +124,7 @@ def load_reporting_membership(
         raise ValueError(
             "Mask hash policy requires its matching owner verifier; no guessed file-byte identity."
         )
-    if not Path(mask_path).is_file():
+    if mask_path is None or not Path(mask_path).is_file():
         raise ValueError("Exact-file mask witness must be a regular file.")
     mask_hash = checksum_path(Path(mask_path))
     if mask_hash != registry["mask_sha256"]:
