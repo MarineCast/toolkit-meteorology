@@ -15,6 +15,7 @@ import numpy as np
 from .artifacts import checksum_path
 from .core.artifacts import atomic_write_json
 from .credentials import resolve_credentials
+from .run_settings import log
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
@@ -49,7 +50,8 @@ class Archive:
     """Caller holds the cache writer lock. Metadata and completed objects are pinned."""
 
     def __init__(self, root, bbox, *, workers=4, transfer_bytes=8 * 1024**3,
-                 max_seconds=3600, fetcher=None):
+                 max_seconds=3600, fetcher=None, verbosity=False):
+        self.verbosity = verbosity
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         self.fetcher = fetcher or fetch
@@ -115,6 +117,7 @@ class Archive:
                 raise ValueError('Corrupt cached ECMWF object: ' + name)
             with self.lock:
                 self.used[name] = record
+            log(getattr(self, 'verbosity', False), f'Cache hit: {name} ({record["bytes"]:,} bytes; no API call)')
             return path.read_bytes()
         if shutil.disk_usage(self.root).free < limit + 64 * 1024**2:
             raise ValueError('Insufficient disk for regional source object.')
@@ -122,10 +125,21 @@ class Archive:
             if self.requests >= 20000 or self.bytes + limit > self.cap:
                 raise ValueError('Regional request/transfer cap exceeded.')
             self.requests += 1
+            request_number = self.requests
             self.bytes += limit
-        body = self.fetcher(name, limit)
-        if len(body) > limit:
-            raise ValueError('Regional object exceeded transfer cap.')
+        verbose = getattr(self, 'verbosity', False)
+        started = time.perf_counter()
+        log(verbose, f'API call #{request_number}: GET {name} (attempt 1/1; no automatic retries)')
+        try:
+            body = self.fetcher(name, limit)
+            if len(body) > limit:
+                raise ValueError('Regional object exceeded transfer cap.')
+        except Exception as error:
+            log(verbose, f'API call #{request_number} failed after {time.perf_counter() - started:.2f}s '
+                f'({type(error).__name__}; details redacted). No automatic retry; rerun to resume verified cache.')
+            raise
+        log(verbose, f'API call #{request_number} completed in {time.perf_counter() - started:.2f}s; '
+            f'{len(body):,} bytes received')
         path.parent.mkdir(parents=True, exist_ok=True)
         temporary = path.with_name(path.name + '.partial')
         with temporary.open('wb') as stream:
@@ -178,6 +192,7 @@ class Archive:
             if checksum_path(path) != record['sha256']:
                 raise ValueError('Corrupt cached regional array.')
             self.used.update(record['sources'])
+            log(getattr(self, 'verbosity', False), f'Array cache reused: {parameter}, time block {index} (no API call)')
         else:
             if shutil.disk_usage(self.root).free < size * len(self.coords) * 4 + 512 * 1024**2:
                 raise ValueError('Insufficient disk for regional array and source chunks.')

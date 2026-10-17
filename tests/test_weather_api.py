@@ -459,3 +459,51 @@ def test_new_precipitation_metric_requires_boundary_opt_in(weather, monkeypatch)
     assert report['products']['daily']['null_counts']['TEMPERATURE_2M_C_MEAN'] == 0
     catalog = json.loads(result.catalog_path.read_text())
     assert catalog['incomplete_final_day'] and len(catalog['partial_metric_coverage']) == 1
+
+
+
+def test_verbose_run_reports_safe_effective_settings_plan_and_timings(weather, monkeypatch, capsys):
+    monkeypatch.setenv('CDSAPI_KEY', 'private-token-must-not-appear')
+    weather['verbosity'] = True
+    result = get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
+    output = capsys.readouterr()
+    assert output.out == ''
+    for key in ('DATA_DIR', 'START_DATE', 'END_DATE', 'VERBOSITY', 'REBUILD', 'METRICS'):
+        assert key in output.err
+    for message in ('Preflight passed', 'Mode: REBUILD', 'Missing dates: 1 UTC day',
+                    'Query plan: UTC 2009-01-01 through 2009-01-01; native fields t2m',
+                    'Source metadata/cache ready', 'query/cache', 'processing/write',
+                    'finalization', 'publication', 'API calls 0', 'Weather run completed'):
+        assert message in output.err
+    assert 'private-token-must-not-appear' not in output.err
+    assert all(line.startswith('[meteorology ') for line in output.err.splitlines())
+    assert check_weather(result.catalog_path)['valid']
+
+
+def test_verbose_append_and_noop_report_missing_work(weather, capsys):
+    weather['verbosity'] = False
+    get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
+    assert not capsys.readouterr().err
+    weather.update(verbosity=True, rebuild=False)
+    get_weather('2009-01-02', '2009-01-02', ['pressure'], **weather)
+    output = capsys.readouterr()
+    assert 'Mode: APPEND' in output.err
+    assert 'Saved product validation passed' in output.err
+    assert 'Missing dates: 1 UTC day; 2009-01-02 through 2009-01-02' in output.err
+    assert 'New metrics to backfill: pressure across 2009-01-01 through 2009-01-01' in output.err
+    get_weather('2009-01-01', '2009-01-02', ['temperature', 'pressure'], **weather)
+    output = capsys.readouterr()
+    assert 'Missing dates: none' in output.err
+    assert 'Query 0.00s; processing 0.00s; API calls 0' in output.err
+    assert 'Publishing' not in output.err and 'API call #' not in output.err
+
+
+def test_verbose_cli_keeps_stdout_to_catalog_path(weather, monkeypatch, capsys):
+    monkeypatch.setattr('sys.argv', ['meteorology', 'get', '2009-01-01', '2009-01-01',
+        '--variables', 'temperature', '--output-dir', str(weather['output_dir']),
+        '--cache-dir', str(weather['cache_dir']), '--verbose', '--rebuild'])
+    regional.main()
+    output = capsys.readouterr()
+    assert output.out.strip() == str(weather['output_dir']/'catalog.json')
+    assert len(output.out.splitlines()) == 1
+    assert 'Preflight passed' in output.err and 'Weather run completed' in output.err

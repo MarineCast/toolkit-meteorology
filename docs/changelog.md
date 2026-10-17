@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — verbose run diagnostics
+
+Show timestamped resolved settings and output/query plans, missing dates/metrics,
+cache reuse, actual API attempts and safe failure messages on stderr. Measure
+query/cache, processing/write, finalization, publication and total elapsed times.
+Report the actual no-automatic-retry policy; preserve quiet mode and CLI stdout.
+
 ## Unreleased — preflight and metric backfill
 
 Add one side-effect-free settings preflight with aggregated errors, required file

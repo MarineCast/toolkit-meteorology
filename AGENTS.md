@@ -37,7 +37,12 @@ all six effective values; no-file Python API calls retain validated optional def
 Check date order, unique allowed metrics, booleans, readable/unique assignments and
 output ancestor permissions before study loading, locks or source access. Report
 all errors together without raw values. `meteorology preflight` checks settings
-without running. Test settings in temporary directories, never personal defaults.
+without running. Test settings in temporary directories, never personal defaults. Verbose diagnostics
+use `run_settings.log` on stderr with UTC timestamps: whitelist resolved run keys,
+show actual missing/query plans, cache/API events and measured stage timings.
+Credentials, headers, response bodies and raw exception text must not enter logs.
+Do not claim automatic retries: none are implemented. Preserve quiet progress when
+false and catalog-only CLI stdout; test cache/no-op and failure-redaction messages.
 
 The installed CLI is `meteorology get [START] [END] --variables ...` and
 `meteorology check CATALOG --study-config PATH`; `python -m meteorology` uses the

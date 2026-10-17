@@ -30,7 +30,8 @@ Run `meteorology get` or `get_weather()` from that directory to use these defaul
 Explicit arguments override process environment, which overrides `.env`. Relative
 `DATA_DIR` in the file resolves beside the file. `.env` is private and ignored;
 only `.env.example` is committed. Progress goes to stderr; use `--no-verbose` or
-`verbosity=False` to silence it. Study configuration and provider credentials are
+`verbosity=False` to silence it. Verbose messages show resolved settings, missing
+work, cache/API events, retry policy, and query/processing/publication timings. Study configuration and provider credentials are
 still required separately. This example targets the current product directory;
 use a scratch `DATA_DIR` for experiments. Merely editing settings runs no pipeline.
 

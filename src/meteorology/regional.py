@@ -6,7 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
-import sys
+import time
 
 import numpy as np
 import pandas as pd
@@ -18,7 +18,7 @@ from ._version import __version__
 from .compute import BASE, WIND, day_frames, mapping, series
 from .core.artifacts import TransactionalFamilyPublisher
 from .regional_source import Archive, URL, utcnow
-from .run_settings import VARIABLES
+from .run_settings import VARIABLES, log
 
 DEFAULT_BBOX = (-129.7, 45.9, -121.5, 51.5)
 METHOD = 'ecmwf-arco-wide-h3-utc-v1'
@@ -176,12 +176,10 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
     expected = {p.name for p in (result.hourly_path, result.daily_path, result.catalog_path)}
     if output.exists() and any(p.name not in expected for p in output.iterdir()):
         raise ValueError('Choose a dedicated output directory; unrelated files are preserved.')
-    if verbosity:
-        print(f"Weather {first} through {last}: opening source/cache", file=sys.stderr, flush=True)
+    started = time.perf_counter()
+    query_seconds = processing_seconds = 0.0
     # Cache lock prevents duplicate downloads and conflicting source receipts.
     with TransactionalFamilyPublisher._exclusive_parent(cache):
-        archive = Archive(cache, bbox, workers=workers, transfer_bytes=transfer_bytes,
-                          max_seconds=max_seconds)
         old = existing or {}
         old_first = date.fromisoformat(old['start_date']) if old else None
         old_last = date.fromisoformat(old['end_date']) if old else None
@@ -197,10 +195,22 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
         queries = [(a, b, parameters, selected) for a, b in missing]
         if backfill_parameters:
             queries.append((old_first, old_last, backfill_parameters, backfill))
-        if verbosity:
-            for a, b, fields, scope in queries:
-                print(f'Acquiring UTC {a} through {b}: {", ".join(fields)}',
-                      file=sys.stderr, flush=True)
+        missing_days = sum((b - a).days + 1 for a, b in missing)
+        ranges = ', '.join(f'{a} through {b}' for a, b in missing) or 'none'
+        log(verbosity, f'Missing dates: {missing_days:,} UTC day{"s" if missing_days != 1 else ""}; {ranges}')
+        additions = sorted({spec['variable'] for specs in backfill.values() for spec in specs.values()})
+        log(verbosity, 'New metrics to backfill: ' + (', '.join(additions) or 'none') +
+            (f' across {old_first} through {old_last}' if additions else ''))
+        for a, b, fields, scope in queries:
+            log(verbosity, f'Query plan: UTC {a} through {b}; native fields {", ".join(fields)}')
+        log(verbosity, f'Opening regional source/cache at {json.dumps(str(cache))}')
+        log(verbosity, f'ECMWF ARCO endpoint: {URL}')
+        metadata_started = time.perf_counter()
+        archive = Archive(cache, bbox, workers=workers, transfer_bytes=transfer_bytes,
+                          max_seconds=max_seconds, verbosity=verbosity)
+        query_seconds += time.perf_counter() - metadata_started
+        log(verbosity, f'Source metadata/cache ready in {query_seconds:.2f}s; '
+            f'coverage ends {archive.times[-1].astype("datetime64[s]")} UTC')
         for a, b, fields, scope in queries:
             start_second = int(pd.Timestamp(a, tz='UTC').timestamp())
             end_second = int(pd.Timestamp(b, tz='UTC').timestamp()) + 86400
@@ -261,17 +271,22 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                     archive.checkpoint()
                     day = stamp.date()
                     reuse = bool(old and old_first <= day <= old_last)
-                    if verbosity:
-                        action = 'Reusing' if reuse else 'Processing'
-                        print(f"{action} UTC day {day}", file=sys.stderr, flush=True)
+                    day_started = time.perf_counter()
+                    action = 'Reusing' if reuse else 'Processing'
+                    log(verbosity, f"{action} UTC day {day}")
                     current_parameters = backfill_parameters if reuse else parameters
+                    query_started = time.perf_counter()
                     if current_parameters:
+                        log(verbosity, f'Query/cache read for {day}: {", ".join(current_parameters)}')
                         if ((allow_incomplete_final_day and day == last) or
                                 ('tp' not in current_parameters and
                                  int(pd.Timestamp(day, tz='UTC').timestamp()) + 86400 > archive.times[-1])):
                             cube = archive.cube(day, current_parameters, allow_missing_boundary=True)
                         else:
                             cube = archive.cube(day, current_parameters)
+                    elapsed_query = time.perf_counter() - query_started if current_parameters else 0.0
+                    query_seconds += elapsed_query
+                    processing_started = time.perf_counter()
                     for frequency in ('hourly', 'daily'):
                         if reuse:
                             table = retained[frequency].read_row_group((day - old_first).days)
@@ -308,6 +323,10 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                                                                  compression='zstd')
                         writers[frequency].write_table(table, row_group_size=65536)
                         rows[frequency] += len(table)
+                    elapsed_processing = time.perf_counter() - processing_started
+                    processing_seconds += elapsed_processing
+                    log(verbosity, f'Day {day} complete: query/cache {elapsed_query:.2f}s; '
+                        f'processing/write {elapsed_processing:.2f}s; total {time.perf_counter() - day_started:.2f}s')
             finally:
                 for writer in writers.values():
                     writer.close()
@@ -317,6 +336,8 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                         totals = counts[frequency].setdefault(name, {})
                         for label, total in statuses.items():
                             totals[label] = totals.get(label, 0) + total
+            finalize_started = time.perf_counter()
+            log(verbosity, 'Finalizing product checksums, status totals and source evidence')
             products = {}
             for frequency, path in paths.items():
                 schema = pq.read_schema(path)
@@ -370,9 +391,18 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                 catalog.pop('source_metadata_sha256', None)
                 catalog.pop('source_evidence_sha256', None)
             publisher.stage_manifest(result.catalog_path, catalog)
+            finalize_seconds = time.perf_counter() - finalize_started
+            log(verbosity, f'Staged files ready after {finalize_seconds:.2f}s finalization; '
+                'publishing hourly, daily and catalog together')
+            publish_started = time.perf_counter()
             publisher.publish()
-    if verbosity:
-        print(f"Published {result.catalog_path}", file=sys.stderr, flush=True)
+            publish_seconds = time.perf_counter() - publish_started
+    log(verbosity, f"Published {result.catalog_path}")
+    log(verbosity, f'Run timings: query/cache {query_seconds:.2f}s; '
+        f'processing/write {processing_seconds:.2f}s; finalization {finalize_seconds:.2f}s; '
+        f'publication {publish_seconds:.2f}s; '
+        f'pipeline total {time.perf_counter() - started:.2f}s; '
+        f'API calls {archive.requests:,}; response bytes {archive.bytes:,}')
     return result
 
 
@@ -400,13 +430,23 @@ def get_weather(start_date=None, end_date=None, variable_list=None, *, study_con
     Defaults from local .env include metrics and rebuild (False preserves existing dates).
     """
     from .marine_reporting import load_reporting_membership
-
     from .run_settings import resolve
+
+    run_started = time.perf_counter()
 
     start_date, end_date, output_dir, verbosity, variable_list, rebuild = resolve(
         start_date, end_date, output_dir, verbosity, env_file,
         variable_list=variable_list, rebuild=rebuild)
     variables = allowed_variables(ALLOWED_VARIABLES if variable_list is None else variable_list)
+    settings_file = Path(env_file).expanduser().resolve() if env_file is not None else Path.cwd()/'.env'
+    log(verbosity, 'Preflight passed. Resolved settings (arguments > environment > .env):')
+    for key, value in dict(DATA_DIR=str(output_dir), START_DATE=start_date, END_DATE=end_date,
+                          METRICS=variables, VERBOSITY=verbosity, REBUILD=rebuild).items():
+        log(verbosity, f'  {key} = {json.dumps(value)}')
+    log(verbosity, 'Settings file: ' + json.dumps(str(settings_file) if settings_file.is_file() else None))
+    log(verbosity, f'Mode: {"REBUILD" if rebuild else "APPEND"}. Automatic API retries disabled; '
+        'reruns resume verified cached objects.')
+    log(verbosity, 'Validating approved study and reporting membership')
     member = load_reporting_membership(study_config)
     study = member.study_identity['study_config']
     first, last, _ = validate(start_date, end_date, study['domain']['bbox_wgs84'],
@@ -423,6 +463,7 @@ def get_weather(start_date=None, end_date=None, variable_list=None, *, study_con
         if output.exists() and not output.is_dir():
             raise ValueError('Output path must be a dedicated weather directory.')
         if output.exists() and any(output.iterdir()):
+            log(verbosity, 'Existing output found; inspecting product files')
             if any(p.is_symlink() for p in output.iterdir()):
                 raise ValueError('Weather output files must not be symlinks.')
             expected = {'catalog.json', 'meteorology-hourly.parquet', 'meteorology-daily.parquet'}
@@ -432,7 +473,10 @@ def get_weather(start_date=None, end_date=None, variable_list=None, *, study_con
             if not rebuild:
                 if found != expected:
                     raise ValueError('Incomplete weather product; use REBUILD=True to rebuild it.')
+                log(verbosity, 'Validating saved product checksums, schema, UTC keys and membership')
+                validation_started = time.perf_counter()
                 check_weather(output / 'catalog.json', _membership=member)
+                log(verbosity, f'Saved product validation passed in {time.perf_counter() - validation_started:.2f}s')
                 existing = json.loads((output / 'catalog.json').read_text())
                 if (existing.get('bbox') != study['domain']['bbox_wgs84'] or
                         existing.get('h3_resolution') != member.resolution):
@@ -449,19 +493,30 @@ def get_weather(start_date=None, end_date=None, variable_list=None, *, study_con
                 old_last = date.fromisoformat(existing['end_date'])
                 if str(old_first) < study['time']['start'] or str(old_last) >= study['time']['end_exclusive']:
                     raise ValueError('Existing dates lie outside the approved study interval.')
+                log(verbosity, f'Saved range: {old_first} through {old_last}; '
+                    f'new metric backfill: {metric_expansion}')
                 if first >= old_first and last <= old_last and not metric_expansion:
-                    if verbosity:
-                        print('Requested dates and metrics already present; no acquisition.',
-                              file=sys.stderr, flush=True)
+                    log(verbosity, 'Requested dates and metrics already present; no acquisition.')
+                    log(verbosity, f'Output unchanged: UTC {old_first} through {old_last}; '
+                        f'metric families {", ".join(variables)}')
+                    log(verbosity, 'Missing dates: none. New metrics: none. '
+                        f'Query 0.00s; processing 0.00s; API calls 0; total {time.perf_counter() - run_started:.2f}s')
                     return RegionalResult(output/'meteorology-hourly.parquet',
                                           output/'meteorology-daily.parquet', output/'catalog.json')
                 first, last = min(first, old_first), max(last, old_last)
-        return get_data(first, last, bbox=study['domain']['bbox_wgs84'],
+        else:
+            log(verbosity, 'No existing data found; building the requested dates and metrics')
+        log(verbosity, f'Output plan: UTC {first} through {last}; metric families {", ".join(variables)}')
+        if rebuild:
+            log(verbosity, 'Rebuild selected: prior weather files stay in place until publication succeeds')
+        result = get_data(first, last, bbox=study['domain']['bbox_wgs84'],
                         output_dir=output, cache_dir=cache_dir, workers=workers,
                         transfer_bytes=transfer_bytes, max_seconds=max_seconds,
                         variable_list=variables, membership=member, verbosity=verbosity,
                         existing=existing, publisher=publisher,
                         allow_incomplete_final_day=allow_incomplete_final_day)
+    log(verbosity, f'Weather run completed in {time.perf_counter() - run_started:.2f}s')
+    return result
 
 
 def check_weather(catalog_path, *, study_config=None, _membership=None):

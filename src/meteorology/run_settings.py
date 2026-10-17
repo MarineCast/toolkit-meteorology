@@ -1,8 +1,9 @@
 """Side-effect-free run preflight: arguments > environment > local .env."""
-from datetime import date
+from datetime import date, datetime, timezone
 import os
 from pathlib import Path
 import shlex
+import sys
 
 VARIABLES = ('temperature', 'dewpoint', 'relative_humidity', 'wind',
              'cloud_cover', 'pressure', 'precipitation')
@@ -128,3 +129,12 @@ def preflight(start_date=None, end_date=None, output_dir=None, verbosity=None, e
 def resolve(*args, **options):
     """Run the same preflight, retaining defaults for file-free Python API calls."""
     return preflight(*args, require_all=False, **options)
+
+
+
+def log(verbosity, message):
+    """Emit one timestamped operational line to stderr; callers whitelist content."""
+    if verbosity:
+        stamp = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+        sys.stderr.write(f'[meteorology {stamp}] {message}\n')
+        sys.stderr.flush()

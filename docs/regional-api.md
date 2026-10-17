@@ -49,8 +49,27 @@ get_weather()  # dates/output/verbosity/metrics/rebuild from local settings
 get_weather(env_file="/path/to/.env", verbosity=False)
 ```
 
-Verbose runs report source/cache opening, each UTC processing day and successful
-publication to stderr. CLI stdout retains the resulting catalog path. These
+Verbose progress uses timestamped UTC lines on stderr. It shows the six resolved
+settings (after argument/environment/file precedence), selected settings-file path,
+mode, saved-product validation time, requested and final output ranges/metrics,
+missing-date intervals and new metric backfill. Query plans identify native fields.
+Source messages identify the official endpoint, verified object/array cache reuse,
+and each actual API call with request number, attempt 1/1, elapsed seconds and bytes.
+
+There are currently no automatic API retries. Startup and API messages state this
+policy; a failed call reports elapsed time and exception type with details redacted.
+A manual rerun reuses verified completed objects. Messages never claim a retry or
+network request for cache reuse and never print credentials, authorization headers,
+response bodies or raw exception text.
+
+Each day reports query/cache time separately from processing/write time. The final
+summary includes source metadata/cache time, reduction/retained-row merge/write
+time, checksum/evidence finalization, publication, total elapsed time and actual
+request/byte counts. Query/cache time can include disk reads and chunk decoding;
+per-API timings isolate retrieval. Total elapsed time also includes other overhead.
+Contained requests explicitly report no missing work and zero query/processing/API
+calls after validation. `VERBOSITY=False` silences these progress messages. CLI
+stdout retains only the resulting catalog path. These
 settings do not enable the incomplete-final-day option: explicitly pass
 `--allow-incomplete-final-day` / `allow_incomplete_final_day=True` when qualifying
 that boundary. They do not select historical source epochs.

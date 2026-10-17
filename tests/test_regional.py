@@ -278,3 +278,40 @@ def test_daily_wind_uses_mean_vector_not_mean_direction():
     direction = frames['WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR']
     assert np.isnan(direction.VALUE.iloc[0])
     assert direction.VALUE_STATUS.iloc[0] == 'UNDEFINED_CALM_MEAN'
+
+
+
+@pytest.mark.parametrize('verbose', [False, True])
+def test_api_and_cache_messages_are_opt_in_and_safe(tmp_path, capsys, verbose):
+    calls = []
+    archive = bare_archive(tmp_path, lambda name, cap: calls.append(name) or b'fixture')
+    archive.verbosity = verbose
+    archive.object('tp/0.1.2', limit=100)
+    archive.object('tp/0.1.2', limit=100)
+    output = capsys.readouterr()
+    assert calls == ['tp/0.1.2']
+    assert not output.out
+    if verbose:
+        assert 'API call #1: GET tp/0.1.2 (attempt 1/1; no automatic retries)' in output.err
+        assert 'API call #1 completed in' in output.err
+        assert '7 bytes received' in output.err
+        assert 'Cache hit: tp/0.1.2 (7 bytes; no API call)' in output.err
+        assert 'API call #2' not in output.err
+    else:
+        assert not output.err
+
+
+def test_failed_api_call_logs_timing_and_actual_no_retry_policy(tmp_path, capsys):
+    calls = []
+    def fail(name, cap):
+        calls.append(name)
+        raise RuntimeError('SECRET-response-body')
+    archive = bare_archive(tmp_path, fail)
+    archive.verbosity = True
+    with pytest.raises(RuntimeError):
+        archive.object('tp/0.1.2', limit=100)
+    output = capsys.readouterr()
+    assert calls == ['tp/0.1.2']
+    assert 'failed after' in output.err and 'No automatic retry; rerun to resume' in output.err
+    assert 'SECRET-response-body' not in output.err
+    assert 'completed in' not in output.err and not output.out
