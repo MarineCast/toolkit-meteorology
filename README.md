@@ -21,6 +21,9 @@ DATA_DIR=../../Data/Meteorology/
 START_DATE=2009-01-01
 END_DATE=2026-10-10
 VERBOSITY=True
+# Available: temperature, dewpoint, relative_humidity, wind, cloud_cover, pressure, precipitation
+METRICS=temperature,dewpoint,relative_humidity,wind,cloud_cover,pressure,precipitation
+REBUILD=False
 ```
 
 Run `meteorology get` or `get_weather()` from that directory to use these defaults.
@@ -34,8 +37,12 @@ use a scratch `DATA_DIR` for experiments. Merely editing settings runs no pipeli
 Allowed families: `temperature`, `dewpoint`, `relative_humidity`, `wind`,
 `cloud_cover`, `pressure`, `precipitation`. All seven yield 14 daily and 10 hourly
 fields. The current approved registry has 463 cells. Dates are inclusive UTC days.
-The fast ECMWF geographic chunk archive is cached separately; calls replace their
-requested output range with two Parquets and `catalog.json`.
+The fast ECMWF geographic chunk archive is cached separately. With `REBUILD=False`
+(the default), runs validate existing files, preserve their dates and acquire only
+missing dates; a fully covered request does no acquisition or publication. Disjoint
+requests also fill the intervening dates to keep a continuous product. `REBUILD=True`
+replaces the product with the requested dates and metrics. Either mode creates the
+product if absent. Metric changes require rebuild; valid existing nulls are retained.
 
 ```sh
 meteorology get 2009-01-01 2009-01-02 --variables temperature wind --output-dir scratch/weather --cache-dir /path/to/source-cache

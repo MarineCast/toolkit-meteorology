@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — run settings and incremental dates
+
+Read ignored local `.env` run defaults, with a committed `.env.example`: output,
+UTC dates, verbosity, requested metric families and rebuild mode. Explicit arguments
+override environment/file settings. Append validates existing data, preserves
+saved dates/vintages and acquires missing dates only; covered requests are no-ops.
+Explicit rebuild replaces requested dates/metrics. Both create an absent product;
+transactional rollback and source-epoch lineage apply to incremental publication.
+
 ## Unreleased — legacy removal
 
 Remove retired HRRR/CDS request engines, astronomy, model features, visualizers,

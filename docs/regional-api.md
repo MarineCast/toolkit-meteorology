@@ -17,7 +17,7 @@ check_weather(result.catalog_path, study_config="/path/to/config/study.v1.json")
 ```
 
 Allowed families: `temperature`, `dewpoint`, `relative_humidity`, `wind`,
-`cloud_cover`, `pressure`, `precipitation`. Omit the list for all families.
+`cloud_cover`, `pressure`, `precipitation`. Omit the list to use configured METRICS, or all families when unset.
 Unknown, duplicate and empty lists reject before source access. Only selected
 source parameters are fetched. Dates are inclusive UTC dates inside the approved
 study. Output is the exact registry, without an intermediate rectangle export.
@@ -25,17 +25,16 @@ study. Output is the exact registry, without an intermediate rectangle export.
 ## Local run defaults
 
 Copy the repository's `.env.example` to `.env` and set `DATA_DIR`, `START_DATE`,
-`END_DATE`, and `VERBOSITY=True` or `False`. The API and `get` CLI read `.env` in
+`END_DATE`, `METRICS`, `VERBOSITY=True` or `False`, and `REBUILD=True` or `False`. The API and `get` CLI read `.env` in
 the current working directory only, including when installed outside the checkout.
 Use `env_file="/path/to/.env"` or `--env-file PATH` to select another file.
-No file is read and no acquisition occurs on import. Only these four run keys
+No file is read and no acquisition occurs on import. Only these six run keys
 are read; values are never executed, expanded as shell expressions, or copied to
 the process environment. Quote values containing spaces. Unknown keys are ignored.
 
 Precedence is explicit API/CLI option, process environment, then `.env`. Dates
 may be omitted individually if supplied by configuration. Without configuration,
-dates remain required, output defaults to `data/meteorology`, and verbosity is
-false. Relative file-based `DATA_DIR` resolves beside that file; explicit and
+dates remain required, output defaults to `data/meteorology`, verbosity is false, all metrics are selected, and rebuild is false. Relative file-based `DATA_DIR` resolves beside that file; explicit and
 process-environment paths resolve from the working directory. Absolute paths work
 in all cases. Personal `.env` files are ignored and excluded from distributions;
 `.env.example` is the committed template. Study and credentials resolve separately.
@@ -46,7 +45,7 @@ meteorology get 2009-01-01 2009-01-02 --output-dir scratch/weather --no-verbose
 ```
 
 ```python
-get_weather()  # dates/output/verbosity from local settings; all allowed families
+get_weather()  # dates/output/verbosity/metrics/rebuild from local settings
 get_weather(env_file="/path/to/.env", verbosity=False)
 ```
 
@@ -54,7 +53,7 @@ Verbose runs report source/cache opening, each UTC processing day and successful
 publication to stderr. CLI stdout retains the resulting catalog path. These
 settings do not enable the incomplete-final-day option: explicitly pass
 `--allow-incomplete-final-day` / `allow_incomplete_final_day=True` when qualifying
-that boundary. They also do not append data or select historical source epochs.
+that boundary. They do not select historical source epochs.
 A fresh source vintage may revise values; use scratch outputs for verification.
 
 ## Files and quantities
@@ -63,9 +62,51 @@ A fresh source vintage may revise values; use scratch outputs for verification.
 - `meteorology-daily.parquet`: H3_INDEX string, DATE date32, selected float64 metrics.
 - `catalog.json`: method, source metadata/evidence identities, units, dates, hashes and value-status totals.
 
-All families yield 10 hourly and 14 daily columns. Each call replaces its selected
-output range and columns, without appending. Unrelated output-directory files
-cause an error. The returned result holds hourly_path, daily_path and catalog_path.
+All families yield 10 hourly and 14 daily metric columns. The returned result holds
+hourly_path, daily_path and catalog_path. Unrelated output-directory files cause
+an error in either mode.
+
+## Rebuild and append modes
+
+`METRICS` is a comma-separated list of the allowed family names above; the example
+file comments list them. Explicit `variable_list` / `--variables` overrides it.
+`rebuild=True` / `--rebuild` / `REBUILD=True` replaces existing weather files with
+exactly the requested dates and metrics. `rebuild=False` / `--no-rebuild` /
+`REBUILD=False` (the default) preserves existing dates and acquires only missing
+dates. Both modes build normally if the destination is absent or empty.
+
+Append inspects a complete three-file product and validates hashes, schemas,
+units, UTC keys, membership and status/null totals before acquisition. Requests
+already contained in its date range return unchanged paths with zero acquisition
+and no publication. Otherwise the final range is the union of saved and requested
+dates. Missing dates before/after the old range are the only new cube queries.
+For disjoint ranges, the intervening dates are also fetched to retain the complete
+UTC day lattice. Invalid existing files are not guessed around: use explicit
+rebuild to replace a corrupt/incomplete weather product after inspection. Unrelated
+files and symlink entries remain errors in both modes.
+
+Append requires the same metric columns and approved membership/envelope. To
+change METRICS, use rebuild; no old columns are silently dropped or new columns
+partially filled. Existing valid nulls, including a retained partial rainfall day,
+are not missing dates and are preserved. Filling/revising such values requires an
+explicit rebuild. The incomplete-final-day option still governs newly acquired
+terminal support; it is not enabled by either rebuild setting.
+
+Old values and null/status totals are retained; `source_epochs` preserves their
+vintages separately from new intervals. No single source snapshot hash describes
+a combined product. Because the deliverable is two monolithic Parquets, append
+streams old row groups and new days into staged replacement files, requiring
+space for the combined output; it does not redownload saved days or load the full
+history into memory. A shared output lock covers inspection through publication,
+and interrupted publication uses the existing recovery journal. Source-cache
+snapshots stay pinned: a stale frontier still requires an explicitly selected
+fresh cache to qualify newer source coverage.
+
+```sh
+meteorology get --no-rebuild
+meteorology get 2009-01-01 2009-01-02 --rebuild --output-dir scratch/weather
+```
+
 
 | Family | Hourly values | Daily reductions |
 | --- | --- | --- |
@@ -124,7 +165,7 @@ meteorology check scratch/weather/catalog.json --study-config /path/to/config/st
 ```
 
 `python -m meteorology` and `python -m meteorology.regional` expose the same commands.
-`get` also accepts --allow-incomplete-final-day, --env-file, and --verbose/--no-verbose;
+`get` also accepts --allow-incomplete-final-day, --env-file, --verbose/--no-verbose, and --rebuild/--no-rebuild;
 it has no dry-run option.
 The Python API exposes additional resource caps. `check_weather` streams one day
 at a time to verify hashes, schema/types/units, exact UTC lattice and uniqueness,

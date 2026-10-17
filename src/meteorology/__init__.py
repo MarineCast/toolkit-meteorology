@@ -4,9 +4,8 @@ from ._version import __version__
 
 def get_weather(start_date=None, end_date=None, variable_list=None, **options):
     """Publish inclusive UTC dates for the approved coastal registry."""
-    from .regional import ALLOWED_VARIABLES, get_weather as implementation
-    return implementation(start_date, end_date,
-                          ALLOWED_VARIABLES if variable_list is None else variable_list, **options)
+    from .regional import get_weather as implementation
+    return implementation(start_date, end_date, variable_list, **options)
 
 
 def check_weather(catalog_path, **options):

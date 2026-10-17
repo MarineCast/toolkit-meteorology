@@ -4,10 +4,10 @@ import os
 from pathlib import Path
 import shlex
 
-KEYS = {'DATA_DIR', 'START_DATE', 'END_DATE', 'VERBOSITY'}
+KEYS = {'DATA_DIR', 'START_DATE', 'END_DATE', 'VERBOSITY', 'METRICS', 'REBUILD'}
 
 
-def resolve(start_date=None, end_date=None, output_dir=None, verbosity=None, env_file=None):
+def resolve(start_date=None, end_date=None, output_dir=None, verbosity=None, env_file=None, *, variable_list=None, rebuild=None):
     """Read only known keys; never execute values or change the process environment."""
     path = Path(env_file).expanduser().resolve() if env_file is not None else Path.cwd() / '.env'
     values = {}
@@ -53,4 +53,12 @@ def resolve(start_date=None, end_date=None, output_dir=None, verbosity=None, env
         verbose = verbose.lower() == 'true'
     if type(verbose) is not bool:
         raise ValueError('VERBOSITY must be True or False.')
-    return first, last, target.resolve(), verbose
+    replace = rebuild if rebuild is not None else values.get('REBUILD', 'False')
+    if isinstance(replace, str) and replace.lower() in {'true', 'false'}:
+        replace = replace.lower() == 'true'
+    if type(replace) is not bool:
+        raise ValueError('REBUILD must be True or False.')
+    metrics = variable_list
+    if metrics is None and 'METRICS' in values:
+        metrics = [value.strip() for value in values['METRICS'].split(',')]
+    return first, last, target.resolve(), verbose, metrics, replace

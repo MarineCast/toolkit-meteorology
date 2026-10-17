@@ -14,3 +14,11 @@ New values must retain source evidence; old source snapshots must not be silentl
 substituted. Publication stages files and recovers failures before replacing the
 three-file output. Current approved Data and private source caches are not
 cleanup targets.
+
+Run settings select requested metric families and rebuild mode. Append (the
+default) validates existing files, requires identical metric schemas and approved
+membership, preserves existing values/nulls/vintages, and acquires only missing
+UTC dates. It fills gaps between disjoint old/new ranges to keep continuous keys.
+Rebuild explicitly replaces the selected product range/metrics. Both modes build
+an absent product. A contained append request leaves existing files unchanged.
+Combined products record source epochs; publication remains recoverable.

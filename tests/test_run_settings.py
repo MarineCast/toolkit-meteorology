@@ -23,13 +23,13 @@ def test_file_environment_and_explicit_precedence(tmp_path, monkeypatch):
     file.write_text('# defaults\nDATA_DIR="weather files" # relative to file\n'
                     'START_DATE = 2009-01-01\nEND_DATE=2009-01-02\nVERBOSITY=True\n'
                     'CDSAPI_KEY=ignored\n')
-    assert resolve(env_file=file) == ('2009-01-01', '2009-01-02', folder/'weather files', True)
+    assert resolve(env_file=file) == ('2009-01-01', '2009-01-02', folder/'weather files', True, None, False)
     monkeypatch.setenv('DATA_DIR', 'process-output')
     monkeypatch.setenv('START_DATE', '2009-01-02')
     monkeypatch.setenv('VERBOSITY', 'false')
-    assert resolve(env_file=file) == ('2009-01-02', '2009-01-02', tmp_path/'process-output', False)
+    assert resolve(env_file=file) == ('2009-01-02', '2009-01-02', tmp_path/'process-output', False, None, False)
     assert resolve('2009-01-01', '2009-01-03', 'explicit', True, file) == (
-        '2009-01-01', '2009-01-03', tmp_path/'explicit', True)
+        '2009-01-01', '2009-01-03', tmp_path/'explicit', True, None, False)
     assert 'CDSAPI_KEY' not in __import__('os').environ
 
 
@@ -55,7 +55,7 @@ def test_missing_file_dates_and_default_output(tmp_path):
     with pytest.raises(ValueError, match='env_file'):
         resolve(env_file=tmp_path/'absent')
     assert resolve('2009-01-01', '2009-01-02') == (
-        '2009-01-01', '2009-01-02', tmp_path/'data/meteorology', False)
+        '2009-01-01', '2009-01-02', tmp_path/'data/meteorology', False, None, False)
 
 
 @pytest.mark.parametrize('args,verbose', [([], None), (['--verbose'], True), (['--no-verbose'], False)])
@@ -70,3 +70,30 @@ def test_cli_optional_dates_and_verbosity(args, verbose, monkeypatch, capsys):
     assert seen['start_date'] is None and seen['end_date'] is None
     assert seen['verbosity'] is verbose
     assert capsys.readouterr().out.strip() == 'result/catalog.json'
+
+
+
+def test_metrics_and_rebuild_precedence(monkeypatch):
+    Path('.env').write_text('START_DATE=2009-01-01\nEND_DATE=2009-01-02\n'
+                            'METRICS=temperature,wind # available families\nREBUILD=True\n')
+    assert resolve()[4:] == (['temperature', 'wind'], True)
+    monkeypatch.setenv('METRICS', 'pressure')
+    monkeypatch.setenv('REBUILD', 'false')
+    assert resolve()[4:] == (['pressure'], False)
+    assert resolve(variable_list=['dewpoint'], rebuild=True)[4:] == (['dewpoint'], True)
+    monkeypatch.setenv('REBUILD', 'maybe')
+    with pytest.raises(ValueError, match='REBUILD'):
+        resolve()
+
+
+@pytest.mark.parametrize('args,replace', [([], None), (['--rebuild'], True), (['--no-rebuild'], False)])
+def test_cli_rebuild_and_env_metrics(args, replace, monkeypatch):
+    seen = {}
+    def get(**options):
+        seen.update(options)
+        return SimpleNamespace(catalog_path=Path('result/catalog.json'))
+    monkeypatch.setattr(regional, 'get_weather', get)
+    monkeypatch.setattr('sys.argv', ['meteorology', 'get', *args])
+    regional.main()
+    assert seen['rebuild'] is replace
+    assert seen['variable_list'] is None  # config supplies metrics instead of parser defaults

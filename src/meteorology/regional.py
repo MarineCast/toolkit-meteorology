@@ -1,4 +1,5 @@
 """Simple historical weather API: ECMWF ARCO to wide hourly/daily H3 Parquets."""
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import date, timedelta
 import hashlib
@@ -147,7 +148,7 @@ def hourly_day(cube, day, specs, spatial, counters):
 def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteorology',
              cache_dir=None, workers=4, transfer_bytes=8 * 1024**3, max_seconds=3600,
              allow_incomplete_final_day=False,
-             variable_list=None, membership=None, verbosity=False):
+             variable_list=None, membership=None, verbosity=False, existing=None, publisher=None):
     """Acquire/reuse regional ERA5 and publish hourly/daily wide H3 R5 Parquets.
 
     Inclusive UTC dates. Output contains exactly two Parquets and catalog.json in
@@ -182,9 +183,20 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
     with TransactionalFamilyPublisher._exclusive_parent(cache):
         archive = Archive(cache, bbox, workers=workers, transfer_bytes=transfer_bytes,
                           max_seconds=max_seconds)
-        end_second = int(pd.Timestamp(last, tz='UTC').timestamp()) + 86400
-        start_second = int(pd.Timestamp(first, tz='UTC').timestamp())
-        boundary = end_second - (3600 if allow_incomplete_final_day or 'tp' not in parameters else 0)
+        old = existing or {}
+        old_first = date.fromisoformat(old['start_date']) if old else None
+        old_last = date.fromisoformat(old['end_date']) if old else None
+        missing = ([(a, b) for a, b in (
+            (first, min(last, old_first - timedelta(days=1))),
+            (max(first, old_last + timedelta(days=1)), last),
+        ) if a <= b] if old else [(first, last)])
+        query_first, query_last = missing[0][0], missing[-1][1]
+        if old and verbosity:
+            ranges = ', '.join(f'{a} through {b}' for a, b in missing)
+            print(f'Acquiring missing UTC dates: {ranges}', file=sys.stderr, flush=True)
+        end_second = int(pd.Timestamp(query_last, tz='UTC').timestamp()) + 86400
+        start_second = int(pd.Timestamp(query_first, tz='UTC').timestamp())
+        boundary = end_second - (3600 if (allow_incomplete_final_day and query_last == last) or 'tp' not in parameters else 0)
         if start_second < archive.times[0] or boundary > archive.times[-1]:
             raise ValueError('Dates plus precipitation boundary exceed cached source coverage; '
                              'use a fresh cache to discover a newer vintage.')
@@ -222,7 +234,13 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                           availability=dict(kind='retrospective_reanalysis',
                               historical_available_at_utc=None,
                               forecast_eligibility='not established'))
-        with TransactionalFamilyPublisher(control) as publisher:
+        if old:
+            static.pop('source_metadata_sha256', None)
+            static['provenance'] = 'catalog source_epochs identifies each date vintage'
+        retained = {f: pq.ParquetFile(output / old['products'][f]['file'])
+                    for f in ('hourly', 'daily')} if old else {}
+        with (nullcontext(publisher) if publisher is not None else
+              TransactionalFamilyPublisher(control)) as publisher:
             paths = {'hourly': publisher.stage_path(result.hourly_path),
                      'daily': publisher.stage_path(result.daily_path)}
             writers = {}
@@ -230,15 +248,20 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                 for stamp in pd.date_range(first, last, freq='D'):
                     archive.checkpoint()
                     day = stamp.date()
+                    reuse = bool(old and old_first <= day <= old_last)
                     if verbosity:
-                        print(f"Processing UTC day {day}", file=sys.stderr, flush=True)
-                    if allow_incomplete_final_day or ('tp' not in parameters and end_second > archive.times[-1]):
-                        cube = archive.cube(day, parameters, allow_missing_boundary=True)
-                    else:
-                        cube = archive.cube(day, parameters)
+                        action = 'Reusing' if reuse else 'Processing'
+                        print(f"{action} UTC day {day}", file=sys.stderr, flush=True)
+                    if not reuse:
+                        if ((allow_incomplete_final_day and day == last) or
+                                ('tp' not in parameters and end_second > archive.times[-1])):
+                            cube = archive.cube(day, parameters, allow_missing_boundary=True)
+                        else:
+                            cube = archive.cube(day, parameters)
                     for frequency in ('hourly', 'daily'):
-                        table = wide_day(cube, day, selected[frequency], frequency, spatial,
-                                         counts[frequency])
+                        table = (retained[frequency].read_row_group((day - old_first).days)
+                                 if reuse else wide_day(cube, day, selected[frequency], frequency,
+                                                        spatial, counts[frequency]))
                         metadata = dict(static, frequency=frequency,
                                         columns={k: v['units'] for k, v in selected[frequency].items()})
                         schema_metadata = {b'meteorology': json.dumps(metadata, sort_keys=True).encode()}
@@ -258,6 +281,12 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
             finally:
                 for writer in writers.values():
                     writer.close()
+            if old:
+                for frequency in counts:
+                    for name, statuses in old['products'][frequency]['value_status_counts'].items():
+                        totals = counts[frequency].setdefault(name, {})
+                        for label, total in statuses.items():
+                            totals[label] = totals.get(label, 0) + total
             products = {}
             for frequency, path in paths.items():
                 schema = pq.read_schema(path)
@@ -276,7 +305,8 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
             catalog = dict(schema_version=1, run_date_utc=utcnow(), start_date=str(first),
                            end_date=str(last), **static, source_evidence_sha256=evidence_hash,
                            source_coverage_end=str(archive.times[-1].astype('datetime64[s]')),
-                           products=products, incomplete_final_day=bool('tp' in parameters and end_second > archive.times[-1]),
+                           products=products, incomplete_final_day=(old.get('incomplete_final_day', False) if old and last == old_last
+                               else bool('tp' in parameters and end_second > archive.times[-1])),
                            acquisition=dict(requests=archive.requests,
                                                               response_bytes=archive.bytes))
             catalog['latest_complete_all_metric_day'] = str(
@@ -285,6 +315,24 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                 expected_hours=24, valid_hours=23, value_status='PARTIAL',
                 missing_interval_end_utc=str(last + timedelta(days=1)) + 'T00:00:00Z')]
                 if catalog['incomplete_final_day'] else [])
+            if old:
+                catalog['partial_metric_coverage'] = [*old.get('partial_metric_coverage', []),
+                    *([] if last == old_last else catalog['partial_metric_coverage'])]
+                previous_epochs = old.get('source_epochs') or [dict(
+                    start_date=old['start_date'], end_date=old['end_date'],
+                    catalog_sha256=checksum_path(result.catalog_path),
+                    metadata_sha256=old['source_metadata_sha256'],
+                    evidence_sha256=old['source_evidence_sha256'],
+                    source_coverage_end=old['source_coverage_end'],
+                    source_method=old.get('source_method', old['method']))]
+                epochs = [*previous_epochs, *[dict(start_date=str(a), end_date=str(b),
+                    metadata_sha256=archive.snapshot, evidence_sha256=evidence_hash,
+                    source_coverage_end=catalog['source_coverage_end'], source_method=METHOD)
+                    for a, b in missing]]
+                catalog['source_epochs'] = sorted(epochs, key=lambda e: e['start_date'])
+                catalog['source_coverage_end'] = max(e['source_coverage_end'] for e in epochs)
+                catalog.pop('source_metadata_sha256', None)
+                catalog.pop('source_evidence_sha256', None)
             publisher.stage_manifest(result.catalog_path, catalog)
             publisher.publish()
     if verbosity:
@@ -304,37 +352,80 @@ def allowed_variables(variable_list):
     return values
 
 
-def get_weather(start_date=None, end_date=None, variable_list=ALLOWED_VARIABLES, *, study_config=None,
+def get_weather(start_date=None, end_date=None, variable_list=None, *, study_config=None,
                 output_dir=None, cache_dir=None, workers=4,
                 transfer_bytes=8 * 1024**3, max_seconds=3600,
-                allow_incomplete_final_day=False, verbosity=None, env_file=None):
+                allow_incomplete_final_day=False, verbosity=None, env_file=None, rebuild=None):
     """Publish approved coastal ERA5 weather for inclusive UTC dates.
 
     Configure MARINECAST_STUDY_CONFIG once, or pass study_config explicitly.
     All seven allowed families produce the approved 14 daily / 10 hourly fields.
     Reuses pinned geographic chunks; processes one UTC day at a time.
+    Defaults from local .env include metrics and rebuild (False preserves existing dates).
     """
     from .marine_reporting import load_reporting_membership
 
     from .run_settings import resolve
 
-    variables = allowed_variables(variable_list)
-    start_date, end_date, output_dir, verbosity = resolve(
-        start_date, end_date, output_dir, verbosity, env_file)
+    start_date, end_date, output_dir, verbosity, variable_list, rebuild = resolve(
+        start_date, end_date, output_dir, verbosity, env_file,
+        variable_list=variable_list, rebuild=rebuild)
+    variables = allowed_variables(ALLOWED_VARIABLES if variable_list is None else variable_list)
     member = load_reporting_membership(study_config)
     study = member.study_identity['study_config']
     first, last, _ = validate(start_date, end_date, study['domain']['bbox_wgs84'],
                               workers, transfer_bytes, max_seconds)
     if str(first) < study['time']['start'] or str(last) >= study['time']['end_exclusive']:
         raise ValueError('Dates must lie inside the approved study interval.')
-    return get_data(first, last, bbox=study['domain']['bbox_wgs84'],
-                    output_dir=output_dir, cache_dir=cache_dir, workers=workers,
-                    transfer_bytes=transfer_bytes, max_seconds=max_seconds,
-                    variable_list=variables, membership=member, verbosity=verbosity,
-                    allow_incomplete_final_day=allow_incomplete_final_day)
+    output = Path(output_dir).resolve()
+    control = output.parent / ('.meteorology-publication-' +
+                               hashlib.sha256(str(output).encode()).hexdigest()[:16])
+    existing = None
+    # Pin recovery, inspection and publication together so two API writers cannot
+    # make append plans against the same stale product.
+    with TransactionalFamilyPublisher(control) as publisher:
+        if output.exists() and not output.is_dir():
+            raise ValueError('Output path must be a dedicated weather directory.')
+        if output.exists() and any(output.iterdir()):
+            if any(p.is_symlink() for p in output.iterdir()):
+                raise ValueError('Weather output files must not be symlinks.')
+            expected = {'catalog.json', 'meteorology-hourly.parquet', 'meteorology-daily.parquet'}
+            found = {p.name for p in output.iterdir()}
+            if found - expected:
+                raise ValueError('Output contains unrelated files; choose a dedicated weather directory.')
+            if not rebuild:
+                if found != expected:
+                    raise ValueError('Incomplete weather product; use REBUILD=True to rebuild it.')
+                check_weather(output / 'catalog.json', _membership=member)
+                existing = json.loads((output / 'catalog.json').read_text())
+                if (existing.get('bbox') != study['domain']['bbox_wgs84'] or
+                        existing.get('h3_resolution') != member.resolution):
+                    raise ValueError('Existing atmospheric envelope or resolution differs from study.')
+                for frequency in ('hourly', 'daily'):
+                    names = [name for name, spec in metric_specs(frequency).items()
+                             if spec['variable'] in variables]
+                    if [c['name'] for c in existing['products'][frequency]['columns']][2:] != names:
+                        raise ValueError('Existing metrics differ; use REBUILD=True to change metrics.')
+                old_first = date.fromisoformat(existing['start_date'])
+                old_last = date.fromisoformat(existing['end_date'])
+                if str(old_first) < study['time']['start'] or str(old_last) >= study['time']['end_exclusive']:
+                    raise ValueError('Existing dates lie outside the approved study interval.')
+                if first >= old_first and last <= old_last:
+                    if verbosity:
+                        print('Requested dates and metrics already present; no acquisition.',
+                              file=sys.stderr, flush=True)
+                    return RegionalResult(output/'meteorology-hourly.parquet',
+                                          output/'meteorology-daily.parquet', output/'catalog.json')
+                first, last = min(first, old_first), max(last, old_last)
+        return get_data(first, last, bbox=study['domain']['bbox_wgs84'],
+                        output_dir=output, cache_dir=cache_dir, workers=workers,
+                        transfer_bytes=transfer_bytes, max_seconds=max_seconds,
+                        variable_list=variables, membership=member, verbosity=verbosity,
+                        existing=existing, publisher=publisher,
+                        allow_incomplete_final_day=allow_incomplete_final_day)
 
 
-def check_weather(catalog_path, *, study_config=None):
+def check_weather(catalog_path, *, study_config=None, _membership=None):
     """Read-only, one-day-at-a-time checks of current or newly generated products.
 
     Checks exact UTC keys, metric schemas/units, file hashes and null/status totals.
@@ -347,7 +438,8 @@ def check_weather(catalog_path, *, study_config=None):
     catalog = json.loads(path.read_text())
     if catalog.get('method') not in (METHOD, COASTAL_METHOD) or catalog.get('timezone') != 'UTC':
         raise ValueError('Unsupported weather method or timezone.')
-    member = load_reporting_membership(study_config) if study_config is not None else None
+    member = (_membership if _membership is not None else
+              load_reporting_membership(study_config) if study_config is not None else None)
     if member is not None and any(catalog.get(k) != getattr(member, a) for k, a in (
             ('membership_sha256', 'artifact_sha256'), ('mask_sha256', 'mask_sha256'),
             ('mask_revision', 'mask_revision'))):
@@ -437,11 +529,13 @@ def main():
     get = commands.add_parser('get')
     get.add_argument('start_date', nargs='?')
     get.add_argument('end_date', nargs='?')
-    get.add_argument('--variables', nargs='+', choices=VARIABLES, default=VARIABLES)
+    get.add_argument('--variables', nargs='+', choices=VARIABLES)
     get.add_argument('--study-config')
     get.add_argument('--output-dir')
     get.add_argument('--env-file', help='Run defaults file (default: .env in current directory)')
     get.add_argument('--verbose', dest='verbosity', action=argparse.BooleanOptionalAction, default=None)
+    get.add_argument('--rebuild', action=argparse.BooleanOptionalAction, default=None,
+                     help='Replace requested range; --no-rebuild preserves and extends existing dates')
     get.add_argument('--cache-dir')
     get.add_argument('--allow-incomplete-final-day', action='store_true')
     check = commands.add_parser('check')

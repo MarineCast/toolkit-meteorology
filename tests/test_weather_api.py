@@ -1,5 +1,7 @@
 """The supported API: offline acquisition, exact selection and product checks."""
 import json
+from datetime import date
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -24,7 +26,7 @@ def weather(tmp_path, monkeypatch):
     monkeypatch.setattr(regional, 'mapping', lambda *a: ([0, 1], ['a', 'b'], np.zeros(2), 'test'))
     for flag in ('invalid_rh', 'fail', 'missing_rain'):
         monkeypatch.setattr(FakeArchive, flag, False)
-    return dict(study_config='study', output_dir=tmp_path/'out', cache_dir=tmp_path/'cache')
+    return dict(study_config='study', output_dir=tmp_path/'out', cache_dir=tmp_path/'cache', rebuild=True)
 
 
 def test_primary_api_exact_cells_and_all_fields(weather):
@@ -168,3 +170,191 @@ def test_env_defaults_produce_offline_weather(weather, tmp_path, monkeypatch, ca
     assert result.catalog_path.parent == tmp_path/'override'
     assert json.loads(result.catalog_path.read_text())['start_date'] == '2009-01-02'
     assert not capsys.readouterr().err
+
+
+@pytest.mark.parametrize('rebuild', [False, True])
+def test_both_modes_build_absent_output(weather, rebuild):
+    weather['rebuild'] = rebuild
+    result = get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
+    assert check_weather(result.catalog_path)['products']['hourly']['rows'] == 24
+
+
+def test_append_covered_range_is_verified_noop(weather, monkeypatch):
+    result = get_weather('2009-01-01', '2009-01-02', ['temperature'], **weather)
+    original = {p: p.read_bytes() for p in (result.catalog_path, result.daily_path, result.hourly_path)}
+    monkeypatch.setattr(regional, 'Archive', lambda *a, **k: pytest.fail('source opened'))
+    weather['rebuild'] = False
+    assert get_weather('2009-01-02', '2009-01-02', ['temperature'], **weather) == result
+    assert all(p.read_bytes() == value for p, value in original.items())
+
+
+@pytest.mark.parametrize('initial,requested,expected', [
+    (('2009-01-01', '2009-01-01'), ('2009-01-01', '2009-01-03'), [2, 3]),
+    (('2009-01-03', '2009-01-03'), ('2009-01-01', '2009-01-02'), [1, 2]),
+    (('2009-01-02', '2009-01-02'), ('2009-01-01', '2009-01-03'), [1, 3]),
+    (('2009-01-01', '2009-01-01'), ('2009-01-03', '2009-01-03'), [2, 3]),
+])
+def test_append_only_acquires_missing_dates_and_preserves_old(weather, monkeypatch,
+                                                              initial, requested, expected):
+    result = get_weather(*initial, ['temperature'], **weather)
+    old = pq.read_table(result.daily_path).to_pydict()
+    seen = []
+    original = FakeArchive.cube
+    def cube(self, day, parameters):
+        seen.append(day.day)
+        cube = original(self, day, parameters)
+        cube['values'] += 10  # a different source vintage must not change saved days
+        return cube
+    monkeypatch.setattr(FakeArchive, 'cube', cube)
+    weather['rebuild'] = False
+    get_weather(*requested, ['temperature'], **weather)
+    assert seen == expected
+    assert check_weather(result.catalog_path, study_config='study')['products']['daily']['rows'] == 3
+    table = pq.read_table(result.daily_path).to_pandas()
+    for day, value in zip(old['DATE'], old['TEMPERATURE_2M_C_MEAN']):
+        assert table.loc[table.DATE == day, 'TEMPERATURE_2M_C_MEAN'].iloc[0] == value
+    catalog = json.loads(result.catalog_path.read_text())
+    assert catalog['source_epochs']
+    assert 'source_metadata_sha256' not in catalog
+    assert sum((date.fromisoformat(e['end_date']) -
+                date.fromisoformat(e['start_date'])).days + 1
+               for e in catalog['source_epochs']) == 3
+    # A later no-op can read multi-epoch products without requiring single-vintage hashes.
+    get_weather(*requested, ['temperature'], **weather)
+    assert seen == expected
+
+
+def test_rebuild_replaces_range_and_metrics(weather):
+    result = get_weather('2009-01-01', '2009-01-03', ['temperature'], **weather)
+    get_weather('2009-01-02', '2009-01-02', ['pressure'], **weather)
+    report = check_weather(result.catalog_path)
+    assert report['start_date'] == report['end_date'] == '2009-01-02'
+    assert report['products']['daily']['metrics'] == 2
+    assert 'source_epochs' not in json.loads(result.catalog_path.read_text())
+
+
+def test_append_rejects_changed_metrics_corruption_and_unrelated_files(weather, monkeypatch):
+    result = get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
+    monkeypatch.setattr(regional, 'Archive', lambda *a, **k: pytest.fail('source opened'))
+    weather['rebuild'] = False
+    with pytest.raises(ValueError, match='metrics differ'):
+        get_weather('2009-01-02', '2009-01-02', ['pressure'], **weather)
+    with result.hourly_path.open('ab') as f:
+        f.write(b'corrupt')
+    with pytest.raises(ValueError, match='checksum'):
+        get_weather('2009-01-02', '2009-01-02', ['temperature'], **weather)
+    marker = result.catalog_path.parent/'user.txt'
+    marker.write_text('keep me')
+    weather['rebuild'] = True
+    with pytest.raises(ValueError, match='unrelated'):
+        get_weather('2009-01-02', '2009-01-02', ['temperature'], **weather)
+    assert marker.read_text() == 'keep me'
+
+
+def test_append_failure_keeps_all_previous_files(weather, monkeypatch):
+    result = get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
+    previous = {p: p.read_bytes() for p in (result.catalog_path, result.daily_path, result.hourly_path)}
+    weather['rebuild'] = False
+    monkeypatch.setattr(FakeArchive, 'fail', True)
+    with pytest.raises(RuntimeError, match='Simulated'):
+        get_weather('2009-01-01', '2009-01-03', ['temperature'], **weather)
+    assert all(p.read_bytes() == value for p, value in previous.items())
+
+
+def test_repeated_append_preserves_null_status_and_flattens_epochs(weather, monkeypatch):
+    monkeypatch.setattr(FakeArchive, 'invalid_rh', True)
+    result = get_weather('2009-01-01', '2009-01-01', ALLOWED_VARIABLES, **weather)
+    weather['rebuild'] = False
+    get_weather('2009-01-02', '2009-01-02', ALLOWED_VARIABLES, **weather)
+    get_weather('2009-01-03', '2009-01-03', ALLOWED_VARIABLES, **weather)
+    report = check_weather(result.catalog_path, study_config='study')
+    assert report['products']['daily']['rows'] == 3
+    assert len(json.loads(result.catalog_path.read_text())['source_epochs']) == 3
+
+
+def test_incomplete_directory_requires_explicit_rebuild(weather):
+    weather['output_dir'].mkdir()
+    (weather['output_dir']/'meteorology-hourly.parquet').write_bytes(b'partial')
+    weather['rebuild'] = False
+    with pytest.raises(ValueError, match='Incomplete'):
+        get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
+    weather['rebuild'] = True
+    result = get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
+    assert check_weather(result.catalog_path)['valid']
+
+
+
+def test_partial_null_day_is_retained_when_later_days_append(weather, monkeypatch):
+    class Frontier(FakeArchive):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.times = self.times[:24]
+        def cube(self, day, parameters, allow_missing_boundary=False):
+            cube = super().cube(day, parameters)
+            cube['values'][:, -1, :] = np.nan
+            return cube
+    monkeypatch.setattr(regional, 'Archive', Frontier)
+    result = get_weather('2009-01-01', '2009-01-01', ['precipitation'],
+                         allow_incomplete_final_day=True, **weather)
+    monkeypatch.setattr(regional, 'Archive', FakeArchive)
+    weather['rebuild'] = False
+    get_weather('2009-01-02', '2009-01-02', ['precipitation'], **weather)
+    report = check_weather(result.catalog_path)
+    assert report['products']['daily']['null_counts']['PRECIPITATION_MM'] == 1
+    catalog = json.loads(result.catalog_path.read_text())
+    assert not catalog['incomplete_final_day']
+    assert catalog['partial_metric_coverage'][0]['date'] == '2009-01-01'
+    assert catalog['latest_complete_all_metric_day'] == '2009-01-02'
+
+
+def test_append_rollback_and_retry(weather, monkeypatch):
+    from meteorology.core.artifacts import publication
+    result = get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
+    previous = {p: p.read_bytes() for p in (result.catalog_path, result.daily_path, result.hourly_path)}
+    original_replace = publication.os.replace
+    failed = False
+    def fail_daily(source, destination):
+        nonlocal failed
+        if Path(destination) == result.daily_path and not failed:
+            failed = True
+            raise OSError('append publication failure')
+        return original_replace(source, destination)
+    weather['rebuild'] = False
+    monkeypatch.setattr(publication.os, 'replace', fail_daily)
+    with pytest.raises(OSError, match='append publication failure'):
+        get_weather('2009-01-02', '2009-01-02', ['temperature'], **weather)
+    assert all(p.read_bytes() == value for p, value in previous.items())
+    get_weather('2009-01-02', '2009-01-02', ['temperature'], **weather)
+    assert check_weather(result.catalog_path)['products']['daily']['rows'] == 2
+
+
+def test_append_lock_rejects_concurrent_writer(weather, monkeypatch):
+    import hashlib
+    from meteorology.core.artifacts import TransactionalFamilyPublisher
+    result = get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
+    output = result.catalog_path.parent
+    control = output.parent / ('.meteorology-publication-' +
+                               hashlib.sha256(str(output).encode()).hexdigest()[:16])
+    weather['rebuild'] = False
+    monkeypatch.setattr(regional, 'Archive', lambda *a, **k: pytest.fail('source opened'))
+    with TransactionalFamilyPublisher(control):
+        with pytest.raises(RuntimeError, match='busy'):
+            get_weather('2009-01-02', '2009-01-02', ['temperature'], **weather)
+
+
+def test_env_metrics_and_append_mode(weather, tmp_path, monkeypatch):
+    from meteorology.run_settings import KEYS
+    monkeypatch.chdir(tmp_path)
+    for key in KEYS:
+        monkeypatch.delenv(key, raising=False)
+    (tmp_path/'.env').write_text(f'DATA_DIR={weather["output_dir"]}\nSTART_DATE=2009-01-01\n'
+        'END_DATE=2009-01-01\nMETRICS=pressure\nREBUILD=False\n')
+    result = get_weather(study_config='study', cache_dir=weather['cache_dir'])
+    assert check_weather(result.catalog_path)['products']['daily']['metrics'] == 2
+    get_weather('2009-01-02', '2009-01-02', study_config='study', cache_dir=weather['cache_dir'])
+    assert check_weather(result.catalog_path)['products']['daily']['rows'] == 2
+    # Explicit metric + rebuild options override both configured values.
+    get_weather('2009-01-03', '2009-01-03', ['wind'], rebuild=True,
+                study_config='study', cache_dir=weather['cache_dir'])
+    report = check_weather(result.catalog_path)
+    assert report['products']['daily']['rows'] == 1 and report['products']['hourly']['metrics'] == 4

@@ -18,7 +18,8 @@ import siblings, application code, workspace scripts, or checkout-only files.
 ## Public API and configuration
 
 `meteorology.get_weather(start_date=None, end_date=None, variable_list=None, **options)`
-publishes inclusive UTC days. `None` selects `ALLOWED_VARIABLES`: temperature,
+publishes inclusive UTC days. `None` selects configured METRICS, falling back to
+`ALLOWED_VARIABLES`: temperature,
 dewpoint, relative_humidity, wind, cloud_cover, pressure, precipitation. All seven
 produce 14 daily and 10 hourly metrics. Reject unknown, duplicate, or empty
 selections before source acquisition. `check_weather(catalog_path,
@@ -26,7 +27,7 @@ study_config=...)` is read-only; supply the approved study to verify external
 membership. `validate_product` is a compatibility spelling for catalog checks.
 
 `run_settings.py` resolves explicit arguments > process environment > `.env` in
-CWD for DATA_DIR, START_DATE, END_DATE and VERBOSITY. Dates can be omitted when
+CWD for DATA_DIR, START_DATE, END_DATE, VERBOSITY, METRICS and REBUILD. Dates can be omitted when
 configured; file-relative output paths resolve beside that file. `env_file` /
 `--env-file` selects a file explicitly. No implicit parent search or environment
 mutation. Keep personal `.env` ignored; commit only `.env.example`. Progress is
@@ -38,7 +39,13 @@ The installed CLI is `meteorology get [START] [END] --variables ...` and
 same implementation. Resolve the owner-managed study via explicit `study_config`
 or `MARINECAST_STUDY_CONFIG`; registry/mask inputs are external, not bundled data.
 Use explicit scratch `output_dir` and canonical retained `cache_dir` in checks.
-A production call replaces the requested output range; it is not an append API.
+Default REBUILD=False validates and preserves existing dates, querying only missing
+dates (including bridges for disjoint ranges). A contained request is a no-op.
+REBUILD=True replaces the requested range/metrics. Both modes build absent outputs.
+Append requires identical metric schemas; existing nulls are preserved. Validate
+existing membership and provenance, keep source_epochs for combined vintages,
+and hold the output transaction lock from inspection through publication. Tests
+must cover both modes, no-op, prepend/tail/bridge ranges and rollback.
 Resolve provider credentials through `credentials.py`; never expose tokens in
 logs, exceptions, catalogs, fixtures, or committed configuration.
 
