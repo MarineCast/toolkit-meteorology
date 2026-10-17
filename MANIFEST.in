@@ -1,6 +1,5 @@
 include README.md LICENSE AGENTS.md mkdocs.yml
-recursive-include config *.yaml
 recursive-include docs *.md *.svg *.png *.json
 recursive-include tests *.py *.json
-recursive-include benchmarks *.py
-recursive-include demo *.py
+include .env.example
+exclude .env

@@ -1,0 +1,298 @@
+{
+  "run_date": "2026-10-15",
+  "source": "https://arco.datastores.ecmwf.int/cadl-arco-geo-002/arco/reanalysis_era5_single_levels/sfc/geoChunked.zarr",
+  "source_metadata_sha256": "1f4ef2da414afc97f31512ac2e016efb1e22724668e601d833a4b77f1732f785",
+  "bbox": [
+    -129.7,
+    45.9,
+    -121.5,
+    51.5
+  ],
+  "h3_resolution": 5,
+  "catalog_sha256": "4fcf3faf46a82a509e90803283e73c99dcd097a22949d666ec362c9de3a07038",
+  "output_directory": "MarineCast/Data/Meteorology",
+  "validation": {
+    "start": "2009-01-01",
+    "end": "2026-10-08",
+    "days": 6490,
+    "products": {
+      "daily": {
+        "rows": 11428890,
+        "bytes": 585945174,
+        "sha256": "b32d9cbcf59715d1b8fde122fa3d14a39550abba14291b91ac45e9f4663665e4",
+        "statistics": {
+          "TEMPERATURE_2M_C_MEAN": {
+            "nulls": 0,
+            "min": -34.65264612833656,
+            "max": 32.936424509684265
+          },
+          "TEMPERATURE_2M_C_MIN": {
+            "nulls": 0,
+            "min": -38.91008605957029,
+            "max": 25.462976074218773
+          },
+          "TEMPERATURE_2M_C_MAX": {
+            "nulls": 0,
+            "min": -31.427404785156227,
+            "max": 44.39626464843752
+          },
+          "DEWPOINT_2M_C_MEAN": {
+            "nulls": 0,
+            "min": -37.533166631062805,
+            "max": 21.302676137288433
+          },
+          "RELATIVE_HUMIDITY_2M_PCT_MEAN": {
+            "nulls": 48121,
+            "min": 14.954800134704639,
+            "max": 99.99802957426726
+          },
+          "U_WIND_10M_MS_MEAN": {
+            "nulls": 0,
+            "min": -17.787321090698242,
+            "max": 19.325915654500324
+          },
+          "V_WIND_10M_MS_MEAN": {
+            "nulls": 0,
+            "min": -18.553789138793945,
+            "max": 20.35140101114909
+          },
+          "WIND_SPEED_10M_MS_MEAN": {
+            "nulls": 0,
+            "min": 0.16732393128942835,
+            "max": 21.45456078571185
+          },
+          "WIND_SPEED_10M_MS_MAX": {
+            "nulls": 0,
+            "min": 0.29143015449302334,
+            "max": 29.964834010707467
+          },
+          "WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR": {
+            "nulls": 0,
+            "min": -0.0,
+            "max": 359.9999343168686
+          },
+          "TOTAL_CLOUD_COVER_PCT_MEAN": {
+            "nulls": 0,
+            "min": -0.0,
+            "max": 100.0
+          },
+          "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN": {
+            "nulls": 0,
+            "min": 970.2841666666667,
+            "max": 1054.8329687499997
+          },
+          "MEAN_SEA_LEVEL_PRESSURE_HPA_MIN": {
+            "nulls": 0,
+            "min": 950.95625,
+            "max": 1050.491875
+          },
+          "PRECIPITATION_MM": {
+            "nulls": 0,
+            "min": -0.0,
+            "max": 196.20418548583984
+          }
+        }
+      },
+      "hourly": {
+        "rows": 274293360,
+        "bytes": 9151514590,
+        "sha256": "2d6cbd2a12a319da80e679b4eea74e8340f268d2d7a16ebce3e080ab9bf8869e",
+        "statistics": {
+          "TEMPERATURE_2M_C": {
+            "nulls": 0,
+            "min": -38.91008605957029,
+            "max": 44.39626464843752
+          },
+          "DEWPOINT_2M_C": {
+            "nulls": 0,
+            "min": -42.36676635742185,
+            "max": 26.676416015625023
+          },
+          "RELATIVE_HUMIDITY_2M_PCT": {
+            "nulls": 56504,
+            "min": 2.2816673663408205,
+            "max": 100.00999997727678
+          },
+          "U_WIND_10M_MS": {
+            "nulls": 0,
+            "min": -25.773712158203125,
+            "max": 26.122817993164062
+          },
+          "V_WIND_10M_MS": {
+            "nulls": 0,
+            "min": -23.57147216796875,
+            "max": 25.175262451171875
+          },
+          "WIND_SPEED_10M_MS": {
+            "nulls": 0,
+            "min": 0.0004054361039912849,
+            "max": 29.964834010707467
+          },
+          "WIND_DIRECTION_10M_DEG_FROM": {
+            "nulls": 0,
+            "min": -0.0,
+            "max": 359.9999225550609
+          },
+          "TOTAL_CLOUD_COVER_PCT": {
+            "nulls": 0,
+            "min": -0.0,
+            "max": 100.0
+          },
+          "MEAN_SEA_LEVEL_PRESSURE_HPA": {
+            "nulls": 0,
+            "min": 950.95625,
+            "max": 1058.26625
+          },
+          "PRECIPITATION_MM": {
+            "nulls": 0,
+            "min": -0.0,
+            "max": 15.549659729003906
+          }
+        }
+      }
+    },
+    "daily_hourly_comparisons": {
+      "2009-01-01": {
+        "TEMPERATURE_2M_C_MEAN": 1761,
+        "TEMPERATURE_2M_C_MIN": 1761,
+        "TEMPERATURE_2M_C_MAX": 1761,
+        "DEWPOINT_2M_C_MEAN": 1761,
+        "RELATIVE_HUMIDITY_2M_PCT_MEAN": 1761,
+        "U_WIND_10M_MS_MEAN": 1761,
+        "V_WIND_10M_MS_MEAN": 1761,
+        "WIND_SPEED_10M_MS_MEAN": 1761,
+        "WIND_SPEED_10M_MS_MAX": 1761,
+        "WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR": 1761,
+        "TOTAL_CLOUD_COVER_PCT_MEAN": 1761,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN": 1761,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MIN": 1761,
+        "PRECIPITATION_MM": 1761
+      },
+      "2009-05-21": {
+        "TEMPERATURE_2M_C_MEAN": 1761,
+        "TEMPERATURE_2M_C_MIN": 1761,
+        "TEMPERATURE_2M_C_MAX": 1761,
+        "DEWPOINT_2M_C_MEAN": 1761,
+        "RELATIVE_HUMIDITY_2M_PCT_MEAN": 1761,
+        "U_WIND_10M_MS_MEAN": 1761,
+        "V_WIND_10M_MS_MEAN": 1761,
+        "WIND_SPEED_10M_MS_MEAN": 1761,
+        "WIND_SPEED_10M_MS_MAX": 1761,
+        "WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR": 1761,
+        "TOTAL_CLOUD_COVER_PCT_MEAN": 1761,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN": 1761,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MIN": 1761,
+        "PRECIPITATION_MM": 1761
+      },
+      "2009-05-22": {
+        "TEMPERATURE_2M_C_MEAN": 1761,
+        "TEMPERATURE_2M_C_MIN": 1761,
+        "TEMPERATURE_2M_C_MAX": 1761,
+        "DEWPOINT_2M_C_MEAN": 1761,
+        "RELATIVE_HUMIDITY_2M_PCT_MEAN": 1761,
+        "U_WIND_10M_MS_MEAN": 1761,
+        "V_WIND_10M_MS_MEAN": 1761,
+        "WIND_SPEED_10M_MS_MEAN": 1761,
+        "WIND_SPEED_10M_MS_MAX": 1761,
+        "WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR": 1761,
+        "TOTAL_CLOUD_COVER_PCT_MEAN": 1761,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN": 1761,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MIN": 1761,
+        "PRECIPITATION_MM": 1761
+      },
+      "2012-02-29": {
+        "TEMPERATURE_2M_C_MEAN": 1761,
+        "TEMPERATURE_2M_C_MIN": 1761,
+        "TEMPERATURE_2M_C_MAX": 1761,
+        "DEWPOINT_2M_C_MEAN": 1761,
+        "RELATIVE_HUMIDITY_2M_PCT_MEAN": 1759,
+        "U_WIND_10M_MS_MEAN": 1761,
+        "V_WIND_10M_MS_MEAN": 1761,
+        "WIND_SPEED_10M_MS_MEAN": 1761,
+        "WIND_SPEED_10M_MS_MAX": 1761,
+        "WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR": 1761,
+        "TOTAL_CLOUD_COVER_PCT_MEAN": 1761,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN": 1761,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MIN": 1761,
+        "PRECIPITATION_MM": 1761
+      },
+      "2017-02-05": {
+        "TEMPERATURE_2M_C_MEAN": 1761,
+        "TEMPERATURE_2M_C_MIN": 1761,
+        "TEMPERATURE_2M_C_MAX": 1761,
+        "DEWPOINT_2M_C_MEAN": 1761,
+        "RELATIVE_HUMIDITY_2M_PCT_MEAN": 1743,
+        "U_WIND_10M_MS_MEAN": 1761,
+        "V_WIND_10M_MS_MEAN": 1761,
+        "WIND_SPEED_10M_MS_MEAN": 1761,
+        "WIND_SPEED_10M_MS_MAX": 1761,
+        "WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR": 1761,
+        "TOTAL_CLOUD_COVER_PCT_MEAN": 1761,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN": 1761,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MIN": 1761,
+        "PRECIPITATION_MM": 1761
+      },
+      "2024-02-29": {
+        "TEMPERATURE_2M_C_MEAN": 1761,
+        "TEMPERATURE_2M_C_MIN": 1761,
+        "TEMPERATURE_2M_C_MAX": 1761,
+        "DEWPOINT_2M_C_MEAN": 1761,
+        "RELATIVE_HUMIDITY_2M_PCT_MEAN": 1761,
+        "U_WIND_10M_MS_MEAN": 1761,
+        "V_WIND_10M_MS_MEAN": 1761,
+        "WIND_SPEED_10M_MS_MEAN": 1761,
+        "WIND_SPEED_10M_MS_MAX": 1761,
+        "WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR": 1761,
+        "TOTAL_CLOUD_COVER_PCT_MEAN": 1761,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN": 1761,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MIN": 1761,
+        "PRECIPITATION_MM": 1761
+      },
+      "2026-10-08": {
+        "TEMPERATURE_2M_C_MEAN": 1761,
+        "TEMPERATURE_2M_C_MIN": 1761,
+        "TEMPERATURE_2M_C_MAX": 1761,
+        "DEWPOINT_2M_C_MEAN": 1761,
+        "RELATIVE_HUMIDITY_2M_PCT_MEAN": 1758,
+        "U_WIND_10M_MS_MEAN": 1761,
+        "V_WIND_10M_MS_MEAN": 1761,
+        "WIND_SPEED_10M_MS_MEAN": 1761,
+        "WIND_SPEED_10M_MS_MAX": 1761,
+        "WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR": 1761,
+        "TOTAL_CLOUD_COVER_PCT_MEAN": 1761,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN": 1761,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MIN": 1761,
+        "PRECIPITATION_MM": 1761
+      }
+    },
+    "h3_cells": 1761,
+    "status": "PASS"
+  },
+  "source_archive": {
+    "objects": 1786,
+    "bytes": 3326437708,
+    "decoded_array_bytes": 5389611584
+  },
+  "final_cached_export_seconds": 771.67,
+  "final_export_provider_requests": 0,
+  "software_checks": {
+    "pytest_passed": 541,
+    "pytest_skipped": 1,
+    "skip": "opt-in NOAA live test",
+    "installed_wheel_regional_tests_passed": 10,
+    "ruff": "PASS",
+    "strict_docs": "PASS",
+    "distribution": "PASS",
+    "pip_check": "PASS"
+  },
+  "environments": [
+    "toolkit-meteorology/.venv (Python 3.12.13)",
+    "miniforge3/envs/orcacast (Python 3.12.13)"
+  ],
+  "limitations": [
+    "Full bounding-box atmospheric H3 support, not a certified marine mask.",
+    "Source final/preliminary revision and historical operational availability are unknown.",
+    "Independent observational accuracy was not tested.",
+    "Acquisition was resumed while validating and optimizing the exporter; this is not a cold end-to-end timing."
+  ]
+}
