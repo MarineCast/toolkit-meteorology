@@ -123,3 +123,23 @@ def test_source_frontier_precipitation_requires_explicit_partial_day(weather, mo
     catalog = json.loads(result.catalog_path.read_text())
     assert not catalog['incomplete_final_day']
     assert check_weather(result.catalog_path)['products']['hourly']['null_counts'] == {'TEMPERATURE_2M_C': 0}
+
+
+def test_primary_imports_do_not_load_retired_stacks():
+    import subprocess
+    import sys
+    code = """
+import importlib.abc
+import sys
+class RejectLegacy(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.split('.')[0] in {'pyproj', 'shapely', 'sklearn', 'xarray', 'psutil', 'pydantic', 'eccodes', 'cdsapi', 'herbie', 'geopandas', 'folium', 'branca'}:
+            raise AssertionError('Retired dependency imported: ' + fullname)
+sys.meta_path.insert(0, RejectLegacy())
+import meteorology
+from meteorology import regional, regional_source, coastal, marine_reporting
+assert len(meteorology.ALLOWED_VARIABLES) == 7
+assert not hasattr(meteorology, 'get_weather_request')
+assert not hasattr(meteorology, 'get_temperature')
+"""
+    subprocess.run([sys.executable, '-c', code], check=True)

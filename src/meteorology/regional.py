@@ -13,7 +13,7 @@ import pyarrow.parquet as pq
 
 from .artifacts import checksum_path
 from ._version import __version__
-from .backfill_compute import BASE, WIND, day_frames, mapping, series
+from .compute import BASE, WIND, day_frames, mapping, series
 from .core.artifacts import TransactionalFamilyPublisher
 from .regional_source import Archive, URL, utcnow
 
@@ -44,28 +44,6 @@ def metric_specs(frequency):
     return specs
 
 
-def selections(metric):
-    """Family aliases select both grains; exact columns select their applicable grain."""
-    all_specs = {f: metric_specs(f) for f in ('hourly', 'daily')}
-    if metric is None:
-        return all_specs
-    if metric in VARIABLES:
-        return {f: {k: v for k, v in specs.items() if v['variable'] == metric}
-                for f, specs in all_specs.items()}
-    if not any(metric in specs for specs in all_specs.values()):
-        raise ValueError('Unknown metric. Use a family name or an exact catalog metric column.')
-    # A daily aggregate has its instantaneous hourly companion; an hourly metric
-    # selects that quantity's supported daily aggregates, not unrelated metrics.
-    base = next(name for name in all_specs['hourly']
-                if metric == name or metric.startswith(name + '_'))
-    return {
-        'hourly': {base: all_specs['hourly'][base]},
-        'daily': {name: spec for name, spec in all_specs['daily'].items()
-                  if (name == metric if metric not in all_specs['hourly']
-                      else name == base or name.startswith(base + '_'))},
-    }
-
-
 def validate(start_date, end_date, bbox, workers, transfer_bytes, max_seconds):
     first, last = date.fromisoformat(str(start_date)), date.fromisoformat(str(end_date))
     if first > last:
@@ -94,10 +72,8 @@ def wide_day(cube, day, specs, frequency, spatial, counters):
     columns = {name: np.full(n, np.nan) for name in specs}
     request = dict(variables=list(dict.fromkeys(v['variable'] for v in specs.values())),
                    frequency=frequency)
-    # The shared reducer's lineage is transient here. ARCO object evidence lives
-    # in the private archive; do not publish its CDS labels or fabricated expver.
-    lineage = {}
-    for frame in day_frames(cube, None, day, request, spatial, lineage):
+    # Source-object evidence remains in the pinned private archive.
+    for frame in day_frames(cube, None, day, request, spatial):
         name = frame.METRIC.iloc[0]
         if name not in specs:
             continue
@@ -105,7 +81,6 @@ def wide_day(cube, day, specs, frequency, spatial, counters):
         counts = counters.setdefault(name, {})
         for status, count in frame.VALUE_STATUS.value_counts().items():
             counts[str(status)] = counts.get(str(status), 0) + int(count)
-        lineage.clear()
     data = {'H3_INDEX': pa.array(cells, type=pa.string()),
             'DATE': pa.array([day] * n, type=pa.date32())}
     for name, values in columns.items():
@@ -170,19 +145,17 @@ def hourly_day(cube, day, specs, spatial, counters):
 
 def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteorology',
              cache_dir=None, workers=4, transfer_bytes=8 * 1024**3, max_seconds=3600,
-             metric_name=None, allow_incomplete_final_day=False,
+             allow_incomplete_final_day=False,
              variable_list=None, membership=None):
     """Acquire/reuse regional ERA5 and publish hourly/daily wide H3 R5 Parquets.
 
     Inclusive UTC dates. Output contains exactly two Parquets and catalog.json in
     a dedicated directory. Source cache is a sibling by default. No network runs
-    on import. Exact daily metrics include their hourly companion column.
+    on import. The public coastal entry point supplies validated membership.
     """
     first, last, bbox = validate(start_date, end_date, bbox, workers, transfer_bytes, max_seconds)
-    selected = selections(metric_name)
+    selected = {f: metric_specs(f) for f in ('hourly', 'daily')}
     if variable_list is not None:
-        if metric_name is not None:
-            raise ValueError('Choose variable_list or metric_name, not both.')
         variables = allowed_variables(variable_list)
         selected = {f: {k: v for k, v in specs.items() if v['variable'] in variables}
                     for f, specs in selected.items()}
@@ -310,11 +283,6 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
             publisher.stage_manifest(result.catalog_path, catalog)
             publisher.publish()
     return result
-
-
-def get_metric(metric_name, start_date, end_date, **options):
-    """Publish one metric family or exact catalog column using the same local cache."""
-    return get_data(start_date, end_date, metric_name=metric_name, **options)
 
 
 def allowed_variables(variable_list):

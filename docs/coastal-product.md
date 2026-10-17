@@ -58,18 +58,11 @@ one missing terminal hour; larger gaps still reject publication. Keep the fronti
 and all seven source shapes in the run evidence. Never use a
 calendar date or expected lag as proof of actual source availability.
 
-For the next update use the existing authorized credential resolver and call
-`meteorology.get_data('2026-10-09', latest_instantaneous_day, bbox=approved_bbox,
-output_dir=tail_dir, cache_dir=fresh_cache, workers=2,
-transfer_bytes=4 * 1024**3, max_seconds=3600,
-allow_incomplete_final_day=True)`. The existing tail is transactionally
-replaced only after success. Re-run the publication command above. Pinning a fresh
-cache intentionally selects the new source epoch only for the tail; the historical
-rectangle remains unchanged. Existing credentials can be loaded with
-`resolve_credentials(env_file=workspace / '.env', required=True)` and assigned in
-process to `CDSAPI_KEY`; never print or persist the token. This neither creates
-credentials nor accepts terms. A failed bounded call resumes from its verified
-objects when repeated with the same cache; a newer vintage needs a fresh cache.
+For new direct production use `get_weather` with explicit study, dates, variables,
+output and cache as described in the [API](regional-api.md). The earlier two-epoch
+publication command remains for retained-product replay. Keep historical source
+vintages unchanged; updating the remote snapshot can revise values. Rerunning a
+failed call reuses completed source objects.
 
 Check available storage before each run: the first new geographic time block
 requires hundreds of MiB of source/archive storage, and staging the coastal hourly
@@ -148,7 +141,7 @@ independent validation of every daily/hourly key, membership and null count.
 The installed `get_weather(start_date, end_date, variable_list)` now produces the
 approved coastal membership directly from the fast regional source, without a
 rectangle export. See the [primary API](regional-api.md#approved-coastal-api) and
-[quickstart](getting-started/quickstart.md). The retained merger above remains a
+[usage](regional-api.md). The retained merger above remains a
 compatibility route for the original two-epoch publication.
 
 Verification on Python 3.12.13 used existing environments and retained source caches:
@@ -168,7 +161,6 @@ No live provider acquisition, independent observational validation or Python
 environments; distribution builds and installed-wheel execution passed.
 
 Remaining work includes a portable multi-epoch replay descriptor, stricter source
-contract/time gates inside the legacy retained merger, bounded automatic retries,
-and separate legacy-route/dependency retirement. These are not represented as fixed
+contract/time gates inside the retained merger and bounded automatic retries. These are not represented as fixed
 by the primary API. The current source metadata/evidence snapshots remain pinned;
 a fresh ERA5/ERA5T vintage may revise historical values.

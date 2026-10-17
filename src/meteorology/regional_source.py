@@ -8,14 +8,17 @@ from pathlib import Path
 import shutil
 import threading
 import time
-from urllib.request import Request, build_opener, HTTPSHandler, ProxyHandler
+from urllib.request import Request, build_opener, HTTPSHandler, ProxyHandler, HTTPRedirectHandler
 
 import numpy as np
 
 from .artifacts import checksum_path
 from .core.artifacts import atomic_write_json
-from .era5.credentials import resolve_credentials
-from .era5.transport import NoRedirect
+from .credentials import resolve_credentials
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
 
 URL = ('https://arco.datastores.ecmwf.int/cadl-arco-geo-002/arco/'
        'reanalysis_era5_single_levels/sfc/geoChunked.zarr')

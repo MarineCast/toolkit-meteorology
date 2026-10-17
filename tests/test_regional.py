@@ -96,15 +96,6 @@ def test_missing_and_unsupported_values_stay_null(tmp_path, fake, monkeypatch):
     assert status['OUTSIDE_SUPPORTED_RH_DOMAIN'] == 1
 
 
-def test_exact_metric_and_hourly_companion(tmp_path, fake):
-    result = regional.get_metric('TEMPERATURE_2M_C_MIN', '2009-01-01', '2009-01-01',
-                                 output_dir=tmp_path / 'public')
-    assert pq.read_schema(result.daily_path).names == ['H3_INDEX', 'DATE', 'TEMPERATURE_2M_C_MIN']
-    assert pq.read_schema(result.hourly_path).names == ['H3_INDEX', 'DATETIME', 'TEMPERATURE_2M_C']
-    assert set(regional.selections('WIND_SPEED_10M_MS')['daily']) == {
-        'WIND_SPEED_10M_MS_MEAN', 'WIND_SPEED_10M_MS_MAX'}
-
-
 def test_failure_preserves_published_pair(tmp_path, fake, monkeypatch):
     result = regional.get_data('2009-01-01', '2009-01-01', output_dir=tmp_path / 'public')
     original = {p: p.read_bytes() for p in (result.hourly_path, result.daily_path, result.catalog_path)}
@@ -116,8 +107,6 @@ def test_failure_preserves_published_pair(tmp_path, fake, monkeypatch):
 
 def test_invalid_request_does_not_acquire(tmp_path, monkeypatch):
     monkeypatch.setattr(regional, 'Archive', lambda *a, **k: pytest.fail('Unexpected acquisition'))
-    with pytest.raises(ValueError, match='Unknown metric'):
-        regional.get_metric('not-a-metric', '2009-01-01', '2009-01-01')
     with pytest.raises(ValueError, match='on or before'):
         regional.get_data('2009-02-01', '2009-01-01')
     with pytest.raises(ValueError, match='separate'):
@@ -211,7 +200,7 @@ def test_regional_block_crops_axes_and_reuses_verified_local_array(tmp_path):
 
 def test_vector_hourly_matches_reference_reducer_with_missing_invalid_and_calm():
     from datetime import date
-    from meteorology.backfill_compute import day_frames
+    from meteorology.compute import day_frames
     rng = np.random.default_rng(1729)
     parameters = ['t2m', 'd2m', 'u10', 'v10', 'msl', 'tcc', 'tp']
     values = np.array([rng.normal(center, spread, (25, 8)) for center, spread in
@@ -228,12 +217,12 @@ def test_vector_hourly_matches_reference_reducer_with_missing_invalid_and_calm()
                 metadata=dict(grid_hash='fixture', evidence={}))
     spatial = (np.array([7, 0, 1, 2, 3, 4, 5, 6, 7]), [str(i) for i in range(9)],
                np.zeros(9), 'fixture')
-    specs = regional.selections(None)['hourly']
+    specs = regional.metric_specs('hourly')
     counts = {}
     actual = regional.hourly_day(cube, day, specs, spatial, counts).to_pandas()
     expected, expected_counts = {}, {}
     request = dict(variables=list(regional.VARIABLES), frequency='hourly')
-    for frame in day_frames(cube, None, day, request, spatial, {}):
+    for frame in day_frames(cube, None, day, request, spatial):
         name = frame.METRIC.iloc[0]
         expected.setdefault(name, []).append(frame.VALUE.to_numpy())
         target = expected_counts.setdefault(name, {})
@@ -266,3 +255,26 @@ def test_missing_terminal_midnight_is_explicit_partial_not_zero():
     archive.times = archive.times[:-1]
     with pytest.raises(ValueError, match='boundary'):
         archive.cube(stamps[0].date(), ['tp'], allow_missing_boundary=True)
+
+
+def test_daily_wind_uses_mean_vector_not_mean_direction():
+    from datetime import date
+    from meteorology.compute import day_frames
+    parameters = ['t2m', 'u10', 'v10']
+    values = np.array([np.arange(25)[:, None] + 280.,
+                       np.array([3., -3.] * 12 + [3.])[:, None], np.zeros((25, 1))])
+    day = date(2009, 1, 1)
+    cube = dict(values=values, parameters=np.array(parameters),
+        times=pd.date_range(day, periods=25, freq='h', tz='UTC').as_unit('ns').asi8,
+        coordinates=np.array([[48., -124.]]), metadata=dict(grid_hash='fixture', evidence={}))
+    request = dict(variables=['temperature', 'wind'], frequency='daily')
+    frames = {f.METRIC.iloc[0]: f for f in day_frames(cube, None, day, request,
+              (np.array([0]), ['a'], np.zeros(1), 'fixture'))}
+    assert frames['TEMPERATURE_2M_C_MEAN'].VALUE.iloc[0] == pytest.approx(18.35)
+    assert frames['TEMPERATURE_2M_C_MIN'].VALUE.iloc[0] == pytest.approx(6.85)
+    assert frames['TEMPERATURE_2M_C_MAX'].VALUE.iloc[0] == pytest.approx(29.85)
+    assert frames['WIND_SPEED_10M_MS_MEAN'].VALUE.iloc[0] == 3.
+    assert frames['WIND_SPEED_10M_MS_MAX'].VALUE.iloc[0] == 3.
+    direction = frames['WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR']
+    assert np.isnan(direction.VALUE.iloc[0])
+    assert direction.VALUE_STATUS.iloc[0] == 'UNDEFINED_CALM_MEAN'

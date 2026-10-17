@@ -5,12 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "toolkit-meteorology"
 dynamic = ["version"]
-description = "Regional ERA5 and HRRR weather, daylight, lunar and atmospheric H3 products"
+description = "Approved coastal ERA5 hourly and daily weather"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 license = "Apache-2.0"
 authors = [{name = "MarineCast contributors"}]
-keywords = ["meteorology", "ERA5", "HRRR", "H3", "geospatial", "astronomy", "environmental modeling", "reproducible science"]
+keywords = ["meteorology", "ERA5", "H3", "geospatial", "environmental modeling", "reproducible science"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
@@ -25,18 +25,13 @@ classifiers = [
 ]
 dependencies = [
   "h3>=4", "numpy>=1.26", "numcodecs>=0.12,<0.18", "pandas>=2.1",
-  "psutil>=5.9", "pyarrow>=14", "pydantic>=2", "pyproj>=3.6", "PyYAML>=6",
-  "scikit-learn>=1.4", "shapely>=2", "xarray>=2024.1",
+  "pyarrow>=14", "PyYAML>=6",
 ]
 
 [project.optional-dependencies]
-visualization = ["branca>=0.7", "folium>=0.20", "geopandas>=1"]
-acquisition = ["herbie-data>=2024.3", "cfgrib>=0.9", "eccodes>=2.35"]
-era5 = ["cdsapi>=0.7.7", "eccodes>=2.35"]
-native-pilot = ["eccodes>=2.35"]
 test = ["pytest>=8"]
 docs = ["mkdocs-material>=9.5", "mkdocstrings[python]>=0.25", "pymdown-extensions>=10.2,<12.2"]
-dev = ["branca>=0.7", "folium>=0.20", "geopandas>=1", "pytest>=8", "ruff>=0.8", "build>=1.2", "twine>=5", "mkdocs-material>=9.5", "mkdocstrings[python]>=0.25", "pymdown-extensions>=10.2,<12.2"]
+dev = ["pytest>=8", "ruff>=0.8", "build>=1.2", "twine>=5", "mkdocs-material>=9.5", "mkdocstrings[python]>=0.25", "pymdown-extensions>=10.2,<12.2"]
 
 [project.urls]
 Documentation = "https://marinecast.github.io/toolkit-meteorology/"
@@ -48,6 +43,7 @@ meteorology = "meteorology.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+namespaces = false
 
 [tool.setuptools.dynamic]
 version = {attr = "meteorology._version.__version__"}
@@ -58,7 +54,6 @@ meteorology = ["resources/**/*", "**/*.md"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --import-mode=importlib"
-markers = ["live: opt-in network and GRIB provider compatibility tests"]
 
 [tool.ruff]
 target-version = "py311"

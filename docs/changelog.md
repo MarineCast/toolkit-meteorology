@@ -1,6 +1,15 @@
 # Changelog
 
-## Unreleased — coastal API
+## Unreleased — legacy removal
+
+Remove retired HRRR/CDS request engines, astronomy, model features, visualizers,
+demos/benchmarks, legacy configuration, tests and docs. Extract unchanged UTC
+numerical reductions into compute.py; keep the fast source cache, exact membership,
+current catalog checks, retained epoch merger and transaction recovery. Reduce
+runtime dependencies to six. See [migration](MIGRATION.md) and [inventory](cleanup.md).
+
+
+## Prior coastal API rollout — PR #15
 
 - Add `get_weather(start_date, end_date, variable_list)` for exact approved coastal
   R5 output using the fast regional source cache; seven allowed families produce

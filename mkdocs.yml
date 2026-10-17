@@ -46,50 +46,11 @@ markdown_extensions:
           format: !!python/name:pymdownx.superfences.fence_code_format
 nav:
   - Home: index.md
-  - Get started:
-      - Coastal weather API: regional-api.md
-      - Coastal ERA5 product: coastal-product.md
-      - Legacy weather requests: request-api.md
-      - Legacy CDS backfill: era5-backfill.md
-      - Quickstart: getting-started/quickstart.md
-      - Installation: SETUP.md
-      - Configuration: CONFIGURATION.md
-  - Science:
-      - Methodology: methodology.md
-      - Product contracts: CONTRACTS.md
-      - Product tables: PRODUCTS.md
-      - Variable inventory: reference/variables.md
-      - Limitations: limitations.md
-  - Guides:
-      - Acquisition and build: WORKFLOWS.md
-      - ERA5 and HRRR retrospective products: era5-retrospective.md
-      - Native source pilots:
-          - HRRR UTC-day pilot: HRRR_NATIVE_DAY_PILOT.md
-          - ERA5 CDS lifecycle and pilot: CDS_JOB_INTEGRATION_AND_PILOTS.md
-      - Shared study configuration: shared-study.md
-      - Marine reporting integration: marine-reporting.md
-      - Hourly weather: hourly-weather.md
-      - Live one-week demo: live-week-demo.md
-      - Measured demo results: live-week-results.md
-      - Compact weather summaries: weather-summaries.md
-      - Daily matrix: daily-matrix.md
-      - Modeling guidance: guides/downstream-modeling.md
-  - Reference:
-      - CLI: reference/cli.md
-      - Python API: reference/api.md
-      - Sources and rights: DATA_SOURCES.md
-  - Development:
-      - Implementation tracker: IMPLEMENTATION_TRACKER.md
-      - Request handoff: request-handoff.md
-      - Request refactor evidence: request-refactor-evidence.md
-      - ERA5 backfill performance: era5-backfill-performance.md
-      - Request review fixes: request-review-evidence.md
-      - Cleanup inventory: request-cleanup.md
-      - Architecture: ARCHITECTURE.md
-      - Development checks: DEVELOPMENT.md
-      - Archived validation: archived-validation.md
-      - Scientific validation plan: scientific-validation-plan.md
-      - Release process: development/release-process.md
-      - Repository presentation: development/repository-presentation.md
-      - Migration history: MIGRATION.md
-      - Changelog: changelog.md
+  - API and usage: regional-api.md
+  - Current product: coastal-product.md
+  - Contract: CONTRACTS.md
+  - Architecture: ARCHITECTURE.md
+  - Development: DEVELOPMENT.md
+  - Migration: MIGRATION.md
+  - Cleanup inventory: cleanup.md
+  - Changelog: changelog.md

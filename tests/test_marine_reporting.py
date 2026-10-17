@@ -1,22 +1,10 @@
-from dataclasses import replace
 from pathlib import Path
 import hashlib
 import json
-
 import h3
-import pandas as pd
 import pytest
-from shapely.geometry import box
-
-from meteorology.marine_reporting import (
-    load_reporting_membership,
-    nearest_native_crosswalk,
-    project_native_daily,
-)
-from meteorology.study import load_study_config
-
-FIXTURE = Path(__file__).parent / "fixtures/study.coastal-policy.v1.json"
-
+from meteorology.marine_reporting import load_reporting_membership
+FIXTURE = Path(__file__).parent / 'fixtures/study.coastal-policy.v1.json'
 
 def registry(tmp_path):
     center = h3.latlng_to_cell(49, -125, 5)
@@ -65,33 +53,6 @@ def registry(tmp_path):
         study, mask_path=mask, mask_hash_policy="sha256_exact_file_bytes"
     )
     return member, study, mask, reader
-
-
-def native(source="ERA5", day="2024-01-01"):
-    rows = []
-    for lat in [48.75, 49, 49.25, 49.5]:
-        for lon in [-125.5, -125.25, -125, -124.75]:
-            index = len(rows)
-            prefix = source + "_TEMPERATURE_2M_C"
-            rows.append(
-                dict(
-                    DATE=day,
-                    TIMEZONE="UTC",
-                    SOURCE_MODEL=source,
-                    SOURCE_GRID_HASH="a" * 64,
-                    SOURCE_GRID_INDEX=index,
-                    SOURCE_LAT=lat,
-                    SOURCE_LON=lon,
-                    **{
-                        prefix: float(index),
-                        prefix + "_STATUS": "COMPLETE",
-                        prefix + "_VALID_HOURS": 24,
-                        prefix + "_EXPECTED_HOURS": 24,
-                        prefix + "_COVERAGE_FRACTION": 1.0,
-                    },
-                )
-            )
-    return pd.DataFrame(rows)
 
 
 def test_pending_real_geometry_fails_before_reader_or_artifact_io(tmp_path):
@@ -165,99 +126,6 @@ def test_bad_registry_fails_closed(tmp_path, change, match):
         load_reporting_membership(study, mask_path=mask, mask_hash_policy="sha256_exact_file_bytes")
 
 
-def test_era5_mapping_preserves_native_coarseness_and_unsupported_rows(tmp_path):
-    member, _, _, _ = registry(tmp_path)
-    source = native()
-    unchanged = source.copy(deep=True)
-    crosswalk, meta = nearest_native_crosswalk(source, member, source_family="ERA5")
-    assert tuple(crosswalk.H3_INDEX) == member.cells
-    assert meta["supported_cells"] == len(member.cells) - 1
-    assert crosswalk.SOURCE_GRID_INDEX.dropna().duplicated().any()  # No finer weather information.
-    output, receipt = project_native_daily(source, crosswalk, meta, member, source_family="ERA5")
-    pd.testing.assert_frame_equal(source, unchanged)
-    assert len(output) == len(member.cells)
-    unsupported = output[output.SPATIAL_SUPPORT_STATUS != "SUPPORTED"].iloc[0]
-    assert pd.isna(unsupported.ERA5_TEMPERATURE_2M_C)
-    assert unsupported.ERA5_TEMPERATURE_2M_C_STATUS == "UNAVAILABLE"
-    assert unsupported.ERA5_TEMPERATURE_2M_C_VALID_HOURS == 0
-    assert unsupported.ERA5_TEMPERATURE_2M_C_COVERAGE_FRACTION == 0
-    for row in output[output.SPATIAL_SUPPORT_STATUS == "SUPPORTED"].itertuples():
-        assert (
-            row.ERA5_TEMPERATURE_2M_C
-            == source.set_index("SOURCE_GRID_INDEX").loc[
-                row.SOURCE_GRID_INDEX, "ERA5_TEMPERATURE_2M_C"
-            ]
-        )
-    assert receipt["requested_time"]["start"] == "2009-01-01"
-    assert receipt["actual_daily_coverage"]["available_days"] == ["2024-01-01"]
-    assert receipt["actual_daily_coverage"]["period_complete"] is False
-
-
-def test_hrrr_footprint_and_distance_separate_from_era5(tmp_path):
-    member, _, _, _ = registry(tmp_path)
-    source = native("HRRR")
-    with pytest.raises(ValueError, match="distance allowance"):
-        nearest_native_crosswalk(source, member, source_family="HRRR")
-    with pytest.raises(ValueError, match="native footprint"):
-        nearest_native_crosswalk(source, member, source_family="HRRR", hrrr_max_distance_m=10000)
-    crosswalk, meta = nearest_native_crosswalk(
-        source,
-        member,
-        source_family="HRRR",
-        hrrr_qualified_footprint=box(-125.5, 48.75, -124.75, 49.5),
-        hrrr_max_distance_m=1,
-    )
-    assert meta["supported_cells"] == 0
-    output, _ = project_native_daily(source, crosswalk, meta, member, source_family="HRRR")
-    assert output.HRRR_TEMPERATURE_2M_C.isna().all()
-    assert not any(c.startswith("ERA5_") for c in output.columns)
-
-
-def test_crosswalk_tampering_family_mix_and_pending_membership_rejected(tmp_path):
-    member, _, _, _ = registry(tmp_path)
-    source = native()
-    crosswalk, meta = nearest_native_crosswalk(source, member, source_family="ERA5")
-    bad = crosswalk.copy()
-    bad.loc[0, "SOURCE_GRID_INDEX"] = 0
-    with pytest.raises(ValueError, match="checksum identity"):
-        project_native_daily(source, bad, meta, member, source_family="ERA5")
-    with pytest.raises(ValueError, match="separate"):
-        nearest_native_crosswalk(source, member, source_family="HRRR")
-    pending = replace(member, study_identity=load_study_config(FIXTURE, planning=True))
-    with pytest.raises(ValueError, match="qualified geometry"):
-        nearest_native_crosswalk(source, pending, source_family="ERA5")
-
-
-@pytest.mark.parametrize(
-    "kind", ["duplicate", "timezone", "coverage", "partial_value", "date", "grid"]
-)
-def test_bad_native_daily_support_fails(tmp_path, kind):
-    member, _, _, _ = registry(tmp_path)
-    source = native()
-    crosswalk, meta = nearest_native_crosswalk(source, member, source_family="ERA5")
-    if kind == "duplicate":
-        source = pd.concat([source, source.iloc[[0]]], ignore_index=True)
-    elif kind == "timezone":
-        source.TIMEZONE = "America/Los_Angeles"
-    elif kind == "coverage":
-        source.loc[0, "ERA5_TEMPERATURE_2M_C_COVERAGE_FRACTION"] = 0.5
-    elif kind == "partial_value":
-        source.loc[
-            0,
-            [
-                "ERA5_TEMPERATURE_2M_C_VALID_HOURS",
-                "ERA5_TEMPERATURE_2M_C_COVERAGE_FRACTION",
-                "ERA5_TEMPERATURE_2M_C_STATUS",
-            ],
-        ] = [23, 23 / 24, "PARTIAL"]
-    elif kind == "date":
-        source.DATE = "2008-12-31"
-    else:
-        source.loc[0, "SOURCE_LAT"] += 0.01
-    with pytest.raises(ValueError):
-        project_native_daily(source, crosswalk, meta, member, source_family="ERA5")
-
-
 @pytest.mark.parametrize("bad", [b"abc\r\n", b"abc", b"\n", b" abc\n", b"abc\n\n", b"\xff\n"])
 def test_exact_ascii_lf_interface_rejects_malformed_bytes(bad):
     from meteorology.marine_reporting import _parse_membership_ids
@@ -280,54 +148,6 @@ def test_interface_path_is_config_relative_and_format_pin_matches_owner(tmp_path
         load_reporting_membership(
             study, mask_path=mask, mask_hash_policy="canonical_geometry_unknown"
         )
-
-
-def test_empty_owner_membership_is_zero_bytes_and_not_filled_from_bbox(tmp_path):
-    member, study, mask, _ = registry(tmp_path)
-    config = json.loads(study.read_text())
-    config["grid_registry"]["memberships"][0].update(
-        count=0, sha256=hashlib.sha256(b"").hexdigest()
-    )
-    study.write_text(json.dumps(config))
-    (tmp_path / "Data/synthetic.ids").write_bytes(b"")
-    member = load_reporting_membership(
-        study, mask_path=mask, mask_hash_policy="sha256_exact_file_bytes"
-    )
-    assert member.cells == ()
-    assert member.canonical_membership_sha256 == hashlib.sha256(b"").hexdigest()
-    crosswalk, meta = nearest_native_crosswalk(native(), member, source_family="ERA5")
-    result, _ = project_native_daily(native(), crosswalk, meta, member, source_family="ERA5")
-    assert len(result) == 0
-
-
-def test_foreign_metric_columns_do_not_blend_sources(tmp_path):
-    member, _, _, _ = registry(tmp_path)
-    source = native()
-    crosswalk, meta = nearest_native_crosswalk(source, member, source_family="ERA5")
-    source["HRRR_TEMPERATURE_2M_C"] = 0
-    with pytest.raises(ValueError, match="cannot be blended"):
-        project_native_daily(source, crosswalk, meta, member, source_family="ERA5")
-
-
-def test_extra_source_metric_without_status_rejected(tmp_path):
-    member, *_ = registry(tmp_path)
-    frame = native()
-    frame["ERA5_WIND_SPEED_10M_M_S"] = float("inf")
-    cross, meta = nearest_native_crosswalk(frame, member, source_family="ERA5")
-    with pytest.raises(ValueError, match="Uncontracted"):
-        project_native_daily(frame, cross, meta, member, source_family="ERA5")
-
-
-def test_canonical_cells_must_match_artifact_hash(tmp_path):
-    member, *_ = registry(tmp_path)
-    cells = tuple(sorted((*member.cells[:-1], h3.latlng_to_cell(51.5, -128, 5))))
-    forged = replace(
-        member,
-        cells=cells,
-        canonical_membership_sha256=hashlib.sha256(("\n".join(cells) + "\n").encode()).hexdigest(),
-    )
-    with pytest.raises(ValueError, match="pinned registry"):
-        nearest_native_crosswalk(native(), forged, source_family="ERA5")
 
 
 def test_exact_file_mask_rejects_directory(tmp_path):

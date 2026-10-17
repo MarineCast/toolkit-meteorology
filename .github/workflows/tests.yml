@@ -1,37 +1,27 @@
 name: Offline package checks
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-
+on: [push, pull_request]
 permissions:
   contents: read
-
 jobs:
   tests:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
+        os: [ubuntu-24.04]
         python: ['3.11', '3.12', '3.13']
+        include:
+          - os: macos-15
+            python: '3.12'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
           cache: pip
-      - run: python -m pip install '.[dev,native-pilot]'
+      - run: python -m pip install '.[dev]'
       - run: python -m pytest -q
-      - run: python benchmarks/request_lifecycle.py
-      - run: ruff check src tests benchmarks demo
-      - run: meteorology catalog --check
-      - run: meteorology feature-policy --check
-      - run: |
-          python -m meteorology.variables --markdown > /tmp/meteorology-variables.md
-          diff -u docs/reference/variables.md /tmp/meteorology-variables.md
+      - run: ruff check src tests
       - run: mkdocs build --strict
-
   wheel:
     runs-on: ubuntu-24.04
     steps:
@@ -39,39 +29,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: pip
       - run: python -m pip install build twine
       - run: python -m build
       - run: python -m twine check dist/*
-      - name: Install wheel outside the checkout and run offline products
-        run: |
+      - run: |
           python -m venv /tmp/meteorology-wheel
           /tmp/meteorology-wheel/bin/python -m pip install dist/*.whl pytest
-          mkdir -p /tmp/meteorology_wheel_tests
-          cp tests/test_regional.py tests/test_coastal.py tests/test_weather_api.py /tmp/meteorology_wheel_tests/
+          cp -R tests /tmp/meteorology_wheel_tests
           touch /tmp/meteorology_wheel_tests/__init__.py
           cd /tmp
-          /tmp/meteorology-wheel/bin/python -c 'import meteorology; print(meteorology.__version__)'
           /tmp/meteorology-wheel/bin/python -m pytest -q --import-mode=importlib /tmp/meteorology_wheel_tests
-          /tmp/meteorology-wheel/bin/python -c "import importlib.util; assert all(importlib.util.find_spec(m) is None for m in ('folium', 'branca', 'geopandas'))"
           /tmp/meteorology-wheel/bin/meteorology --help
-          /tmp/meteorology-wheel/bin/meteorology sources
-          /tmp/meteorology-wheel/bin/meteorology variables --data-source era5
-          /tmp/meteorology-wheel/bin/meteorology backfill --start-date 2009-01-01 --end-date 2018-12-31 --bbox -129.7 45.9 -121.5 51.5 --dry-run
-          /tmp/meteorology-wheel/bin/meteorology get temperature --start-date 2024-01-01 --end-date 2024-01-01 --bbox -124 48 -123 48.5 --data-source hrrr --dry-run
-          /tmp/meteorology-wheel/bin/meteorology --workspace /tmp/meteorology-smoke init
-          /tmp/meteorology-wheel/bin/meteorology --workspace /tmp/meteorology-smoke example-offline
-          /tmp/meteorology-wheel/bin/meteorology --workspace /tmp/meteorology-smoke validate --daily-matrix /tmp/meteorology-smoke/outputs/synthetic-daily-matrix.parquet
           /tmp/meteorology-wheel/bin/python -m pip check
-
-  macos-smoke:
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: pip
-      - run: python -m pip install '.[test,native-pilot]'
-      - run: python -m pytest -q tests/test_request_api.py tests/test_request_transport.py tests/test_hrrr_native_source.py tests/test_era5_resources.py tests/test_processing_scaling.py tests/test_concurrency.py tests/test_request_review.py tests/test_request_lineage.py tests/test_request_preflight.py tests/test_request_storage.py tests/test_request_lifecycle.py tests/test_request_commit.py tests/test_request_qualification.py tests/test_backfill.py tests/test_regional.py
-      - run: meteorology get temperature --start-date 2024-01-01 --end-date 2024-01-01 --bbox -124 48 -123 48.5 --data-source hrrr --dry-run
