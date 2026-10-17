@@ -1,54 +1,125 @@
 # toolkit-meteorology agent guidance
 
-## Scope
+## Supported outcome
 
-One supported product: exact approved coastal R5 ERA5 hourly/daily files and catalog.
-Read docs/ARCHITECTURE.md, docs/CONTRACTS.md and docs/regional-api.md before producer
-changes. Shared boundaries follow ../../.github/INFRASTRUCTURE.md in a grouped
-workspace. No sibling runtime imports. Inspect Git state and preserve concurrent work.
+This repository supports one product: the approved coastal H3 R5 ERA5 hourly and
+daily weather Parquets plus `catalog.json`. Keep the pipeline small. Do not restore
+removed HRRR/CDS request planners, astronomy, modeling, visualization, per-family
+entry points, or optional runtime stacks without explicit new product scope.
+Legacy implementation remains in Git history; `docs/cleanup.md` and
+`docs/MIGRATION.md` describe the removal.
+
+Start with `git status --short`; preserve concurrent edits. Read
+`docs/regional-api.md`, `docs/CONTRACTS.md`, and `docs/ARCHITECTURE.md` before
+producer changes. Shared boundaries follow `../../.github/INFRASTRUCTURE.md` when
+working in the grouped MarineCast workspace. The installed package must not
+import siblings, application code, workspace scripts, or checkout-only files.
+
+## Public API and configuration
+
+`meteorology.get_weather(start_date, end_date, variable_list=None, **options)`
+publishes inclusive UTC days. `None` selects `ALLOWED_VARIABLES`: temperature,
+dewpoint, relative_humidity, wind, cloud_cover, pressure, precipitation. All seven
+produce 14 daily and 10 hourly metrics. Reject unknown, duplicate, or empty
+selections before source acquisition. `check_weather(catalog_path,
+study_config=...)` is read-only; supply the approved study to verify external
+membership. `validate_product` is a compatibility spelling for catalog checks.
+
+The installed CLI is `meteorology get START END --variables ...` and
+`meteorology check CATALOG --study-config PATH`; `python -m meteorology` uses the
+same implementation. Resolve the owner-managed study via explicit `study_config`
+or `MARINECAST_STUDY_CONFIG`; registry/mask inputs are external, not bundled data.
+Use explicit scratch `output_dir` and canonical retained `cache_dir` in checks.
+A production call replaces the requested output range; it is not an append API.
+Resolve provider credentials through `credentials.py`; never expose tokens in
+logs, exceptions, catalogs, fixtures, or committed configuration.
+
+## Code and test map
+
+| Responsibility | Implementation | Focused tests |
+| --- | --- | --- |
+| API, variable/date gates, wide tables, catalog validation, CLI | `regional.py`, package exports, `cli.py` | `test_weather_api.py`, `test_regional.py` |
+| Fast ECMWF geographic chunks, bounded transfers/concurrency, pinned metadata and checksummed caches | `regional_source.py` | `test_regional.py` |
+| Native sampling, unit conversion, hourly fields and UTC reductions | `compute.py` | `test_regional.py`, `test_weather_api.py` |
+| Approved study and exact registry/mask membership | `study.py`, `marine_reporting.py`, `resources/` | `test_study.py`, `test_marine_reporting.py` |
+| Credential resolution and redaction | `credentials.py` | `test_credentials.py` |
+| Transactional publication/recovery and hashes | `core/artifacts/`, `artifacts.py` | `test_publication.py`, `test_regional.py` |
+| Original retained multi-epoch product merger; no acquisition | `coastal.py` | `test_coastal.py` |
+
+`regional.get_data` is an internal shared exporter retained by the implementation
+and compatibility tests; it is not the supported root API. The retained merger
+and workspace update helpers do not make additional products public interfaces.
 
 ## Scientific and storage constraints
 
-Preserve exact registry/mask membership, units, UTC interval semantics, nulls,
-source vintages and provenance. Unknown operational availability stays unknown;
-retrospective ERA5/ERA5T is not a forecast qualification. Never modify approved
-Data or retained source caches for tests. Use small offline fixtures and bounded
-scratch replay; no bulk copies or duplicate environments. User-requested source
-cleanup does not authorize data deletion. Retained legacy source is in Git history.
+Preserve exact approved membership (currently 463 cells), keys, units, UTC interval
+semantics, null/status accounting, source vintages and provenance. Quarter-degree
+nearest-source sampling does not create independent H3-scale weather information.
+Instantaneous daily support is 00–23 UTC; precipitation uses intervals ending
+01:00 through next midnight. Missing support stays null, including unsupported
+RH. Daily wind direction uses the mean vector. Do not zero-fill, clip, or silently
+substitute revised source values.
 
-## Checks
+Discover coverage from actual source coordinates, not calendar lag. The explicit
+`allow_incomplete_final_day` option permits one missing terminal precipitation
+hour; it must not conceal larger gaps. ERA5/ERA5T revision identity and historical
+operational availability remain unknown where evidence is absent. This is
+retrospective reanalysis, not a qualified forecast archive. Source snapshots and
+epoch lineage must remain explicit; fresh acquisition need not reproduce a prior
+vintage. Reruns reuse completed verified objects; do not describe this as automatic
+retry or portable full multi-epoch reconstruction without implementing/testing it.
 
-Run focused tests, then `python -m pytest -q`, `ruff check src tests`,
-`mkdocs build --strict`, wheel/sdist build and outside-checkout installed-wheel tests.
-Ordinary tests must not access providers. Docs-only edits require strict docs and
-`git diff --check`. Test cache corruption, incomplete rainfall boundaries, scientific
-reductions, exact keys/membership and publication failure/recovery when affected.
-Report exactly what ran, including untested live acquisition or full reconstruction.
+Never modify approved `MarineCast/Data/Meteorology` or retained inputs/caches for
+tests or source cleanup. Use small offline fixtures and bounded scratch replay;
+no full historical rebuild, bulk copies, or duplicate large environments unless
+explicitly scoped. Check storage headroom before acquisition/staging and run one
+writer per output/cache. Preserve recoverable publication and source-cache integrity.
 
-## Documentation and generated files
+## Verification
 
-Edit and commit documentation sources in `docs/` and configuration in `mkdocs.yml`.
-`site/` is generated HTML from `mkdocs build`; it is disposable, ignored, and must
-not be edited as documentation source or committed. Reuse that build destination.
+Reuse an existing Python 3.11–3.13 environment (`.venv` locally when available).
+Runtime dependencies are h3, numpy, numcodecs, pandas, pyarrow and PyYAML; developer
+tools belong in optional extras. For behavior changes run focused tests, then:
 
-Python bytecode (`*.py[cod]`) and `__pycache__/` are generated and already ignored.
-Do not commit them. For an authorized local bytecode cleanup, limit removal to the
-requested repository source/test trees, preserve environments and retained data or
-source caches, and remove resulting ordinary empty directories with empty-only
-checks. Inspect hidden entries before calling a directory empty; do not follow
-symlinks. Use `PYTHONDONTWRITEBYTECODE=1` for import checks after bytecode cleanup.
+```sh
+python -m pytest -q
+ruff check src tests
+mkdocs build --strict
+python -m build
+python -m twine check dist/*
+git diff --check
+```
 
-## Navigation
+Follow `.github/workflows/tests.yml` for outside-checkout installed-wheel tests,
+CLI smoke and `pip check`; ensure packaged resources resolve without the checkout.
+Routine tests must not contact providers. Cover scientific reductions, next-midnight
+and block boundaries, exact membership/keys, null/status totals, corrupted caches,
+selected source dependencies, rollback and interrupted publication recovery when
+affected. Docs/instruction-only edits need strict docs and `git diff --check`.
+Report what actually ran and what did not: live acquisition, full reconstruction,
+observational accuracy and other Python versions are separate claims. Historical
+test counts and dated acceptance evidence in docs are not current verification.
 
-Use scoped source search for known paths. The optional local Graphify index lives
-in ignored `graphify-out/`; source and tests remain authoritative. Check its
-manifest and `refresh-metadata.json` against relevant source before querying. Read
-recorded diagnostic limitations; missing edges do not prove absence. Code-only
-AST extraction omits documentation semantics and may miss dynamic relationships.
-Do not rebuild merely for a query. When a refresh is explicitly requested, reuse
-the existing isolated Graphify installation and run from this repository only:
-`graphify extract . --code-only --no-cluster`. After intentional source deletions,
-verify the deleted paths before using `--force` to replace a larger stale graph.
-Keep graphs local and ignored; do not enable hooks, global merging, or publishing.
-No local skill is required for ordinary pipeline edits; use the Graphify skill
-when refreshing or exporting its index.
+## Documentation, generated files and navigation
+
+Edit documentation in `docs/` and configuration in `mkdocs.yml`. `site/` is ignored
+generated HTML from `mkdocs build`; do not edit or commit it. Reuse that destination.
+Python bytecode (`*.py[cod]`) and `__pycache__/` are already ignored. Authorized
+bytecode cleanup is local to the requested source/test trees; preserve environments,
+data and retained source caches. Inspect hidden entries, do not follow symlinks,
+and remove resulting ordinary empty directories with empty-only checks. Use
+`PYTHONDONTWRITEBYTECODE=1` for post-cleanup import checks.
+
+Use scoped `rg` for known paths and symbols. Optional Graphify navigation lives in
+ignored `graphify-out/`; check the manifest and `refresh-metadata.json` against
+relevant source. Source/tests outrank graph edges; code-only AST extraction omits
+prose semantics and can miss dynamic references. The current refresh records
+dangling endpoints and possible relation collapse, so no-match is not proof of absence.
+Do not rebuild just to answer a query. For an explicitly requested refresh use the
+Graphify skill and existing isolated tooling, scoped to this checkout, with
+`graphify extract . --code-only --no-cluster`. After deletions, an in-place forced
+refresh can preserve orphan nodes; use a fresh scratch output and verify paths and
+diagnostics before replacing the local index. Keep graphs local/ignored; do not
+install hooks, merge global graphs, publish caches, or overwrite maintained guidance
+through generated Graphify integration. No local skill is required for ordinary
+pipeline edits.
