@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
+import sys
 
 import numpy as np
 import pandas as pd
@@ -146,7 +147,7 @@ def hourly_day(cube, day, specs, spatial, counters):
 def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteorology',
              cache_dir=None, workers=4, transfer_bytes=8 * 1024**3, max_seconds=3600,
              allow_incomplete_final_day=False,
-             variable_list=None, membership=None):
+             variable_list=None, membership=None, verbosity=False):
     """Acquire/reuse regional ERA5 and publish hourly/daily wide H3 R5 Parquets.
 
     Inclusive UTC dates. Output contains exactly two Parquets and catalog.json in
@@ -175,6 +176,8 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
     expected = {p.name for p in (result.hourly_path, result.daily_path, result.catalog_path)}
     if output.exists() and any(p.name not in expected for p in output.iterdir()):
         raise ValueError('Choose a dedicated output directory; unrelated files are preserved.')
+    if verbosity:
+        print(f"Weather {first} through {last}: opening source/cache", file=sys.stderr, flush=True)
     # Cache lock prevents duplicate downloads and conflicting source receipts.
     with TransactionalFamilyPublisher._exclusive_parent(cache):
         archive = Archive(cache, bbox, workers=workers, transfer_bytes=transfer_bytes,
@@ -227,6 +230,8 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                 for stamp in pd.date_range(first, last, freq='D'):
                     archive.checkpoint()
                     day = stamp.date()
+                    if verbosity:
+                        print(f"Processing UTC day {day}", file=sys.stderr, flush=True)
                     if allow_incomplete_final_day or ('tp' not in parameters and end_second > archive.times[-1]):
                         cube = archive.cube(day, parameters, allow_missing_boundary=True)
                     else:
@@ -282,6 +287,8 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                 if catalog['incomplete_final_day'] else [])
             publisher.stage_manifest(result.catalog_path, catalog)
             publisher.publish()
+    if verbosity:
+        print(f"Published {result.catalog_path}", file=sys.stderr, flush=True)
     return result
 
 
@@ -297,10 +304,10 @@ def allowed_variables(variable_list):
     return values
 
 
-def get_weather(start_date, end_date, variable_list=ALLOWED_VARIABLES, *, study_config=None,
-                output_dir='data/meteorology', cache_dir=None, workers=4,
+def get_weather(start_date=None, end_date=None, variable_list=ALLOWED_VARIABLES, *, study_config=None,
+                output_dir=None, cache_dir=None, workers=4,
                 transfer_bytes=8 * 1024**3, max_seconds=3600,
-                allow_incomplete_final_day=False):
+                allow_incomplete_final_day=False, verbosity=None, env_file=None):
     """Publish approved coastal ERA5 weather for inclusive UTC dates.
 
     Configure MARINECAST_STUDY_CONFIG once, or pass study_config explicitly.
@@ -309,7 +316,11 @@ def get_weather(start_date, end_date, variable_list=ALLOWED_VARIABLES, *, study_
     """
     from .marine_reporting import load_reporting_membership
 
+    from .run_settings import resolve
+
     variables = allowed_variables(variable_list)
+    start_date, end_date, output_dir, verbosity = resolve(
+        start_date, end_date, output_dir, verbosity, env_file)
     member = load_reporting_membership(study_config)
     study = member.study_identity['study_config']
     first, last, _ = validate(start_date, end_date, study['domain']['bbox_wgs84'],
@@ -319,7 +330,7 @@ def get_weather(start_date, end_date, variable_list=ALLOWED_VARIABLES, *, study_
     return get_data(first, last, bbox=study['domain']['bbox_wgs84'],
                     output_dir=output_dir, cache_dir=cache_dir, workers=workers,
                     transfer_bytes=transfer_bytes, max_seconds=max_seconds,
-                    variable_list=variables, membership=member,
+                    variable_list=variables, membership=member, verbosity=verbosity,
                     allow_incomplete_final_day=allow_incomplete_final_day)
 
 
@@ -424,11 +435,13 @@ def main():
     parser = argparse.ArgumentParser(description='Approved coastal ERA5 weather')
     commands = parser.add_subparsers(dest='command', required=True)
     get = commands.add_parser('get')
-    get.add_argument('start_date')
-    get.add_argument('end_date')
+    get.add_argument('start_date', nargs='?')
+    get.add_argument('end_date', nargs='?')
     get.add_argument('--variables', nargs='+', choices=VARIABLES, default=VARIABLES)
     get.add_argument('--study-config')
-    get.add_argument('--output-dir', default='data/meteorology')
+    get.add_argument('--output-dir')
+    get.add_argument('--env-file', help='Run defaults file (default: .env in current directory)')
+    get.add_argument('--verbose', dest='verbosity', action=argparse.BooleanOptionalAction, default=None)
     get.add_argument('--cache-dir')
     get.add_argument('--allow-incomplete-final-day', action='store_true')
     check = commands.add_parser('check')

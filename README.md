@@ -14,6 +14,23 @@ result = get_weather("2009-01-01", "2009-01-02", ALLOWED_VARIABLES,
 check_weather(result.catalog_path, study_config="/path/to/config/study.v1.json")
 ```
 
+For local run defaults, copy `.env.example` to `.env` in the repo root:
+
+```dotenv
+DATA_DIR=../../Data/Meteorology/
+START_DATE=2009-01-01
+END_DATE=2026-10-10
+VERBOSITY=True
+```
+
+Run `meteorology get` or `get_weather()` from that directory to use these defaults.
+Explicit arguments override process environment, which overrides `.env`. Relative
+`DATA_DIR` in the file resolves beside the file. `.env` is private and ignored;
+only `.env.example` is committed. Progress goes to stderr; use `--no-verbose` or
+`verbosity=False` to silence it. Study configuration and provider credentials are
+still required separately. This example targets the current product directory;
+use a scratch `DATA_DIR` for experiments. Merely editing settings runs no pipeline.
+
 Allowed families: `temperature`, `dewpoint`, `relative_humidity`, `wind`,
 `cloud_cover`, `pressure`, `precipitation`. All seven yield 14 daily and 10 hourly
 fields. The current approved registry has 463 cells. Dates are inclusive UTC days.

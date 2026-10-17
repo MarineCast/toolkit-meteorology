@@ -22,6 +22,41 @@ Unknown, duplicate and empty lists reject before source access. Only selected
 source parameters are fetched. Dates are inclusive UTC dates inside the approved
 study. Output is the exact registry, without an intermediate rectangle export.
 
+## Local run defaults
+
+Copy the repository's `.env.example` to `.env` and set `DATA_DIR`, `START_DATE`,
+`END_DATE`, and `VERBOSITY=True` or `False`. The API and `get` CLI read `.env` in
+the current working directory only, including when installed outside the checkout.
+Use `env_file="/path/to/.env"` or `--env-file PATH` to select another file.
+No file is read and no acquisition occurs on import. Only these four run keys
+are read; values are never executed, expanded as shell expressions, or copied to
+the process environment. Quote values containing spaces. Unknown keys are ignored.
+
+Precedence is explicit API/CLI option, process environment, then `.env`. Dates
+may be omitted individually if supplied by configuration. Without configuration,
+dates remain required, output defaults to `data/meteorology`, and verbosity is
+false. Relative file-based `DATA_DIR` resolves beside that file; explicit and
+process-environment paths resolve from the working directory. Absolute paths work
+in all cases. Personal `.env` files are ignored and excluded from distributions;
+`.env.example` is the committed template. Study and credentials resolve separately.
+
+```sh
+meteorology get --cache-dir /path/to/retained-cache
+meteorology get 2009-01-01 2009-01-02 --output-dir scratch/weather --no-verbose
+```
+
+```python
+get_weather()  # dates/output/verbosity from local settings; all allowed families
+get_weather(env_file="/path/to/.env", verbosity=False)
+```
+
+Verbose runs report source/cache opening, each UTC processing day and successful
+publication to stderr. CLI stdout retains the resulting catalog path. These
+settings do not enable the incomplete-final-day option: explicitly pass
+`--allow-incomplete-final-day` / `allow_incomplete_final_day=True` when qualifying
+that boundary. They also do not append data or select historical source epochs.
+A fresh source vintage may revise values; use scratch outputs for verification.
+
 ## Files and quantities
 
 - `meteorology-hourly.parquet`: H3_INDEX string, DATETIME timestamp(us, UTC), selected float64 metrics.
@@ -64,7 +99,7 @@ Credentials resolve from CDSAPI_KEY, CDSAPI_RC or ~/.cdsapirc. Tokens go only to
 fixed official HTTPS endpoint; redirects and proxy forwarding are disabled.
 A complete retained-cache replay requires no token or provider request.
 
-Defaults: output_dir="data/meteorology", sibling private .meteorology-cache,
+Without run settings: output_dir="data/meteorology", sibling private .meteorology-cache,
 workers=4 (allowed 1–4), transfer_bytes=8 GiB, max_seconds=3600 (up to 86400).
 The Python API accepts these keyword options. Objects/arrays are checksummed;
 metadata pins one source vintage. Rerun a failed call to reuse completed objects.
@@ -89,7 +124,8 @@ meteorology check scratch/weather/catalog.json --study-config /path/to/config/st
 ```
 
 `python -m meteorology` and `python -m meteorology.regional` expose the same commands.
-`get` also accepts --allow-incomplete-final-day; it has no dry-run option.
+`get` also accepts --allow-incomplete-final-day, --env-file, and --verbose/--no-verbose;
+it has no dry-run option.
 The Python API exposes additional resource caps. `check_weather` streams one day
 at a time to verify hashes, schema/types/units, exact UTC lattice and uniqueness,
 member consistency, finite/null representation and status totals. Pass study_config

@@ -2,7 +2,7 @@
 from ._version import __version__
 
 
-def get_weather(start_date, end_date, variable_list=None, **options):
+def get_weather(start_date=None, end_date=None, variable_list=None, **options):
     """Publish inclusive UTC dates for the approved coastal registry."""
     from .regional import ALLOWED_VARIABLES, get_weather as implementation
     return implementation(start_date, end_date,

@@ -17,7 +17,7 @@ import siblings, application code, workspace scripts, or checkout-only files.
 
 ## Public API and configuration
 
-`meteorology.get_weather(start_date, end_date, variable_list=None, **options)`
+`meteorology.get_weather(start_date=None, end_date=None, variable_list=None, **options)`
 publishes inclusive UTC days. `None` selects `ALLOWED_VARIABLES`: temperature,
 dewpoint, relative_humidity, wind, cloud_cover, pressure, precipitation. All seven
 produce 14 daily and 10 hourly metrics. Reject unknown, duplicate, or empty
@@ -25,7 +25,15 @@ selections before source acquisition. `check_weather(catalog_path,
 study_config=...)` is read-only; supply the approved study to verify external
 membership. `validate_product` is a compatibility spelling for catalog checks.
 
-The installed CLI is `meteorology get START END --variables ...` and
+`run_settings.py` resolves explicit arguments > process environment > `.env` in
+CWD for DATA_DIR, START_DATE, END_DATE and VERBOSITY. Dates can be omitted when
+configured; file-relative output paths resolve beside that file. `env_file` /
+`--env-file` selects a file explicitly. No implicit parent search or environment
+mutation. Keep personal `.env` ignored; commit only `.env.example`. Progress is
+stderr (`verbosity=True` / `--verbose`); explicit false / `--no-verbose` silences it.
+Test settings in isolated temporary directories, never against personal defaults.
+
+The installed CLI is `meteorology get [START] [END] --variables ...` and
 `meteorology check CATALOG --study-config PATH`; `python -m meteorology` uses the
 same implementation. Resolve the owner-managed study via explicit `study_config`
 or `MARINECAST_STUDY_CONFIG`; registry/mask inputs are external, not bundled data.
@@ -42,6 +50,7 @@ logs, exceptions, catalogs, fixtures, or committed configuration.
 | Fast ECMWF geographic chunks, bounded transfers/concurrency, pinned metadata and checksummed caches | `regional_source.py` | `test_regional.py` |
 | Native sampling, unit conversion, hourly fields and UTC reductions | `compute.py` | `test_regional.py`, `test_weather_api.py` |
 | Approved study and exact registry/mask membership | `study.py`, `marine_reporting.py`, `resources/` | `test_study.py`, `test_marine_reporting.py` |
+| Local run defaults and precedence | `run_settings.py` | `test_run_settings.py`, `test_weather_api.py` |
 | Credential resolution and redaction | `credentials.py` | `test_credentials.py` |
 | Transactional publication/recovery and hashes | `core/artifacts/`, `artifacts.py` | `test_publication.py`, `test_regional.py` |
 | Original retained multi-epoch product merger; no acquisition | `coastal.py` | `test_coastal.py` |

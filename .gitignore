@@ -13,3 +13,8 @@ site/
 
 # Graphify generated code graph and local caches
 /graphify-out/
+
+# Personal run configuration; commit only the example
+.env
+.env.*
+!.env.example

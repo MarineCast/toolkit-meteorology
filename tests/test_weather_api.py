@@ -143,3 +143,28 @@ assert not hasattr(meteorology, 'get_weather_request')
 assert not hasattr(meteorology, 'get_temperature')
 """
     subprocess.run([sys.executable, '-c', code], check=True)
+
+
+@pytest.mark.parametrize('verbose', [True, False])
+def test_env_defaults_produce_offline_weather(weather, tmp_path, monkeypatch, capsys, verbose):
+    from meteorology.run_settings import KEYS
+    monkeypatch.chdir(tmp_path)
+    for key in KEYS:
+        monkeypatch.delenv(key, raising=False)
+    defaults = tmp_path/'.env'
+    defaults.write_text(f'DATA_DIR={weather["output_dir"]}\nSTART_DATE=2009-01-01\n'
+                        f'END_DATE=2009-01-01\nVERBOSITY={verbose}\n')
+    result = get_weather(variable_list=['temperature'], study_config=weather['study_config'],
+                         cache_dir=weather['cache_dir'])
+    assert result.catalog_path.parent == weather['output_dir']
+    assert check_weather(result.catalog_path)['products']['daily']['rows'] == 1
+    logs = capsys.readouterr()
+    assert not logs.out
+    assert ('Processing UTC day 2009-01-01' in logs.err) == verbose
+    assert ('Published ' in logs.err) == verbose
+    result = get_weather('2009-01-02', '2009-01-02', ['temperature'],
+                         verbosity=False, output_dir=tmp_path/'override',
+                         study_config=weather['study_config'], cache_dir=weather['cache_dir'])
+    assert result.catalog_path.parent == tmp_path/'override'
+    assert json.loads(result.catalog_path.read_text())['start_date'] == '2009-01-02'
+    assert not capsys.readouterr().err
