@@ -1,11 +1,20 @@
 # Changelog
 
+## Unreleased — preflight and metric backfill
+
+Add one side-effect-free settings preflight with aggregated errors, required file
+settings, date/metric/boolean/path checks, and an offline `meteorology preflight`
+command. Append can expand requested metric families across the entire retained
+date range while preserving old columns, aligning exact keys and recording
+metric-scoped lineage for overlapping vintages.
+
 ## Unreleased — run settings and incremental dates
 
 Read ignored local `.env` run defaults, with a committed `.env.example`: output,
 UTC dates, verbosity, requested metric families and rebuild mode. Explicit arguments
 override environment/file settings. Append validates existing data, preserves
-saved dates/vintages and acquires missing dates only; covered requests are no-ops.
+saved dates/columns/vintages, acquires missing dates and backfills new metrics
+across the retained range; covered requests are no-ops.
 Explicit rebuild replaces requested dates/metrics. Both create an absent product;
 transactional rollback and source-epoch lineage apply to incremental publication.
 

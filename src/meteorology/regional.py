@@ -18,10 +18,9 @@ from ._version import __version__
 from .compute import BASE, WIND, day_frames, mapping, series
 from .core.artifacts import TransactionalFamilyPublisher
 from .regional_source import Archive, URL, utcnow
+from .run_settings import VARIABLES
 
 DEFAULT_BBOX = (-129.7, 45.9, -121.5, 51.5)
-VARIABLES = ('temperature', 'dewpoint', 'relative_humidity', 'wind',
-             'cloud_cover', 'pressure', 'precipitation')
 METHOD = 'ecmwf-arco-wide-h3-utc-v1'
 COASTAL_METHOD = 'era5-retained-exact-coastal-r5-v1'
 ALLOWED_VARIABLES = VARIABLES
@@ -190,16 +189,29 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
             (first, min(last, old_first - timedelta(days=1))),
             (max(first, old_last + timedelta(days=1)), last),
         ) if a <= b] if old else [(first, last)])
-        query_first, query_last = missing[0][0], missing[-1][1]
-        if old and verbosity:
-            ranges = ', '.join(f'{a} through {b}' for a, b in missing)
-            print(f'Acquiring missing UTC dates: {ranges}', file=sys.stderr, flush=True)
-        end_second = int(pd.Timestamp(query_last, tz='UTC').timestamp()) + 86400
-        start_second = int(pd.Timestamp(query_first, tz='UTC').timestamp())
-        boundary = end_second - (3600 if (allow_incomplete_final_day and query_last == last) or 'tp' not in parameters else 0)
-        if start_second < archive.times[0] or boundary > archive.times[-1]:
-            raise ValueError('Dates plus precipitation boundary exceed cached source coverage; '
-                             'use a fresh cache to discover a newer vintage.')
+        backfill = {f: {name: spec for name, spec in selected[f].items()
+                       if name not in {c['name'] for c in old['products'][f]['columns']}}
+                    for f in selected} if old else {f: {} for f in selected}
+        backfill_parameters = sorted({p for specs in backfill.values()
+                                      for spec in specs.values() for p in spec['parameters']})
+        queries = [(a, b, parameters, selected) for a, b in missing]
+        if backfill_parameters:
+            queries.append((old_first, old_last, backfill_parameters, backfill))
+        if verbosity:
+            for a, b, fields, scope in queries:
+                print(f'Acquiring UTC {a} through {b}: {", ".join(fields)}',
+                      file=sys.stderr, flush=True)
+        for a, b, fields, scope in queries:
+            start_second = int(pd.Timestamp(a, tz='UTC').timestamp())
+            end_second = int(pd.Timestamp(b, tz='UTC').timestamp()) + 86400
+            boundary = end_second - (3600 if 'tp' not in fields or
+                (allow_incomplete_final_day and b == last) else 0)
+            if start_second < archive.times[0] or boundary > archive.times[-1]:
+                raise ValueError('Dates plus precipitation boundary exceed cached source coverage; '
+                                 'use a fresh cache to discover a newer vintage.')
+        final_parameters = backfill_parameters if old and last == old_last else parameters
+        final_end_second = int(pd.Timestamp(last, tz='UTC').timestamp()) + 86400
+        new_partial = bool('tp' in final_parameters and final_end_second > archive.times[-1])
         grid = dict(coordinates=archive.coords,
                     metadata=dict(grid_hash=hashlib.sha256(archive.coords.tobytes()).hexdigest()))
         spatial = mapping(grid, bbox, 'h3', cache / 'mapping')
@@ -252,16 +264,34 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                     if verbosity:
                         action = 'Reusing' if reuse else 'Processing'
                         print(f"{action} UTC day {day}", file=sys.stderr, flush=True)
-                    if not reuse:
+                    current_parameters = backfill_parameters if reuse else parameters
+                    if current_parameters:
                         if ((allow_incomplete_final_day and day == last) or
-                                ('tp' not in parameters and end_second > archive.times[-1])):
-                            cube = archive.cube(day, parameters, allow_missing_boundary=True)
+                                ('tp' not in current_parameters and
+                                 int(pd.Timestamp(day, tz='UTC').timestamp()) + 86400 > archive.times[-1])):
+                            cube = archive.cube(day, current_parameters, allow_missing_boundary=True)
                         else:
-                            cube = archive.cube(day, parameters)
+                            cube = archive.cube(day, current_parameters)
                     for frequency in ('hourly', 'daily'):
-                        table = (retained[frequency].read_row_group((day - old_first).days)
-                                 if reuse else wide_day(cube, day, selected[frequency], frequency,
-                                                        spatial, counts[frequency]))
+                        if reuse:
+                            table = retained[frequency].read_row_group((day - old_first).days)
+                            if backfill[frequency]:
+                                added = wide_day(cube, day, backfill[frequency], frequency,
+                                                 spatial, counts[frequency])
+                                # Retained row ordering is not a scientific identity. Align
+                                # added values by exact cell/time keys, never row position.
+                                keys = table.column_names[:2]
+                                old_keys = table.select(keys).to_pandas().set_index(keys).index
+                                new_keys = added.select(keys).to_pandas().set_index(keys).index
+                                positions = new_keys.get_indexer(old_keys)
+                                if np.any(positions < 0):
+                                    raise ValueError('Metric backfill differs from retained UTC keys.')
+                                for name in backfill[frequency]:
+                                    table = table.append_column(name, added[name].take(pa.array(positions)))
+                            table = table.select([*table.column_names[:2], *selected[frequency]])
+                        else:
+                            table = wide_day(cube, day, selected[frequency], frequency,
+                                             spatial, counts[frequency])
                         metadata = dict(static, frequency=frequency,
                                         columns={k: v['units'] for k, v in selected[frequency].items()})
                         schema_metadata = {b'meteorology': json.dumps(metadata, sort_keys=True).encode()}
@@ -305,8 +335,8 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
             catalog = dict(schema_version=1, run_date_utc=utcnow(), start_date=str(first),
                            end_date=str(last), **static, source_evidence_sha256=evidence_hash,
                            source_coverage_end=str(archive.times[-1].astype('datetime64[s]')),
-                           products=products, incomplete_final_day=(old.get('incomplete_final_day', False) if old and last == old_last
-                               else bool('tp' in parameters and end_second > archive.times[-1])),
+                           products=products, incomplete_final_day=bool(new_partial or
+                               (old and last == old_last and old.get('incomplete_final_day', False))),
                            acquisition=dict(requests=archive.requests,
                                                               response_bytes=archive.bytes))
             catalog['latest_complete_all_metric_day'] = str(
@@ -314,10 +344,10 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
             catalog['partial_metric_coverage'] = ([dict(date=str(last), metric='PRECIPITATION_MM',
                 expected_hours=24, valid_hours=23, value_status='PARTIAL',
                 missing_interval_end_utc=str(last + timedelta(days=1)) + 'T00:00:00Z')]
-                if catalog['incomplete_final_day'] else [])
+                if new_partial else [])
             if old:
                 catalog['partial_metric_coverage'] = [*old.get('partial_metric_coverage', []),
-                    *([] if last == old_last else catalog['partial_metric_coverage'])]
+                    *catalog['partial_metric_coverage']]
                 previous_epochs = old.get('source_epochs') or [dict(
                     start_date=old['start_date'], end_date=old['end_date'],
                     catalog_sha256=checksum_path(result.catalog_path),
@@ -325,10 +355,16 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                     evidence_sha256=old['source_evidence_sha256'],
                     source_coverage_end=old['source_coverage_end'],
                     source_method=old.get('source_method', old['method']))]
-                epochs = [*previous_epochs, *[dict(start_date=str(a), end_date=str(b),
-                    metadata_sha256=archive.snapshot, evidence_sha256=evidence_hash,
-                    source_coverage_end=catalog['source_coverage_end'], source_method=METHOD)
-                    for a, b in missing]]
+                old_metrics = {f: [c['name'] for c in old['products'][f]['columns']][2:]
+                               for f in selected}
+                previous_epochs = [dict(e, metrics=e.get('metrics', old_metrics))
+                                   for e in previous_epochs]
+                epochs = list(previous_epochs)
+                for a, b, fields, scope in queries:
+                    epochs.append(dict(start_date=str(a), end_date=str(b),
+                        metadata_sha256=archive.snapshot, evidence_sha256=evidence_hash,
+                        source_coverage_end=catalog['source_coverage_end'], source_method=METHOD,
+                        metrics={f: list(specs) for f, specs in scope.items()}))
                 catalog['source_epochs'] = sorted(epochs, key=lambda e: e['start_date'])
                 catalog['source_coverage_end'] = max(e['source_coverage_end'] for e in epochs)
                 catalog.pop('source_metadata_sha256', None)
@@ -401,16 +437,19 @@ def get_weather(start_date=None, end_date=None, variable_list=None, *, study_con
                 if (existing.get('bbox') != study['domain']['bbox_wgs84'] or
                         existing.get('h3_resolution') != member.resolution):
                     raise ValueError('Existing atmospheric envelope or resolution differs from study.')
-                for frequency in ('hourly', 'daily'):
-                    names = [name for name, spec in metric_specs(frequency).items()
-                             if spec['variable'] in variables]
-                    if [c['name'] for c in existing['products'][frequency]['columns']][2:] != names:
-                        raise ValueError('Existing metrics differ; use REBUILD=True to change metrics.')
+                present = {f: {c['name'] for c in existing['products'][f]['columns'][2:]}
+                           for f in ('hourly', 'daily')}
+                metric_expansion = any(
+                    name not in present[f] for f in present
+                    for name, spec in metric_specs(f).items() if spec['variable'] in variables)
+                retained_families = {spec['variable'] for f in present
+                                     for name, spec in metric_specs(f).items() if name in present[f]}
+                variables = [v for v in VARIABLES if v in set(variables) | retained_families]
                 old_first = date.fromisoformat(existing['start_date'])
                 old_last = date.fromisoformat(existing['end_date'])
                 if str(old_first) < study['time']['start'] or str(old_last) >= study['time']['end_exclusive']:
                     raise ValueError('Existing dates lie outside the approved study interval.')
-                if first >= old_first and last <= old_last:
+                if first >= old_first and last <= old_last and not metric_expansion:
                     if verbosity:
                         print('Requested dates and metrics already present; no acquisition.',
                               file=sys.stderr, flush=True)
@@ -541,12 +580,22 @@ def main():
     check = commands.add_parser('check')
     check.add_argument('catalog_path')
     check.add_argument('--study-config')
+    pre = commands.add_parser('preflight', help='Validate all six run settings without running')
+    pre.add_argument('--env-file')
     options = vars(parser.parse_args())
     command = options.pop('command')
-    if command == 'check':
+    if command == 'preflight':
+        from .run_settings import preflight
+        first, last, output, verbose, metrics, rebuild = preflight(**options)
+        print(json.dumps(dict(START_DATE=first, END_DATE=last, DATA_DIR=str(output),
+                              VERBOSITY=verbose, METRICS=metrics, REBUILD=rebuild), indent=2))
+    elif command == 'check':
         print(json.dumps(check_weather(**options), indent=2))
     else:
         options['variable_list'] = options.pop('variables')
+        from .run_settings import preflight
+        preflight(**{key: options[key] for key in (
+            'start_date', 'end_date', 'output_dir', 'verbosity', 'env_file', 'variable_list', 'rebuild')})
         print(get_weather(**options).catalog_path)
 
 

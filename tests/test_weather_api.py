@@ -155,7 +155,7 @@ def test_env_defaults_produce_offline_weather(weather, tmp_path, monkeypatch, ca
         monkeypatch.delenv(key, raising=False)
     defaults = tmp_path/'.env'
     defaults.write_text(f'DATA_DIR={weather["output_dir"]}\nSTART_DATE=2009-01-01\n'
-                        f'END_DATE=2009-01-01\nVERBOSITY={verbose}\n')
+                        f'END_DATE=2009-01-01\nVERBOSITY={verbose}\nMETRICS=temperature\nREBUILD=True\n')
     result = get_weather(variable_list=['temperature'], study_config=weather['study_config'],
                          cache_dir=weather['cache_dir'])
     assert result.catalog_path.parent == weather['output_dir']
@@ -233,12 +233,10 @@ def test_rebuild_replaces_range_and_metrics(weather):
     assert 'source_epochs' not in json.loads(result.catalog_path.read_text())
 
 
-def test_append_rejects_changed_metrics_corruption_and_unrelated_files(weather, monkeypatch):
+def test_append_rejects_corruption_and_unrelated_files(weather, monkeypatch):
     result = get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
     monkeypatch.setattr(regional, 'Archive', lambda *a, **k: pytest.fail('source opened'))
     weather['rebuild'] = False
-    with pytest.raises(ValueError, match='metrics differ'):
-        get_weather('2009-01-02', '2009-01-02', ['pressure'], **weather)
     with result.hourly_path.open('ab') as f:
         f.write(b'corrupt')
     with pytest.raises(ValueError, match='checksum'):
@@ -348,7 +346,7 @@ def test_env_metrics_and_append_mode(weather, tmp_path, monkeypatch):
     for key in KEYS:
         monkeypatch.delenv(key, raising=False)
     (tmp_path/'.env').write_text(f'DATA_DIR={weather["output_dir"]}\nSTART_DATE=2009-01-01\n'
-        'END_DATE=2009-01-01\nMETRICS=pressure\nREBUILD=False\n')
+        'END_DATE=2009-01-01\nMETRICS=pressure\nREBUILD=False\nVERBOSITY=False\n')
     result = get_weather(study_config='study', cache_dir=weather['cache_dir'])
     assert check_weather(result.catalog_path)['products']['daily']['metrics'] == 2
     get_weather('2009-01-02', '2009-01-02', study_config='study', cache_dir=weather['cache_dir'])
@@ -358,3 +356,106 @@ def test_env_metrics_and_append_mode(weather, tmp_path, monkeypatch):
                 study_config='study', cache_dir=weather['cache_dir'])
     report = check_weather(result.catalog_path)
     assert report['products']['daily']['rows'] == 1 and report['products']['hourly']['metrics'] == 4
+
+
+
+def test_metric_backfill_queries_entire_retained_range_and_aligns_keys(weather, monkeypatch):
+    result = get_weather('2009-01-01', '2009-01-02', ['temperature'], **weather)
+    # Change row ordering without changing the product's scientific keys/values.
+    parquet = pq.ParquetFile(result.hourly_path)
+    tables = [parquet.read_row_group(i) for i in range(2)]
+    with pq.ParquetWriter(result.hourly_path, tables[0].schema) as writer:
+        for table in tables:
+            writer.write_table(table.take(pa.array(np.arange(len(table))[::-1])))
+    old_catalog = json.loads(result.catalog_path.read_text())
+    old_catalog['products']['hourly'].update(bytes=result.hourly_path.stat().st_size,
+                                            sha256=checksum_path(result.hourly_path))
+    result.catalog_path.write_text(json.dumps(old_catalog))
+    saved = pq.read_table(result.hourly_path).to_pydict()
+    seen = []
+    original = FakeArchive.cube
+    def cube(self, day, parameters):
+        seen.append((day.day, parameters))
+        cube = original(self, day, parameters)
+        assert parameters == ['msl']  # no reacquisition of saved temperature
+        cube['values'][0] = np.repeat((100000 + np.arange(25))[:, None], 2, axis=1)
+        return cube
+    monkeypatch.setattr(FakeArchive, 'cube', cube)
+    weather['rebuild'] = False
+    get_weather('2009-01-02', '2009-01-02', ['pressure'], **weather)
+    assert seen == [(1, ['msl']), (2, ['msl'])]
+    report = check_weather(result.catalog_path)
+    assert report['products']['daily']['metrics'] == 5
+    table = pq.read_table(result.hourly_path)
+    for name, values in saved.items():
+        assert table[name].to_pylist() == values
+    frame = table.to_pandas()
+    np.testing.assert_allclose(frame.MEAN_SEA_LEVEL_PRESSURE_HPA, 1000 + frame.DATETIME.dt.hour/100)
+    epochs = json.loads(result.catalog_path.read_text())['source_epochs']
+    assert len(epochs) == 2
+    assert epochs[0]['metrics']['hourly'] == ['TEMPERATURE_2M_C']
+    assert epochs[1]['metrics']['hourly'] == ['MEAN_SEA_LEVEL_PRESSURE_HPA']
+    assert epochs[1]['start_date'] == '2009-01-01' and epochs[1]['end_date'] == '2009-01-02'
+
+
+def test_metric_expansion_combined_with_missing_dates(weather, monkeypatch):
+    result = get_weather('2009-01-02', '2009-01-02', ['temperature'], **weather)
+    seen = []
+    original = FakeArchive.cube
+    def cube(self, day, parameters):
+        seen.append((day.day, parameters))
+        return original(self, day, parameters)
+    monkeypatch.setattr(FakeArchive, 'cube', cube)
+    weather['rebuild'] = False
+    get_weather('2009-01-01', '2009-01-03', ['wind'], **weather)
+    assert seen == [(1, ['t2m', 'u10', 'v10']), (2, ['u10', 'v10']), (3, ['t2m', 'u10', 'v10'])]
+    report = check_weather(result.catalog_path, study_config='study')
+    assert report['products']['daily']['rows'] == 3 and report['products']['daily']['metrics'] == 8
+    assert pq.read_table(result.daily_path)['TEMPERATURE_2M_C_MEAN'].to_pylist() == [10., 10., 10.]
+
+
+def test_repeated_metric_expansion_and_subset_noop(weather, monkeypatch):
+    result = get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
+    weather['rebuild'] = False
+    get_weather('2009-01-01', '2009-01-01', ['pressure'], **weather)
+    get_weather('2009-01-01', '2009-01-01', ['wind'], **weather)
+    epochs = json.loads(result.catalog_path.read_text())['source_epochs']
+    scopes = [set(e['metrics']['hourly']) for e in epochs]
+    assert len(scopes) == 3 and not scopes[0] & scopes[1] and not scopes[1] & scopes[2]
+    assert check_weather(result.catalog_path)['products']['hourly']['metrics'] == 6
+    saved = {p: p.read_bytes() for p in (result.catalog_path, result.daily_path, result.hourly_path)}
+    monkeypatch.setattr(regional, 'Archive', lambda *a, **k: pytest.fail('source opened'))
+    get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
+    assert all(p.read_bytes() == value for p, value in saved.items())
+
+
+def test_metric_backfill_failure_keeps_saved_product(weather, monkeypatch):
+    result = get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
+    saved = {p: p.read_bytes() for p in (result.catalog_path, result.daily_path, result.hourly_path)}
+    weather['rebuild'] = False
+    monkeypatch.setattr(FakeArchive, 'fail', True)
+    with pytest.raises(RuntimeError, match='Simulated'):
+        get_weather('2009-01-01', '2009-01-01', ['wind'], **weather)
+    assert all(p.read_bytes() == value for p, value in saved.items())
+
+
+def test_new_precipitation_metric_requires_boundary_opt_in(weather, monkeypatch):
+    class Frontier(FakeArchive):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.times = self.times[:24]
+        def cube(self, day, parameters, allow_missing_boundary=False):
+            cube = super().cube(day, parameters)
+            cube['values'][:, -1, :] = np.nan
+            return cube
+    monkeypatch.setattr(regional, 'Archive', Frontier)
+    result = get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
+    weather['rebuild'] = False
+    with pytest.raises(ValueError, match='coverage'):
+        get_weather('2009-01-01', '2009-01-01', ['precipitation'], **weather)
+    get_weather('2009-01-01', '2009-01-01', ['precipitation'], allow_incomplete_final_day=True, **weather)
+    report = check_weather(result.catalog_path)
+    assert report['products']['daily']['null_counts']['PRECIPITATION_MM'] == 1
+    assert report['products']['daily']['null_counts']['TEMPERATURE_2M_C_MEAN'] == 0
+    catalog = json.loads(result.catalog_path.read_text())
+    assert catalog['incomplete_final_day'] and len(catalog['partial_metric_coverage']) == 1

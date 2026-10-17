@@ -38,16 +38,24 @@ Allowed families: `temperature`, `dewpoint`, `relative_humidity`, `wind`,
 `cloud_cover`, `pressure`, `precipitation`. All seven yield 14 daily and 10 hourly
 fields. The current approved registry has 463 cells. Dates are inclusive UTC days.
 The fast ECMWF geographic chunk archive is cached separately. With `REBUILD=False`
-(the default), runs validate existing files, preserve their dates and acquire only
-missing dates; a fully covered request does no acquisition or publication. Disjoint
+(the default), runs validate existing files, preserve their dates and acquire
+missing dates and new metrics; a request with all dates/metrics already covered
+does no acquisition or publication. Disjoint
 requests also fill the intervening dates to keep a continuous product. `REBUILD=True`
 replaces the product with the requested dates and metrics. Either mode creates the
-product if absent. Metric changes require rebuild; valid existing nulls are retained.
+product if absent. Newly requested metrics are backfilled across the entire saved range; existing
+columns and valid nulls are retained.
 
 ```sh
-meteorology get 2009-01-01 2009-01-02 --variables temperature wind --output-dir scratch/weather --cache-dir /path/to/source-cache
+meteorology get 2009-01-01 2009-01-02 --variables temperature wind --output-dir scratch/weather --cache-dir /path/to/source-cache --no-verbose --no-rebuild
 meteorology check scratch/weather/catalog.json --study-config /path/to/config/study.v1.json
 ```
+
+Run `meteorology preflight` to check settings without creating output, loading the
+study, or accessing providers. File-backed runs and CLI `get` require all six
+settings from `.env`, environment, or explicit arguments. One preflight reports
+missing/invalid settings together: dates/order, allowed unique metrics, booleans,
+and usable output path/parent permissions. It runs automatically before work.
 
 This is retrospective reanalysis. Historical operational availability and the final
 ERA5 versus preliminary ERA5T distinction are unknown. Unsupported values remain

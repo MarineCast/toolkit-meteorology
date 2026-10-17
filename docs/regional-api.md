@@ -33,7 +33,7 @@ are read; values are never executed, expanded as shell expressions, or copied to
 the process environment. Quote values containing spaces. Unknown keys are ignored.
 
 Precedence is explicit API/CLI option, process environment, then `.env`. Dates
-may be omitted individually if supplied by configuration. Without configuration,
+may be omitted individually if supplied by configuration. For file-free Python API calls,
 dates remain required, output defaults to `data/meteorology`, verbosity is false, all metrics are selected, and rebuild is false. Relative file-based `DATA_DIR` resolves beside that file; explicit and
 process-environment paths resolve from the working directory. Absolute paths work
 in all cases. Personal `.env` files are ignored and excluded from distributions;
@@ -56,6 +56,36 @@ settings do not enable the incomplete-final-day option: explicitly pass
 that boundary. They do not select historical source epochs.
 A fresh source vintage may revise values; use scratch outputs for verification.
 
+## Preflight
+
+`meteorology preflight` (or `meteorology preflight --env-file PATH`) validates run
+settings only and prints the six resolved values. It performs no study/credential
+loading, directory creation, locking, source access, or publication. The same
+`meteorology.run_settings.preflight` function runs automatically before `get`
+starts work. Its checks cover:
+
+- All six effective settings present and nonempty for CLI/file-backed runs.
+- Valid ISO calendar dates with START_DATE <= END_DATE.
+- A nonempty, unique list of allowed metric families.
+- True/False verbosity and rebuild flags.
+- A usable DATA_DIR, with an existing directory ancestor that is writable/searchable.
+- Readable UTF-8 settings, well-formed assignments and no repeated known keys.
+
+Errors are collected into one message naming keys and line numbers, without
+printing raw values or unrelated credentials. Overrides retain the documented
+precedence. Explicit Python API calls with no `.env` retain their documented
+optional defaults, which are validated by the same function; a present/selected
+file must supply any values not explicitly provided. CLI get requires all six
+settings even without a file. The preflight is a local configuration check, not
+proof of future source availability, credentials, free-space sufficiency or
+scientific quality. Study gates, existing-product validation, actual source cutoff,
+and publication-time storage checks still run at their corresponding stages.
+Filesystem access is checked without probing writes and can change after preflight.
+
+```sh
+meteorology preflight
+```
+
 ## Files and quantities
 
 - `meteorology-hourly.parquet`: H3_INDEX string, DATETIME timestamp(us, UTC), selected float64 metrics.
@@ -73,21 +103,27 @@ file comments list them. Explicit `variable_list` / `--variables` overrides it.
 `rebuild=True` / `--rebuild` / `REBUILD=True` replaces existing weather files with
 exactly the requested dates and metrics. `rebuild=False` / `--no-rebuild` /
 `REBUILD=False` (the default) preserves existing dates and acquires only missing
-dates. Both modes build normally if the destination is absent or empty.
+dates and new metrics across saved dates. Both modes build normally if the destination is absent or empty.
 
 Append inspects a complete three-file product and validates hashes, schemas,
 units, UTC keys, membership and status/null totals before acquisition. Requests
-already contained in its date range return unchanged paths with zero acquisition
-and no publication. Otherwise the final range is the union of saved and requested
-dates. Missing dates before/after the old range are the only new cube queries.
+with all dates and selected metrics already present return unchanged paths with
+zero acquisition and no publication. Otherwise the final range is the union of saved and requested
+dates. Only uncovered dates and newly requested metric dependencies trigger cube queries.
 For disjoint ranges, the intervening dates are also fetched to retain the complete
 UTC day lattice. Invalid existing files are not guessed around: use explicit
 rebuild to replace a corrupt/incomplete weather product after inspection. Unrelated
 files and symlink entries remain errors in both modes.
 
-Append requires the same metric columns and approved membership/envelope. To
-change METRICS, use rebuild; no old columns are silently dropped or new columns
-partially filled. Existing valid nulls, including a retained partial rainfall day,
+Append requires the same approved membership/envelope. Newly requested metrics
+are acquired across the entire saved date range, including dates outside a narrower
+new request. Old metric columns remain present even if omitted from the new list;
+new dates include their values too. Saved columns are never reacquired or replaced
+except when their native fields are dependencies of a new derived metric. Any such
+retrieved dependencies are used for the new metric only; saved values remain
+unchanged. Added columns align by exact cell/time keys. Metric-scoped source epochs
+record that new metrics may come from a different source vintage. Existing valid
+nulls, including a retained partial rainfall day,
 are not missing dates and are preserved. Filling/revising such values requires an
 explicit rebuild. The incomplete-final-day option still governs newly acquired
 terminal support; it is not enabled by either rebuild setting.
@@ -160,7 +196,7 @@ operational availability are unknown, and no forecast qualification is implied.
 ## Checks and CLI
 
 ```sh
-meteorology get 2009-01-01 2009-01-02 --variables temperature wind --study-config /path/to/config/study.v1.json --output-dir scratch/weather --cache-dir /path/to/source-cache
+meteorology get 2009-01-01 2009-01-02 --variables temperature wind --study-config /path/to/config/study.v1.json --output-dir scratch/weather --cache-dir /path/to/source-cache --no-verbose --no-rebuild
 meteorology check scratch/weather/catalog.json --study-config /path/to/config/study.v1.json
 ```
 

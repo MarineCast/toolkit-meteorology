@@ -23,10 +23,12 @@ are h3, numpy, pandas, pyarrow, numcodecs and PyYAML. Source data and generated
 products are outside the installable distribution. Metadata snapshots and caches
 are preserved; source-vintage orchestration remains explicit.
 
-`run_settings.py` resolves the six local/environment settings without mutating the
-process environment. `regional.get_weather` owns the output publication lock while
+`run_settings.preflight` validates the six local/environment settings together,
+without mutating the process environment or creating directories. `regional.get_weather` owns the output publication lock while
 recovering, inspecting and validating prior files. Append plans the union range;
-`get_data` reads retained day row groups and acquires only uncovered dates, stages
-the combined product, and records separate source epochs. Rebuild discards no
+`get_data` reads retained day row groups and acquires uncovered dates plus newly
+requested metrics across retained dates. It aligns added columns by cell/time
+keys, stages
+the combined product, and records separate metric-scoped source epochs. Rebuild discards no
 prior files until replacement is ready. Empty targets use the same producer in
 either mode; complete contained append requests need no source archive.

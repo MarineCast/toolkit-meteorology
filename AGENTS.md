@@ -32,7 +32,12 @@ configured; file-relative output paths resolve beside that file. `env_file` /
 `--env-file` selects a file explicitly. No implicit parent search or environment
 mutation. Keep personal `.env` ignored; commit only `.env.example`. Progress is
 stderr (`verbosity=True` / `--verbose`); explicit false / `--no-verbose` silences it.
-Test settings in isolated temporary directories, never against personal defaults.
+`run_settings.preflight` is the single settings gate. CLI/file-backed runs require
+all six effective values; no-file Python API calls retain validated optional defaults.
+Check date order, unique allowed metrics, booleans, readable/unique assignments and
+output ancestor permissions before study loading, locks or source access. Report
+all errors together without raw values. `meteorology preflight` checks settings
+without running. Test settings in temporary directories, never personal defaults.
 
 The installed CLI is `meteorology get [START] [END] --variables ...` and
 `meteorology check CATALOG --study-config PATH`; `python -m meteorology` uses the
@@ -40,12 +45,15 @@ same implementation. Resolve the owner-managed study via explicit `study_config`
 or `MARINECAST_STUDY_CONFIG`; registry/mask inputs are external, not bundled data.
 Use explicit scratch `output_dir` and canonical retained `cache_dir` in checks.
 Default REBUILD=False validates and preserves existing dates, querying only missing
-dates (including bridges for disjoint ranges). A contained request is a no-op.
+dates (including bridges for disjoint ranges). A request with covered dates/metrics is a no-op.
 REBUILD=True replaces the requested range/metrics. Both modes build absent outputs.
-Append requires identical metric schemas; existing nulls are preserved. Validate
+Append expands newly requested metrics across the full retained range, preserves
+old columns (even if omitted) and aligns added values by cell/time keys. Record
+metric-scoped source epochs when vintages differ; existing nulls are preserved. Validate
 existing membership and provenance, keep source_epochs for combined vintages,
 and hold the output transaction lock from inspection through publication. Tests
-must cover both modes, no-op, prepend/tail/bridge ranges and rollback.
+must cover both modes, no-op, prepend/tail/bridge ranges, full-range metric
+backfill/key alignment, preflight side effects and rollback.
 Resolve provider credentials through `credentials.py`; never expose tokens in
 logs, exceptions, catalogs, fixtures, or committed configuration.
 
