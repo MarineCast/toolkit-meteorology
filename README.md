@@ -1,138 +1,79 @@
 # Meteorology Toolkit
 
-<img src="docs/assets/banner.png" alt="Engraved weather station amid clouds, rain, mountains, and pressure systems" width="100%">
+<img src="docs/assets/banner.png" alt="Engraved weather station" width="100%">
 
-[![Offline package checks](https://github.com/MarineCast/toolkit-meteorology/actions/workflows/tests.yml/badge.svg)](https://github.com/MarineCast/toolkit-meteorology/actions/workflows/tests.yml) · [Documentation](https://marinecast.github.io/toolkit-meteorology/) · [Scientific methodology](docs/methodology.md) · [Variable inventory](docs/reference/variables.md)
-
-Retrieve source-selective weather through `meteorology` Python functions or the
-matching CLI. This independent toolkit preserves source grids, units, coverage,
-missingness and checksum-backed lineage. Python 3.11–3.13; macOS or Linux.
-
-## Install from a clone
-
-```sh
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install '.[native-pilot]'  # selective HRRR
-# For ERA5 instead: python -m pip install '.[era5]'
-```
-
-Core installation is `python -m pip install .`. HTML inspectors use the optional
-`.[visualization]` extra. Legacy Herbie acquisition uses `.[acquisition]`.
-These are local-source installation commands; no PyPI publication is claimed.
-
-## Retrieve with Python
+One supported product: approved coastal R5 ERA5 weather. Install with
+`python -m pip install .`, then set `MARINECAST_STUDY_CONFIG` to the approved
+owner-managed study JSON and its registry/mask inputs.
 
 ```python
-from meteorology import get_temperature
+from meteorology import get_weather, ALLOWED_VARIABLES, check_weather
 
-result = get_temperature(
-    start_date="2024-01-01", end_date="2024-01-01",
-    bbox=(-124.0, 48.0, -123.0, 48.5), data_source="hrrr",
-    cache_dir="./weather-cache",
-)
-df = result.to_pandas()
-result.to_parquet("temperature.parquet")
-print(result.metadata)
+result = get_weather("2009-01-01", "2009-01-02", ALLOWED_VARIABLES,
+                     output_dir="scratch/weather", cache_dir="/path/to/source-cache")
+check_weather(result.catalog_path, study_config="/path/to/config/study.v1.json")
 ```
 
-The four required arguments also work positionally. For several variables, use
-`get_weather(variables=["temperature", "wind", "cloud_cover"], ...)`: their input
-dependencies are acquired once. This bounded real-data example performs provider
-access; the new live path has not been executed during this refactor.
+For local run defaults, copy `.env.example` to `.env` in the repo root:
 
-## Retrieve with the CLI
+```dotenv
+DATA_DIR=../../Data/Meteorology/
+START_DATE=2009-01-01
+END_DATE=2026-10-10
+VERBOSITY=True
+# Available: temperature, dewpoint, relative_humidity, wind, cloud_cover, pressure, precipitation
+METRICS=temperature,dewpoint,relative_humidity,wind,cloud_cover,pressure,precipitation
+REBUILD=False
+```
+
+Run `meteorology get` or `get_weather()` from that directory to use these defaults.
+Explicit arguments override process environment, which overrides `.env`. Relative
+`DATA_DIR` in the file resolves beside the file. `.env` is private and ignored;
+only `.env.example` is committed. Progress goes to stderr; use `--no-verbose` or
+`verbosity=False` to silence it. Verbose messages show resolved settings, missing
+work, cache/API events, retry policy, and query/processing/publication timings. Study configuration and provider credentials are
+still required separately. This example targets the current product directory;
+use a scratch `DATA_DIR` for experiments. Merely editing settings runs no pipeline.
+
+Allowed families: `temperature`, `dewpoint`, `relative_humidity`, `wind`,
+`cloud_cover`, `pressure`, `precipitation`. All seven yield 14 daily and 10 hourly
+fields. The current approved registry has 463 cells. Dates are inclusive UTC days.
+The fast ECMWF geographic chunk archive is staged temporarily outside the delivery parent.
+After final-product readback, owned downloads/arrays are removed; source hashes and
+receipts remain in the catalog. Failed runs retain completed objects for resumption.
+Small persistent locks and journals live under `.marinecast-work/meteorology` beside
+the delivery parent. An explicit `cache_dir` is a work base with an owned child;
+existing shared files there are preserved. With `REBUILD=False`
+(the default), runs validate existing files, preserve their dates and acquire
+missing dates and new metrics; a request with all dates/metrics already covered
+does no acquisition or publication. Disjoint
+requests also fill the intervening dates to keep a continuous product. `REBUILD=True`
+replaces the product with the requested dates and metrics. Either mode creates the
+product if absent. Newly requested metrics are backfilled across the entire saved range; existing
+columns and valid nulls are retained.
 
 ```sh
-meteorology get temperature --start-date 2024-01-01 --end-date 2024-01-01 \
-  --bbox -124.0 48.0 -123.0 48.5 --data-source hrrr \
-  --cache-dir ./weather-cache --output temperature.parquet
+meteorology get 2009-01-01 2009-01-02 --variables temperature wind --output-dir scratch/weather --cache-dir /path/to/source-cache --no-verbose --no-rebuild
+meteorology check scratch/weather/catalog.json --study-config /path/to/config/study.v1.json
 ```
 
-Append `--dry-run` to preview exact UTC boundaries, dependencies, support, cache
-hits, missing work and resource limits without network access or writes.
-`meteorology sources` and `meteorology variables --data-source era5` show support.
-Help and standalone queries require no initialized workspace or shared study.
+Run `meteorology preflight` to check settings without creating output, loading the
+study, or accessing providers. File-backed runs and CLI `get` require all six
+settings from `.env`, environment, or explicit arguments. One preflight reports
+missing/invalid settings together: dates/order, allowed unique metrics, booleans,
+and usable output path/parent permissions. It runs automatically before work.
 
-## Returned data
+This is retrospective reanalysis. Historical operational availability and the final
+ERA5 versus preliminary ERA5T distinction are unknown. Unsupported values remain
+null; no forecast qualification is implied.
 
-Daily output is long `DATE × H3_INDEX × METRIC` data for HRRR R5, or
-`DATE × source grid × native point × METRIC` for native output. Rows carry `VALUE`,
-`UNITS`, `SOURCE`, `STATUS`, valid/expected hours and coverage. Temperature is 2 m
-air temperature in Celsius. Dates are inclusive UTC days; partial daily values
-remain null. Hourly output is available with `frequency="hourly"`.
+[API and scientific contract](docs/regional-api.md) ·
+[Current product and source vintages](docs/coastal-product.md) ·
+[Architecture](docs/ARCHITECTURE.md) · [Development](docs/DEVELOPMENT.md) ·
+[Removed legacy interfaces](docs/MIGRATION.md)
 
-Results remain on disk until `.to_pandas()` is requested. `.to_parquet()` streams
-an export with durable JSON metadata: inputs/checksums, source grids and resolution,
-spatial method, time semantics, reductions and method/schema/producer versions.
-Compatible final-cache hits make zero provider requests; subsets read selected
-date/metric partitions. No legacy releases are rewritten.
-
-## Availability and limits
-
-| Variable | HRRR: R5 or native | ERA5: native |
-| --- | --- | --- |
-| Temperature, wind, cloud cover, sea-level pressure, RH | Supported | Supported; RH derived from temperature/dewpoint |
-| Dewpoint | Unsupported | Supported |
-| Visibility | Supported | Unsupported |
-| Interval precipitation | Unsupported | Supported |
-| Interval snowfall water equivalent | Unsupported | Supported |
-
-ERA5 H3 sampling is unqualified and rejected before acquisition. Its 0.25 degree
-CDS distribution does not add detail to the roughly 31 km model information.
-HRRR exposes the v4 CONUS decoder era from 2020-12-03 and checks actual decoded
-footprint and sampling distances. Requests are limited to seven UTC days and a
-bounded crop, one worker and explicit resource caps. Transfer sizes are unknown
-until measured. ERA5 needs local credentials and manual provider-terms acceptance.
-
-Daily instantaneous quantities use sampled hourly means. Wind speed means the
-mean hourly magnitude. ERA5 precipitation and snowfall sum validated one-hour
-amounts, including next-midnight data. `get_precip` aliases `get_precipitation`.
-Snowfall is **mm water equivalent falling during the interval**, separate from
-ground snow depth and snowpack. No fixed fresh-snow depth conversion is used.
-The existing six-rate `PRECIP_MM_DAY_ESTIMATE` retains its separate legacy meaning.
-
-Generated-GRIB and mocked-HTTP tests establish software behavior. They do not
-establish actual CDS/NOAA compatibility for new queries or regional accuracy.
-See [request semantics, source setup and errors](docs/request-api.md),
-[performance and verification evidence](docs/request-refactor-evidence.md), and
-[scientific limitations](docs/limitations.md).
-
-## Start offline
-
-A small source-fixture request requires no credentials or provider access:
-
-```sh
-python -m pip install '.[era5]'
-python demo/request_offline.py --output ./request-demo
-```
-
-For a core-only offline run through the existing weather and astronomy families:
-
-```sh
-meteorology --workspace ./weather-demo init
-meteorology --workspace ./weather-demo example-offline
-```
-
-Both label their generated inputs synthetic. The request demo uses the actual
-ERA5 normalizer and shared getter; the family demo preserves the existing local-day
-products. See [advanced acquisition/build workflows](docs/WORKFLOWS.md),
-[legacy Python API](docs/reference/api.md), [shared-study publication](docs/shared-study.md),
-and [migration history](docs/MIGRATION.md).
-
-## Development
-
-```sh
-python -m pip install -e '.[dev,native-pilot]'
-python -m pytest -q
-ruff check src tests benchmarks
-mkdocs build --strict
-python -m build
-python -m twine check dist/*
-```
-
-See [cleanup inventory](docs/request-cleanup.md),
-[production readiness](PRODUCTION_READINESS.md) and [release checklist](docs/development/release-process.md).
-No merge, release publication, protected-branch change or data deletion accompanies
-this feature branch. Apache-2.0 software; [source rights](docs/DATA_SOURCES.md) apply
-separately to provider data.
+The primary pipeline is `regional.py`, `regional_source.py`, and `compute.py`,
+with small credential/registry helpers and retained transactional publication.
+Legacy HRRR/CDS requests, astronomy, modeling, visualizers and their optional
+extras have been removed. Git history preserves the previous implementation.
+No current or retained data is removed by this source cleanup.

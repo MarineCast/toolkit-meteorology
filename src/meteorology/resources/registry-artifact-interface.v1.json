@@ -23,7 +23,7 @@
     "sha256"
   ],
   "path_base": "directory containing selected study config; relative_path resolves against that directory, not CWD or toolkit; must remain beneath configured resolved data_root",
-  "example_relative_path": "../Data/shared/vancouver-island-columbia/registry/<mask_revision>/water_reporting.r7.txt",
+  "example_relative_path": "../Data/Study/vancouver-island-columbia/registry/<mask_revision>/water_reporting.r7.txt",
   "roles": {
     "water_reporting": "cells whose polygons intersect qualified coastal-plus-inland mask in strictly positive ellipsoidal area; include mixed boundary cells; exclude zero-area touches; never center-only",
     "land_source": "cells with positive-area land overlap inside explicit producer source extent; mixed cells retained",
