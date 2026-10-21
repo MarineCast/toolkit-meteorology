@@ -26,6 +26,11 @@ As checked on 2026-10-21, required checks also require the PR branch to include
 the current `main`. Keep these names stable when changing the matrix. This
 workflow naming correction does not change branch protections or test scope.
 
+The separate `main-merge-access` ruleset permits PR merges through the
+`main-merge-stevetylda` team. On 2026-10-21 the user approved that team's
+repository write assignment. It currently contains only `stevetylda`; future
+members inherit its write access. Required checks and safeguards are unchanged.
+
 A reduced test count after cleanup reflects removal of tests for retired products;
 keep coverage of scientific reductions, UTC boundaries, missingness, membership,
 credentials, cache integrity, rollback and interrupted publication recovery.
