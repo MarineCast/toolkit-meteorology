@@ -327,12 +327,10 @@ def test_append_rollback_and_retry(weather, monkeypatch):
 
 
 def test_append_lock_rejects_concurrent_writer(weather, monkeypatch):
-    import hashlib
     from meteorology.core.artifacts import TransactionalFamilyPublisher
     result = get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
     output = result.catalog_path.parent
-    control = output.parent / ('.meteorology-publication-' +
-                               hashlib.sha256(str(output).encode()).hexdigest()[:16])
+    control = regional.work_root(output)
     weather['rebuild'] = False
     monkeypatch.setattr(regional, 'Archive', lambda *a, **k: pytest.fail('source opened'))
     with TransactionalFamilyPublisher(control):
@@ -507,3 +505,74 @@ def test_verbose_cli_keeps_stdout_to_catalog_path(weather, monkeypatch, capsys):
     assert output.out.strip() == str(weather['output_dir']/'catalog.json')
     assert len(output.out.splitlines()) == 1
     assert 'Preflight passed' in output.err and 'Weather run completed' in output.err
+
+
+def test_work_outside_delivery_and_owned_cache_discarded(weather, tmp_path, monkeypatch):
+    weather['output_dir'] = tmp_path/'Data/Meteorology'
+    shared = weather['cache_dir']
+    shared.mkdir()
+    (shared/'user-source').write_text('preserve')
+    original = FakeArchive.__init__
+
+    def archive(self, root, *args, **kwargs):
+        root.mkdir(parents=True, exist_ok=True)
+        (root/'objects').mkdir(exist_ok=True)
+        (root/'objects/completed').write_text('source')
+        original(self, root, *args, **kwargs)
+
+    monkeypatch.setattr(FakeArchive, '__init__', archive)
+    result = get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
+    assert check_weather(result.catalog_path)['valid']
+    assert {p.name for p in (tmp_path/'Data').iterdir()} == {'Meteorology'}
+    cache = regional.source_root(result.catalog_path.parent, shared)
+    assert not (cache/'objects').exists() and not (cache/'evidence').exists()
+    assert (shared/'user-source').read_text() == 'preserve'
+    catalog = json.loads(result.catalog_path.read_text())
+    assert catalog['source_evidence']['metadata_sha256'] == catalog['source_metadata_sha256']
+
+
+def test_failed_run_keeps_owned_downloads(weather, monkeypatch):
+    cache = regional.source_root(weather['output_dir'], weather['cache_dir'])
+
+    def failed(root, *args, **kwargs):
+        (root/'objects').mkdir(parents=True)
+        (root/'objects/completed').write_text('resume')
+        raise ValueError('provider failed')
+
+    monkeypatch.setattr(regional, 'Archive', failed)
+    with pytest.raises(ValueError, match='provider failed'):
+        get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
+    assert (cache/'objects/completed').read_text() == 'resume'
+
+
+def test_append_preserves_inline_lineage_after_source_cleanup(weather):
+    first = get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
+    original = json.loads(first.catalog_path.read_text())
+    original['source_evidence_by_sha256']['older-epoch'] = {'objects': {'old': 'receipt'}}
+    original['source_catalogs_by_sha256'] = {'old-catalog': {'vintage': 'older'}}
+    first.catalog_path.write_text(json.dumps(original))
+    weather['rebuild'] = False
+    second = get_weather('2009-01-02', '2009-01-02', ['temperature'], **weather)
+    combined = json.loads(second.catalog_path.read_text())
+    assert combined['source_evidence_by_sha256']['older-epoch'] == {'objects': {'old': 'receipt'}}
+    assert combined['source_catalogs_by_sha256'] == original['source_catalogs_by_sha256']
+    assert combined['source_payload_retention']['payloads_retained'] is False
+    assert check_weather(second.catalog_path)['valid']
+
+
+def test_staged_readback_failure_preserves_previous_product(weather, monkeypatch):
+    result = get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
+    before = {p.name: p.read_bytes() for p in result.catalog_path.parent.iterdir()}
+    real_check = regional.check_weather
+
+    def check(path, **options):
+        if options.get('_files') is not None:
+            raise ValueError('staged readback failed')
+        return real_check(path, **options)
+
+    monkeypatch.setattr(regional, 'check_weather', check)
+    weather['rebuild'] = False
+    with pytest.raises(ValueError, match='staged readback failed'):
+        get_weather('2009-01-02', '2009-01-02', ['temperature'], **weather)
+    assert {p.name: p.read_bytes() for p in result.catalog_path.parent.iterdir()} == before
+    assert (regional.source_root(result.catalog_path.parent, weather['cache_dir'])/'evidence').is_dir()

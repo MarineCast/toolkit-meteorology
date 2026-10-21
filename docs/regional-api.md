@@ -105,6 +105,25 @@ Filesystem access is checked without probing writes and can change after preflig
 meteorology preflight
 ```
 
+## Source and working-data lifecycle
+
+The supported `get_weather` API stores staging/journals and a stable lock outside
+the delivery parent, under
+`output_dir.parent.parent/.marinecast-work/meteorology/<destination-hash>`.
+With the default output `Data/Meteorology`, this is beside `Data`, not inside it.
+Default downloads use an owned child of this work area. An explicit `cache_dir`
+selects a work base with a destination-specific owned child, never permission to
+clear unrelated files. The lower-level compatibility `get_data` preserves an
+explicit caller cache; it is not the supported root product API.
+
+After publication, the complete final files/catalog are reopened and validated
+before owned source objects, processed arrays, mapping caches and temporary evidence
+are removed. Receipts/hashes are embedded in `catalog.json`; timestamps and source
+epochs remain explicit. Failed runs retain completed inputs for manual resumption.
+Successful contained requests need no source archive. Future acquisition or a full
+rebuild may download data again and can encounter revised provider values. This
+policy preserves external study grids/masks and caller-owned sources.
+
 ## Files and quantities
 
 - `meteorology-hourly.parquet`: H3_INDEX string, DATETIME timestamp(us, UTC), selected float64 metrics.

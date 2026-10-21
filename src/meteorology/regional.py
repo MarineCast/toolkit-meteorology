@@ -26,6 +26,32 @@ COASTAL_METHOD = 'era5-retained-exact-coastal-r5-v1'
 ALLOWED_VARIABLES = VARIABLES
 
 
+def work_root(output):
+    """Keep persistent lock inodes and transient staging outside the delivery parent."""
+    output = Path(output).expanduser().resolve()
+    identity = hashlib.sha256(str(output).encode()).hexdigest()[:16]
+    return output.parent.parent / '.marinecast-work' / 'meteorology' / identity
+
+
+def source_root(output, cache_dir=None):
+    # An explicit cache_dir is a work base, never a shared cache to sweep.
+    control = work_root(output)
+    return (Path(cache_dir).expanduser().resolve() / ('weather-' + control.name)
+            if cache_dir is not None else control / 'downloads')
+
+
+def _clear_owned_cache(cache, output):
+    expected = dict(owner='meteorology-transient-sources-v1', destination=str(output))
+    if cache.is_symlink() or json.loads((cache / 'owner.json').read_text()) != expected:
+        raise ValueError('Source workspace ownership mismatch; preserved.')
+    for name in ('arrays', 'objects', 'evidence', 'mapping'):
+        path = cache / name
+        if path.is_symlink():
+            raise ValueError('Symlinked source workspace; preserved.')
+        if path.exists():
+            shutil.rmtree(path)
+
+
 @dataclass(frozen=True)
 class RegionalResult:
     """Paths to the three public artifacts; no entire-history DataFrame in memory."""
@@ -147,7 +173,8 @@ def hourly_day(cube, day, specs, spatial, counters):
 def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteorology',
              cache_dir=None, workers=4, transfer_bytes=8 * 1024**3, max_seconds=3600,
              allow_incomplete_final_day=False,
-             variable_list=None, membership=None, verbosity=False, existing=None, publisher=None):
+             variable_list=None, membership=None, verbosity=False, existing=None, publisher=None,
+             _discard_cache=False):
     """Acquire/reuse regional ERA5 and publish hourly/daily wide H3 R5 Parquets.
 
     Inclusive UTC dates. Output contains exactly two Parquets and catalog.json in
@@ -163,14 +190,16 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
     parameters = sorted({p for specs in selected.values() for spec in specs.values()
                          for p in spec['parameters']})
     output = Path(output_dir).expanduser().resolve()
+    control = work_root(output)
+    owned_cache = cache_dir is None or _discard_cache
+    if owned_cache and cache_dir is not None and Path(cache_dir).is_symlink():
+        raise ValueError('Refusing symlinked source workspace.')
     cache = (Path(cache_dir).expanduser().resolve() if cache_dir is not None
-             else output.parent / '.meteorology-cache')
+             else source_root(output))
     if output == cache or output in cache.parents or cache in output.parents:
         raise ValueError('Output and private cache must be separate directories.')
     # Separate control namespace keeps the public directory to three files, while
     # all writers to this output share one recoverable publication journal.
-    control = output.parent / ('.meteorology-publication-' +
-                               hashlib.sha256(str(output).encode()).hexdigest()[:16])
     result = RegionalResult(output / 'meteorology-hourly.parquet',
                             output / 'meteorology-daily.parquet', output / 'catalog.json')
     expected = {p.name for p in (result.hourly_path, result.daily_path, result.catalog_path)}
@@ -180,6 +209,16 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
     query_seconds = processing_seconds = 0.0
     # Cache lock prevents duplicate downloads and conflicting source receipts.
     with TransactionalFamilyPublisher._exclusive_parent(cache):
+        if owned_cache:
+            marker = cache / 'owner.json'
+            expected_owner = dict(owner='meteorology-transient-sources-v1', destination=str(output))
+            if marker.exists():
+                if marker.is_symlink() or json.loads(marker.read_text()) != expected_owner:
+                    raise ValueError('Source workspace ownership mismatch.')
+            elif {p.name for p in cache.iterdir()} <= {'.publication.lock'}:
+                marker.write_text(json.dumps(expected_owner))
+            else:
+                raise ValueError('Refusing unowned source workspace.')
         old = existing or {}
         old_first = date.fromisoformat(old['start_date']) if old else None
         old_last = date.fromisoformat(old['end_date']) if old else None
@@ -360,6 +399,15 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                                (old and last == old_last and old.get('incomplete_final_day', False))),
                            acquisition=dict(requests=archive.requests,
                                                               response_bytes=archive.bytes))
+            catalog['source_evidence'] = evidence
+            retained_evidence = dict(old.get('source_evidence_by_sha256', {})) if old else {}
+            if old and old.get('source_evidence') and old.get('source_evidence_sha256'):
+                retained_evidence[old['source_evidence_sha256']] = old['source_evidence']
+            catalog['source_evidence_by_sha256'] = {**retained_evidence, evidence_hash: evidence}
+            if old and old.get('source_catalogs_by_sha256'):
+                catalog['source_catalogs_by_sha256'] = old['source_catalogs_by_sha256']
+            catalog['source_payload_retention'] = dict(policy='final-products-only' if owned_cache else 'caller-managed',
+                payloads_retained=not owned_cache, rebuild_requires_acquisition=owned_cache)
             catalog['latest_complete_all_metric_day'] = str(
                 last - timedelta(days=int(catalog['incomplete_final_day'])))
             catalog['partial_metric_coverage'] = ([dict(date=str(last), metric='PRECIPITATION_MM',
@@ -391,12 +439,21 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                 catalog.pop('source_metadata_sha256', None)
                 catalog.pop('source_evidence_sha256', None)
             publisher.stage_manifest(result.catalog_path, catalog)
+            if owned_cache:
+                # Validate the actual staged bytes before any final path is replaced.
+                check_weather(publisher.candidate_path(result.catalog_path),
+                              _membership=membership, _files=paths)
             finalize_seconds = time.perf_counter() - finalize_started
             log(verbosity, f'Staged files ready after {finalize_seconds:.2f}s finalization; '
                 'publishing hourly, daily and catalog together')
             publish_started = time.perf_counter()
             publisher.publish()
             publish_seconds = time.perf_counter() - publish_started
+            if owned_cache:
+                check_weather(result.catalog_path, _membership=membership)
+        if owned_cache:
+            _clear_owned_cache(cache, output)
+            log(verbosity, 'Final product readback passed; owned source downloads and arrays removed')
     log(verbosity, f"Published {result.catalog_path}")
     log(verbosity, f'Run timings: query/cache {query_seconds:.2f}s; '
         f'processing/write {processing_seconds:.2f}s; finalization {finalize_seconds:.2f}s; '
@@ -454,8 +511,7 @@ def get_weather(start_date=None, end_date=None, variable_list=None, *, study_con
     if str(first) < study['time']['start'] or str(last) >= study['time']['end_exclusive']:
         raise ValueError('Dates must lie inside the approved study interval.')
     output = Path(output_dir).resolve()
-    control = output.parent / ('.meteorology-publication-' +
-                               hashlib.sha256(str(output).encode()).hexdigest()[:16])
+    control = work_root(output)
     existing = None
     # Pin recovery, inspection and publication together so two API writers cannot
     # make append plans against the same stale product.
@@ -510,16 +566,16 @@ def get_weather(start_date=None, end_date=None, variable_list=None, *, study_con
         if rebuild:
             log(verbosity, 'Rebuild selected: prior weather files stay in place until publication succeeds')
         result = get_data(first, last, bbox=study['domain']['bbox_wgs84'],
-                        output_dir=output, cache_dir=cache_dir, workers=workers,
+                        output_dir=output, cache_dir=source_root(output, cache_dir), workers=workers,
                         transfer_bytes=transfer_bytes, max_seconds=max_seconds,
                         variable_list=variables, membership=member, verbosity=verbosity,
-                        existing=existing, publisher=publisher,
+                        existing=existing, publisher=publisher, _discard_cache=True,
                         allow_incomplete_final_day=allow_incomplete_final_day)
     log(verbosity, f'Weather run completed in {time.perf_counter() - run_started:.2f}s')
     return result
 
 
-def check_weather(catalog_path, *, study_config=None, _membership=None):
+def check_weather(catalog_path, *, study_config=None, _membership=None, _files=None):
     """Read-only, one-day-at-a-time checks of current or newly generated products.
 
     Checks exact UTC keys, metric schemas/units, file hashes and null/status totals.
@@ -551,7 +607,7 @@ def check_weather(catalog_path, *, study_config=None, _membership=None):
         product = catalog['products'][frequency]
         if product['file'] != f'meteorology-{frequency}.parquet':
             raise ValueError('Unexpected weather filename.')
-        source = path.parent / product['file']
+        source = _files[frequency] if _files is not None else path.parent / product['file']
         if source.stat().st_size != product['bytes'] or checksum_path(source) != product['sha256']:
             raise ValueError('Weather file size/checksum mismatch.')
         parquet = pq.ParquetFile(source)

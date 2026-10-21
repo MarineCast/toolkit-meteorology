@@ -20,8 +20,13 @@ existing products. It performs no acquisition and is not the primary path.
 The package imports no sibling or application code. No HRRR, GRIB/CDS planner,
 modeling, astronomy or visualization module is needed. The runtime dependencies
 are h3, numpy, pandas, pyarrow, numcodecs and PyYAML. Source data and generated
-products are outside the installable distribution. Metadata snapshots and caches
-are preserved; source-vintage orchestration remains explicit.
+products are outside the installable distribution. Source receipts and hashes are embedded in the catalog; successful runs discard
+owned compressed objects and arrays after readback. Failed runs retain resumable
+sources outside delivery; source-vintage orchestration remains explicit.
+`regional.work_root` places locks, journals and staging under
+`output.parent.parent/.marinecast-work/meteorology/<destination-hash>`.
+An explicit `cache_dir` supplies a work base with an owned child, preserving other
+files. Stable lock inodes remain; successful bulky intermediates do not.
 
 `run_settings.preflight` validates the six local/environment settings together,
 without mutating the process environment or creating directories. `regional.get_weather` owns the output publication lock while

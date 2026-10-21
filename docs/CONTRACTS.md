@@ -12,8 +12,12 @@ membership, missingness and unknown revision/operational availability. Do not
 relabel source grain as H3-scale information or retrospective data as a forecast.
 New values must retain source evidence; old source snapshots must not be silently
 substituted. Publication stages files and recovers failures before replacing the
-three-file output. Current approved Data and private source caches are not
-cleanup targets.
+three-file output. Final data and external study/registry inputs are preserved.
+Source downloads and arrays belong to a transient owned work area outside delivery.
+After full final readback, successful runs remove those payloads, preserving source
+receipts/hashes inline in the catalog. Failed runs retain completed objects for resume.
+Existing caller-owned/shared files are not swept. Rebuilding after cleanup may require
+new downloads and cannot promise an identical historical provider vintage.
 
 Run settings select requested metric families and rebuild mode. Append (the
 default) validates existing files, requires approved

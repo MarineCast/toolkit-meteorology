@@ -24,28 +24,28 @@ complete all-metric day is October 9. No metric is filled with zero or clipped. 
 fog, radiation, gusts and snowfall are not supplied by this seven-field product;
 they must not be inferred from its cloud, precipitation or mean wind fields.
 
-## Reproduce the retained-data publication
+## Final-product retention policy — 2026-10-18
 
-From the installed toolkit environment, run the following with absolute paths
-(or from the owning checkout with `PYTHONPATH=src`). This command verifies source
-checksums, date adjacency, exact daily membership, unique date/time/cell keys,
-complete hourly support and schemas before transactional publication. A failed
-publication leaves the prior current product recoverable. Rerun the same command
-to rebuild from the retained sources; it performs no network requests.
+The workspace now retains final products and compact provenance rather than raw
+source caches or earlier rectangle/tail products. The existing hourly/daily Parquets
+were preserved byte-for-byte. Their current catalog embeds source receipts and the
+original source-catalog metadata keyed by the verified historical hashes. Source
+epochs retain their date/vintage identities but no longer advertise deleted retained
+source directories. The migration's checksums and compact original acceptance evidence
+are recorded in the workspace's `Reports/data-storage-2026-10-18/`.
 
-```sh
-python -m meteorology.coastal \
-  --study-config /Users/tylerstevenson/Documents/Code_Repos/MarineCast/config/study.v1.json \
-  --source /Users/tylerstevenson/Documents/Code_Repos/MarineCast/Data/.meteorology-update/retained-rectangle-20261015 \
-  --source /Users/tylerstevenson/Documents/Code_Repos/MarineCast/Data/.meteorology-update/tail \
-  --output-dir /Users/tylerstevenson/Documents/Code_Repos/MarineCast/Data/Meteorology \
-  --control-dir /Users/tylerstevenson/Documents/Code_Repos/MarineCast/Data/.meteorology-coastal-publication
-```
+The former `.meteorology-cache*` and `.meteorology-update` directories were removed
+at the user's request after final-product verification. The earlier `coastal.py`
+merger remains a compatibility API for callers who independently retain source
+products; the workspace no longer has the rectangle/tail payloads needed to replay
+that historical command. Fresh provider acquisition may contain revisions and is
+not a claim of exact reconstruction of those historical source bytes.
 
-The prior rectangle files are retained with hard links in the private update area.
-They preserve the preexisting product without an extra full-file copy. Do not
-remove that source or its caches until a separately approved retention change.
-The small tail product is a retained source partition, not a second current release.
+Normal production uses `get_weather` as described in the [API](regional-api.md).
+Transient downloads/arrays and publication staging live outside delivery. Successful
+full readback removes owned source payloads; failed runs retain completed objects for
+resumption. Small stable locks remain outside Data so concurrent processes continue
+to share the same lock inode.
 
 ## Update source coverage
 
@@ -80,30 +80,15 @@ aggregates from hourly inputs. Requested future/unavailable dates remain in the
 catalog's unavailable interval. Source and method lineage are in `source_epochs`
 and `study_identity`; current registry mask and membership hashes are explicit.
 
-An executable bounded update helper is retained at
-`MarineCast/Data/.meteorology-update/update_current.py`. From this checkout:
+The former workspace-specific update/acceptance helpers were working files and
+were removed with `.meteorology-update`. Use `get_weather` for updates and
+`check_weather(..., study_config=...)` for current validation. Historical acceptance
+counts are not a current validation run.
 
-```sh
-# Metadata-only frontier/plan; use a fresh cache for a newer source vintage.
-PYTHONPATH=src .venv/bin/python ../../Data/.meteorology-update/update_current.py \
-  --cache-dir ../../Data/.meteorology-cache-YYYYMMDD
-# Resume the same bounded acquisition and publish exact coastal membership.
-PYTHONPATH=src .venv/bin/python ../../Data/.meteorology-update/update_current.py \
-  --cache-dir ../../Data/.meteorology-cache-YYYYMMDD --run
-# Full independent streaming readback plus sampled native arithmetic checks.
-PYTHONPATH=src .venv/bin/python ../../Data/.meteorology-update/validate_current.py
-```
-
-The independent validator is the retained October 2026 acceptance check, with
-explicit expected membership/null counts and sampled dates. Update its expected
-frontier/null assertions when qualifying a later vintage; do not interpret an
-old acceptance report as validation of a new update.
-
-`Data/.meteorology-update/native-sampling-crosswalk.parquet` records each approved
-cell's source-grid index, latitude/longitude, distance, grid hash and method. The
-463 reporting cells sample 243 distinct native points; the largest recorded
-centroid-to-source distance is about 16.4 km. This is a sampling witness, not an
-independent weather measurement or a water-only atmospheric average.
+The compact native-sampling crosswalk is retained as provenance in the workspace
+migration report. It records source-grid indices, latitude/longitude, distances,
+grid hash and method for the 463 reporting cells sampling 243 distinct native points.
+It is a sampling witness, not an independent measurement or a water-only average.
 
 The refreshed provider chunks span 2024-10-22–2026-10-10 because the geographic
 store compresses a long time series into each spatial object. Retrieving the new

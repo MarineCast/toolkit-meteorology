@@ -38,7 +38,12 @@ use a scratch `DATA_DIR` for experiments. Merely editing settings runs no pipeli
 Allowed families: `temperature`, `dewpoint`, `relative_humidity`, `wind`,
 `cloud_cover`, `pressure`, `precipitation`. All seven yield 14 daily and 10 hourly
 fields. The current approved registry has 463 cells. Dates are inclusive UTC days.
-The fast ECMWF geographic chunk archive is cached separately. With `REBUILD=False`
+The fast ECMWF geographic chunk archive is staged temporarily outside the delivery parent.
+After final-product readback, owned downloads/arrays are removed; source hashes and
+receipts remain in the catalog. Failed runs retain completed objects for resumption.
+Small persistent locks and journals live under `.marinecast-work/meteorology` beside
+the delivery parent. An explicit `cache_dir` is a work base with an owned child;
+existing shared files there are preserved. With `REBUILD=False`
 (the default), runs validate existing files, preserve their dates and acquire
 missing dates and new metrics; a request with all dates/metrics already covered
 does no acquisition or publication. Disjoint

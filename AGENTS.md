@@ -48,7 +48,11 @@ The installed CLI is `meteorology get [START] [END] --variables ...` and
 `meteorology check CATALOG --study-config PATH`; `python -m meteorology` uses the
 same implementation. Resolve the owner-managed study via explicit `study_config`
 or `MARINECAST_STUDY_CONFIG`; registry/mask inputs are external, not bundled data.
-Use explicit scratch `output_dir` and canonical retained `cache_dir` in checks.
+Use explicit scratch `output_dir` and a scratch `cache_dir` work base in checks.
+The supported API uses owned transient source children, removes payloads only after
+final readback, and embeds receipts/hashes in the catalog. Never sweep caller-owned
+files. Keep staging, journals and stable locks outside the delivery parent under
+`.marinecast-work/meteorology/<destination-hash>`. Failed runs retain resumable inputs.
 Default REBUILD=False validates and preserves existing dates, querying only missing
 dates (including bridges for disjoint ranges). A request with covered dates/metrics is a no-op.
 REBUILD=True replaces the requested range/metrics. Both modes build absent outputs.
