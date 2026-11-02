@@ -2,7 +2,8 @@
 
 <img src="docs/assets/banner.png" alt="Engraved weather station" width="100%">
 
-One supported product: approved coastal R5 ERA5 weather. Install with
+Three distinct coastal R5 products: ERA5 Weather, calculated Solar Cycle and
+ERA5 Solar Radiation. Install with
 `python -m pip install .`, then set `MARINECAST_STUDY_CONFIG` to the approved
 owner-managed study JSON and its registry/mask inputs.
 
@@ -69,11 +70,45 @@ null; no forecast qualification is implied.
 
 [API and scientific contract](docs/regional-api.md) ·
 [Current product and source vintages](docs/coastal-product.md) ·
+[Reproducibility review and layer maps](docs/reproducibility.md) ·
 [Architecture](docs/ARCHITECTURE.md) · [Development](docs/DEVELOPMENT.md) ·
 [Removed legacy interfaces](docs/MIGRATION.md)
 
 The primary pipeline is `regional.py`, `regional_source.py`, and `compute.py`,
 with small credential/registry helpers and retained transactional publication.
-Legacy HRRR/CDS requests, astronomy, modeling, visualizers and their optional
+Legacy HRRR/CDS requests, former astronomy interfaces, modeling, visualizers and their optional
 extras have been removed. Git history preserves the previous implementation.
 No current or retained data is removed by this source cleanup.
+
+## Solar Cycle
+
+```python
+from meteorology import get_solar_cycle, check_solar_cycle
+solar = get_solar_cycle(study_config="/path/to/config/study.v1.json")
+check_solar_cycle(solar.catalog_path, study_config="/path/to/config/study.v1.json")
+```
+
+`meteorology solar --study-config PATH` creates `Data/Meteorology/solar-cycle/`
+with its own catalog, hourly solar elevation/azimuth/light phase, and daily
+sunrise/sunset, civil/nautical/astronomical dawn/dusk and phase durations. It uses
+exact R5 cell centres and configured study dates without downloads or weather
+`.env` settings. Durations partition UTC days; sunset may precede sunrise within
+one date. These are sea-level unobstructed-horizon calculations. See the
+[Solar Cycle contract](docs/solar-cycle.md) and
+[radiation/waves investigation](docs/radiation-and-waves.md).
+
+## Solar Radiation
+
+```python
+from meteorology import get_solar_radiation, check_solar_radiation
+radiation = get_solar_radiation("2009-01-01", study_config="/path/to/config/study.v1.json")
+check_solar_radiation(radiation.catalog_path, study_config="/path/to/config/study.v1.json")
+```
+
+`meteorology radiation 2009-01-01 --study-config PATH` discovers the latest complete
+source day and creates `Data/Meteorology/solar-radiation/` with a separate catalog,
+hourly downward shortwave/direct horizontal energy and irradiance, and complete
+UTC daily totals/means. Explicit `--allow-incomplete-final-day` can retain one
+missing terminal interval as null. Append preserves retained vintages and nulls;
+explicit rebuild replaces the selected range. See the
+[Solar Radiation contract](docs/solar-radiation.md).

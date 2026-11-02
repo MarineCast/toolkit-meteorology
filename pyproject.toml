@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "toolkit-meteorology"
 dynamic = ["version"]
-description = "Approved coastal ERA5 hourly and daily weather"
+description = "Coastal Weather, Solar Cycle and Solar Radiation"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 license = "Apache-2.0"

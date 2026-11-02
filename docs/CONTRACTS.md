@@ -1,11 +1,16 @@
 # Product contract
 
-The sole supported output is exact approved coastal R5 ERA5 weather, described in
+The weather output is exact approved coastal R5 ERA5 weather, described in
 [the API contract](regional-api.md). Current output uses
 `era5-retained-exact-coastal-r5-v1`; direct native production records
 `ecmwf-arco-wide-h3-utc-v1` as source_method. Legacy rectangle catalogs remain
 readable for the original retained publication. This does not make rectangle,
-HRRR, astronomy or model-feature outputs supported products.
+HRRR, former astronomy interfaces or model-feature outputs supported products.
+The separately authorized [Solar Cycle](solar-cycle.md) supplies calculated solar
+geometry in its own child directory and catalog, without altering weather files.
+The separately authorized [Solar Radiation](solar-radiation.md) delivers SSRD/FDIR
+energy and irradiance with its own catalog, source epochs and exact interval
+conventions. Weather's seven families and legacy vintages remain unchanged.
 
 Preserve source units, UTC interval meaning, hourly/daily keys, exact approved
 membership, missingness and unknown revision/operational availability. Do not
@@ -33,3 +38,10 @@ before study loading, source acquisition or publication. This validates local
 settings, not provider access or source availability. A present settings file or
 CLI run requires all six values; explicit file-free API calls retain validated
 optional defaults.
+
+Explicit `meteorology.refresh.refresh_weather` maintenance can fill a documented
+missing terminal precipitation interval and append new dates. It preserves all
+retained finite values, sums the retained 23 hourly intervals plus the newly
+supported boundary, records `endpoint_repairs` alongside retained source epochs,
+and compares unchanged old rows exactly before publication. Its caller-owned
+source cache is retained. See the [frontier repair contract](regional-api.md#explicit-frontier-repair-and-refresh).

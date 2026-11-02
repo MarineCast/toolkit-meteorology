@@ -2,9 +2,11 @@
 
 ## Supported outcome
 
-This repository supports one product: the approved coastal H3 R5 ERA5 hourly and
-daily weather Parquets plus `catalog.json`. Keep the pipeline small. Do not restore
-removed HRRR/CDS request planners, astronomy, modeling, visualization, per-family
+This repository supports approved coastal H3 R5 ERA5 hourly/daily weather plus its
+catalog, calculated Solar Cycle and source-derived Solar Radiation companions
+authorized 2026-11-01. Read `docs/solar-cycle.md` and `docs/solar-radiation.md` for
+those independent pipelines. Keep the pipelines small. Do not restore
+removed HRRR/CDS request planners, former astronomy interfaces, modeling, visualization, per-family
 entry points, or optional runtime stacks without explicit new product scope.
 Legacy implementation remains in Git history; `docs/cleanup.md` and
 `docs/MIGRATION.md` describe the removal.
@@ -78,6 +80,8 @@ logs, exceptions, catalogs, fixtures, or committed configuration.
 | Credential resolution and redaction | `credentials.py` | `test_credentials.py` |
 | Transactional publication/recovery and hashes | `core/artifacts/`, `artifacts.py` | `test_publication.py`, `test_regional.py` |
 | Original retained multi-epoch product merger; no acquisition | `coastal.py` | `test_coastal.py` |
+| Calculated Solar Cycle and UTC phase integration | `solar.py`, exports, CLI | `test_solar.py`, weather companion coexistence test |
+| Source Solar Radiation, energy/flux reductions and epochs | `radiation.py`, selected-field `regional_source.Archive`, `companions.py` | `test_radiation.py`, regional/cache checks |
 
 `regional.get_data` is an internal shared exporter retained by the implementation
 and compatibility tests; it is not the supported root API. The retained merger
@@ -107,6 +111,24 @@ tests or source cleanup. Use small offline fixtures and bounded scratch replay;
 no full historical rebuild, bulk copies, or duplicate large environments unless
 explicitly scoped. Check storage headroom before acquisition/staging and run one
 writer per output/cache. Preserve recoverable publication and source-cache integrity.
+
+Solar Cycle defaults to the full approved study and R5 centres, with independent
+`get_solar_cycle` / `check_solar_cycle` and `solar` / `solar-check` commands. It has
+its own files/catalog in `Data/Meteorology/solar-cycle`; weather recognizes only
+the named complete companions. Preserve geometric versus apparent angles, USNO
+thresholds, absent-crossing nulls, true zero durations and split UTC-day intervals.
+Geometry does not establish irradiance, glare, physical viewability or detection.
+Solar Radiation uses `get_solar_radiation` / `check_solar_radiation` and `radiation`
+/ `radiation-check`, with a separate catalog and hourly/daily files in
+`Data/Meteorology/solar-radiation`. Preserve SSRD/FDIR horizontal-plane hourly
+energy, /3600 hourly irradiance and /86400 complete daily mean; no cumulative
+differencing, DNI relabeling, clipping or missing-to-zero substitution. Discover
+the end from actual coordinates. Partial final days need explicit opt-in and may
+lack only next midnight. Append preserves old nulls/vintages; explicit rebuild
+replaces the selected range. Verify all reductions, epochs, cache ownership,
+rollback and native parity; remove owned sources only after final readback.
+Waves are implemented separately in toolkit-oceanography (`docs/WAVES.md` in that
+checkout), with their own source support and validation; they are not a Meteorology acquisition product.
 
 ## Verification
 

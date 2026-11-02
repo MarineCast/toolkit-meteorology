@@ -5,6 +5,9 @@ R5 hourly/daily weather using the fast ECMWF geographic source cache. The public
 files are two Parquets and one catalog. Start with the [API](regional-api.md).
 
 - [Current product and original source vintages](coastal-product.md)
+- [Distinct calculated Solar Cycle](solar-cycle.md)
+- [Separate source-derived Solar Radiation](solar-radiation.md)
+- [Radiation and waves investigation](radiation-and-waves.md)
 - [Scientific contracts](CONTRACTS.md)
 - [Implementation](ARCHITECTURE.md)
 - [Testing and installation](DEVELOPMENT.md)

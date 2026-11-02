@@ -130,6 +130,11 @@ policy preserves external study grids/masks and caller-owned sources.
 - `meteorology-daily.parquet`: H3_INDEX string, DATE date32, selected float64 metrics.
 - `catalog.json`: method, source metadata/evidence identities, units, dates, hashes and value-status totals.
 
+The separate [Solar Cycle](solar-cycle.md) has its own child directory and catalog.
+Weather accepts the recognized complete `solar-cycle/` and
+[Solar Radiation](solar-radiation.md) `solar-radiation/` companions alongside its
+three files; other unrelated entries still reject. Neither adds Weather families.
+
 All families yield 10 hourly and 14 daily metric columns. The returned result holds
 hourly_path, daily_path and catalog_path. Unrelated output-directory files cause
 an error in either mode.
@@ -162,8 +167,9 @@ retrieved dependencies are used for the new metric only; saved values remain
 unchanged. Added columns align by exact cell/time keys. Metric-scoped source epochs
 record that new metrics may come from a different source vintage. Existing valid
 nulls, including a retained partial rainfall day,
-are not missing dates and are preserved. Filling/revising such values requires an
-explicit rebuild. The incomplete-final-day option still governs newly acquired
+are not missing dates and are preserved. Revising finite values requires an explicit rebuild. The narrowly scoped
+frontier maintenance operation below can fill a documented missing terminal
+precipitation interval while preserving every retained finite value. The incomplete-final-day option still governs newly acquired
 terminal support; it is not enabled by either rebuild setting.
 
 Old values and null/status totals are retained; `source_epochs` preserves their
@@ -255,3 +261,61 @@ are structural/source consistency checks, not independent observational truth.
 ::: meteorology.regional.check_weather
     options:
       show_source: false
+
+## Explicit frontier repair and refresh
+
+`meteorology.refresh.refresh_weather` is an explicit maintenance operation for the
+complete 14-daily/10-hourly approved product. It is separate from ordinary append,
+which continues to preserve existing nulls. Inspect fresh source coordinates first
+and choose a supported `end_date`; the function never assumes a calendar lag.
+
+```python
+from meteorology.refresh import refresh_weather
+refresh_weather("2026-10-20", study_config="/path/to/study.v1.json",
+    output_dir="/path/to/Data/Meteorology",
+    cache_dir="/path/to/retained/frontier-20261026", workers=1,
+    allow_incomplete_final_day=True)
+```
+
+The operation holds the publication lock, validates the current product, and
+accepts only one explicitly documented missing terminal precipitation interval.
+It preserves the retained 23 hourly rainfall values, replaces only the missing
+23:00 UTC hourly value using the following midnight's interval-ending source,
+and sums those 24 hours for that cell's daily total. Fresh source revisions to
+previously finite values are ignored. Missing replacement support fails before
+publication. New days use all seven source fields and the normal UTC reductions.
+
+`endpoint_repairs` records the interval, superseded catalog hash, new source
+metadata/evidence hashes, support cutoff and null-only replacement policy. These
+records qualify the otherwise retained `source_epochs`: only the specified
+missing interval and its daily sum are replaced, and the other 23 intervals retain
+their original epoch. New date epochs and old source receipts remain explicit.
+ERA5 versus ERA5T identity and historical operational availability remain unknown.
+
+Every old row is compared with the staged product before promotion, exempting only
+the authorized repaired nulls. Structural checks run before and after publication.
+A fully covered, repaired request is a validated no-op. A repeated request at
+the same pinned partial frontier also leaves the files unchanged when the missing
+next-midnight interval remains unavailable. Failed acquisition retains
+verified cache objects for manual restart; there are no automatic retries. The
+caller-owned cache is retained even after success. Use a fresh cache to discover a
+new provider vintage. This maintenance path neither cleans old sources nor changes
+ordinary `get_weather` source-lifecycle behavior.
+
+### Validated October 26, 2026 refresh
+
+The current coastal product covers 2009-01-01 through 2026-10-20: 463 cells,
+3,010,426 daily rows (14 metrics), and 72,250,224 hourly rows (10 metrics).
+October 10's 463 missing terminal hourly rainfall values and daily totals were
+repaired without revising retained finite values. October 19 is the newest day
+with complete temporal support. October 20 retains 463 unavailable final hourly
+rainfall values and 463 partial daily totals because October 21 midnight is
+absent from this source snapshot. Unsupported RH remains null.
+
+The bounded refresh downloaded 441 field chunks (269,095,962 bytes), plus a small
+metadata/coordinate probe, using one worker. Sources and receipts are retained.
+All unaffected historical rows compared exactly before promotion; staged and
+final product checks, source-boundary and daily/hourly accumulation checks, and
+an unchanged same-frontier rerun passed. See the [dated evidence](evidence/frontier-refresh-20261026.json).
+This confirms structural/source consistency, not observational accuracy, ERA5
+revision identity, historical operational availability, or forecast readiness.

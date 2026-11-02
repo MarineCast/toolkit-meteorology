@@ -1,6 +1,6 @@
 # Architecture
 
-The supported path is:
+The weather path is:
 
 ```text
 Run defaults/explicit options + approved registry/mask + UTC dates + allowed families
@@ -18,7 +18,7 @@ name-bound transaction checksums intentionally differ from raw public file SHA25
 existing products. It performs no acquisition and is not the primary path.
 
 The package imports no sibling or application code. No HRRR, GRIB/CDS planner,
-modeling, astronomy or visualization module is needed. The runtime dependencies
+modeling, former astronomy or visualization module is needed. The runtime dependencies
 are h3, numpy, pandas, pyarrow, numcodecs and PyYAML. Source data and generated
 products are outside the installable distribution. Source receipts and hashes are embedded in the catalog; successful runs discard
 owned compressed objects and arrays after readback. Failed runs retain resumable
@@ -37,3 +37,17 @@ keys, stages
 the combined product, and records separate metric-scoped source epochs. Rebuild discards no
 prior files until replacement is ready. Empty targets use the same producer in
 either mode; complete contained append requests need no source archive.
+
+The distinct Solar Cycle path is approved registry + dates → `solar.py` vectorized
+NOAA/Meeus positions and UTC threshold integration → hourly/daily Parquets and a
+separate catalog under `Meteorology/solar-cycle`. It reuses transactional publication
+and external registry checks, with no ERA5, network, credential or extra runtime
+stack. See [Solar Cycle](solar-cycle.md). Solar changes do not restore the former
+astronomy interface or imply wave acquisition.
+
+The separate Solar Radiation path is approved registry + dates → selected native
+`ssrd`/`fdir` contract in `regional_source.Archive` → `radiation.py` complete UTC
+reductions → separate hourly/daily files/catalog in `Meteorology/solar-radiation`.
+It reuses the source transport and recoverable publisher, with independent source
+epochs, ownership, validation and successful-cache cleanup. `companions.py` lets
+Weather recognize exactly the two named companions. See [Solar Radiation](solar-radiation.md).

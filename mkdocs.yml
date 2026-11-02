@@ -48,6 +48,10 @@ nav:
   - Home: index.md
   - API and usage: regional-api.md
   - Current product: coastal-product.md
+  - Solar Cycle: solar-cycle.md
+  - Solar Radiation: solar-radiation.md
+  - Radiation and waves research: radiation-and-waves.md
+  - Reproducibility and maps: reproducibility.md
   - Contract: CONTRACTS.md
   - Architecture: ARCHITECTURE.md
   - Development: DEVELOPMENT.md

@@ -46,6 +46,22 @@ def test_primary_api_exact_cells_and_all_fields(weather):
     assert catalog['source_method'] == regional.METHOD
 
 
+def test_weather_preserves_distinct_solar_cycle_child(weather, tmp_path, monkeypatch):
+    from meteorology import solar
+    from .test_marine_reporting import registry
+    result = get_weather('2009-01-01', '2009-01-01', **weather)
+    member, study, _, _ = registry(tmp_path)
+    monkeypatch.setattr(solar, 'load_reporting_membership', lambda _: member)
+    companion = solar.get_solar_cycle('2009-01-01', '2009-01-01', study_config=study,
+                                     output_dir=weather['output_dir']/'solar-cycle')
+    before = checksum_path(companion.catalog_path)
+    get_weather('2009-01-01', '2009-01-01', **{**weather, 'rebuild': False})
+    get_weather('2009-01-02', '2009-01-02', **{**weather, 'rebuild': False})
+    get_weather('2009-01-01', '2009-01-01', **weather)
+    assert check_weather(result.catalog_path)['valid']
+    assert checksum_path(companion.catalog_path) == before
+
+
 def test_selected_families_fetch_only_dependencies(weather, monkeypatch):
     original = FakeArchive.cube
     parameters_seen = []
@@ -576,3 +592,43 @@ def test_staged_readback_failure_preserves_previous_product(weather, monkeypatch
         get_weather('2009-01-02', '2009-01-02', ['temperature'], **weather)
     assert {p.name: p.read_bytes() for p in result.catalog_path.parent.iterdir()} == before
     assert (regional.source_root(result.catalog_path.parent, weather['cache_dir'])/'evidence').is_dir()
+
+def test_frontier_refresh_repairs_and_appends_idempotently(weather, monkeypatch):
+    from meteorology.refresh import refresh_weather
+    class Frontier(FakeArchive):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.times = self.times[:24]
+        def cube(self, day, parameters, allow_missing_boundary=False):
+            cube = super().cube(day, parameters)
+            cube['values'][:, -1, :] = np.nan
+            return cube
+    monkeypatch.setattr(regional, 'Archive', Frontier)
+    first = get_weather('2009-01-01', '2009-01-01',
+                        allow_incomplete_final_day=True, **weather)
+    before = pq.read_table(first.hourly_path)
+    partial_digest = checksum_path(first.catalog_path)
+    refresh_weather('2009-01-01', study_config='study',
+        output_dir=weather['output_dir'], cache_dir=weather['cache_dir'])
+    assert checksum_path(first.catalog_path) == partial_digest
+    monkeypatch.setattr(regional, 'Archive', FakeArchive)
+    monkeypatch.setattr(FakeArchive, 'fail', True)
+    with pytest.raises(RuntimeError, match='Simulated acquisition failure'):
+        refresh_weather('2009-01-02', study_config='study',
+            output_dir=weather['output_dir'], cache_dir=weather['cache_dir'])
+    assert checksum_path(first.catalog_path) == partial_digest
+    monkeypatch.setattr(FakeArchive, 'fail', False)
+    result = refresh_weather('2009-01-02', study_config='study',
+        output_dir=weather['output_dir'], cache_dir=weather['cache_dir'])
+    catalog = json.loads(result.catalog_path.read_text())
+    assert not catalog['incomplete_final_day']
+    assert catalog['partial_metric_coverage'] == []
+    assert len(catalog['endpoint_repairs']) == 1
+    assert pq.read_table(result.daily_path)['PRECIPITATION_MM'].to_pylist() == [300., 300.]
+    after = pq.read_table(result.hourly_path).slice(0, 24)
+    assert before.drop(['PRECIPITATION_MM']).equals(after.drop(['PRECIPITATION_MM']), check_metadata=False)
+    digest = checksum_path(result.catalog_path)
+    refresh_weather('2009-01-02', study_config='study',
+        output_dir=weather['output_dir'], cache_dir=weather['cache_dir'])
+    assert checksum_path(result.catalog_path) == digest
+    assert check_weather(result.catalog_path)['valid']

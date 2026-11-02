@@ -174,7 +174,7 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
              cache_dir=None, workers=4, transfer_bytes=8 * 1024**3, max_seconds=3600,
              allow_incomplete_final_day=False,
              variable_list=None, membership=None, verbosity=False, existing=None, publisher=None,
-             _discard_cache=False):
+             _discard_cache=False, repair_terminal_precipitation=False):
     """Acquire/reuse regional ERA5 and publish hourly/daily wide H3 R5 Parquets.
 
     Inclusive UTC dates. Output contains exactly two Parquets and catalog.json in
@@ -198,12 +198,14 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
              else source_root(output))
     if output == cache or output in cache.parents or cache in output.parents:
         raise ValueError('Output and private cache must be separate directories.')
-    # Separate control namespace keeps the public directory to three files, while
+    # Separate control namespace keeps weather to three files, while
     # all writers to this output share one recoverable publication journal.
     result = RegionalResult(output / 'meteorology-hourly.parquet',
                             output / 'meteorology-daily.parquet', output / 'catalog.json')
     expected = {p.name for p in (result.hourly_path, result.daily_path, result.catalog_path)}
-    if output.exists() and any(p.name not in expected for p in output.iterdir()):
+    from .companions import is_meteorology_companion
+    if output.exists() and any(p.name not in expected and not is_meteorology_companion(p)
+                               for p in output.iterdir()):
         raise ValueError('Choose a dedicated output directory; unrelated files are preserved.')
     started = time.perf_counter()
     query_seconds = processing_seconds = 0.0
@@ -222,6 +224,12 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
         old = existing or {}
         old_first = date.fromisoformat(old['start_date']) if old else None
         old_last = date.fromisoformat(old['end_date']) if old else None
+        repair_day = old_last if repair_terminal_precipitation and old.get('incomplete_final_day') else None
+        if repair_day and old.get('partial_metric_coverage') != [dict(
+                date=str(repair_day), metric='PRECIPITATION_MM', expected_hours=24,
+                valid_hours=23, value_status='PARTIAL',
+                missing_interval_end_utc=str(repair_day + timedelta(days=1)) + 'T00:00:00Z')]:
+            raise ValueError('Repair requires exactly one documented terminal precipitation interval.')
         missing = ([(a, b) for a, b in (
             (first, min(last, old_first - timedelta(days=1))),
             (max(first, old_last + timedelta(days=1)), last),
@@ -234,6 +242,8 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
         queries = [(a, b, parameters, selected) for a, b in missing]
         if backfill_parameters:
             queries.append((old_first, old_last, backfill_parameters, backfill))
+        if repair_day:
+            queries.append((repair_day, repair_day, ['tp'], {}))
         missing_days = sum((b - a).days + 1 for a, b in missing)
         ranges = ', '.join(f'{a} through {b}' for a, b in missing) or 'none'
         log(verbosity, f'Missing dates: {missing_days:,} UTC day{"s" if missing_days != 1 else ""}; {ranges}')
@@ -254,7 +264,7 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
             start_second = int(pd.Timestamp(a, tz='UTC').timestamp())
             end_second = int(pd.Timestamp(b, tz='UTC').timestamp()) + 86400
             boundary = end_second - (3600 if 'tp' not in fields or
-                (allow_incomplete_final_day and b == last) else 0)
+                (allow_incomplete_final_day and b == last and a != repair_day) else 0)
             if start_second < archive.times[0] or boundary > archive.times[-1]:
                 raise ValueError('Dates plus precipitation boundary exceed cached source coverage; '
                                  'use a fresh cache to discover a newer vintage.')
@@ -315,6 +325,8 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                     log(verbosity, f"{action} UTC day {day}")
                     current_parameters = backfill_parameters if reuse else parameters
                     query_started = time.perf_counter()
+                    if day == repair_day:
+                        current_parameters = sorted(set(current_parameters) | {'tp'})
                     if current_parameters:
                         log(verbosity, f'Query/cache read for {day}: {", ".join(current_parameters)}')
                         if ((allow_incomplete_final_day and day == last) or
@@ -326,9 +338,17 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                     elapsed_query = time.perf_counter() - query_started if current_parameters else 0.0
                     query_seconds += elapsed_query
                     processing_started = time.perf_counter()
+                    repaired = None
+                    if day == repair_day:
+                        original = {f: retained[f].read_row_group((day - old_first).days)
+                                    for f in ('hourly', 'daily')}
+                        fresh = hourly_day(cube, day, {'PRECIPITATION_MM': selected['hourly']['PRECIPITATION_MM']}, spatial, {})
+                        from .endpoint_repair import repair_precipitation
+                        repaired = repair_precipitation(original, fresh)
                     for frequency in ('hourly', 'daily'):
                         if reuse:
-                            table = retained[frequency].read_row_group((day - old_first).days)
+                            table = (repaired[frequency] if repaired else
+                                     retained[frequency].read_row_group((day - old_first).days))
                             if backfill[frequency]:
                                 added = wide_day(cube, day, backfill[frequency], frequency,
                                                  spatial, counts[frequency])
@@ -375,6 +395,12 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                         totals = counts[frequency].setdefault(name, {})
                         for label, total in statuses.items():
                             totals[label] = totals.get(label, 0) + total
+            if repair_day:
+                for frequency in counts:
+                    totals = counts[frequency]['PRECIPITATION_MM']
+                    cells = len(spatial[1])
+                    totals['PARTIAL' if frequency == 'daily' else 'UNAVAILABLE'] -= cells
+                    totals['COMPLETE'] += cells
             finalize_started = time.perf_counter()
             log(verbosity, 'Finalizing product checksums, status totals and source evidence')
             products = {}
@@ -396,7 +422,7 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                            end_date=str(last), **static, source_evidence_sha256=evidence_hash,
                            source_coverage_end=str(archive.times[-1].astype('datetime64[s]')),
                            products=products, incomplete_final_day=bool(new_partial or
-                               (old and last == old_last and old.get('incomplete_final_day', False))),
+                               (old and not repair_day and last == old_last and old.get('incomplete_final_day', False))),
                            acquisition=dict(requests=archive.requests,
                                                               response_bytes=archive.bytes))
             catalog['source_evidence'] = evidence
@@ -415,7 +441,7 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                 missing_interval_end_utc=str(last + timedelta(days=1)) + 'T00:00:00Z')]
                 if new_partial else [])
             if old:
-                catalog['partial_metric_coverage'] = [*old.get('partial_metric_coverage', []),
+                catalog['partial_metric_coverage'] = [*([] if repair_day else old.get('partial_metric_coverage', [])),
                     *catalog['partial_metric_coverage']]
                 previous_epochs = old.get('source_epochs') or [dict(
                     start_date=old['start_date'], end_date=old['end_date'],
@@ -430,16 +456,30 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                                    for e in previous_epochs]
                 epochs = list(previous_epochs)
                 for a, b, fields, scope in queries:
+                    if not scope:
+                        continue
                     epochs.append(dict(start_date=str(a), end_date=str(b),
                         metadata_sha256=archive.snapshot, evidence_sha256=evidence_hash,
                         source_coverage_end=catalog['source_coverage_end'], source_method=METHOD,
                         metrics={f: list(specs) for f, specs in scope.items()}))
+                if old.get('endpoint_repairs'):
+                    catalog['endpoint_repairs'] = old['endpoint_repairs']
+                if repair_day:
+                    catalog['endpoint_repairs'] = [*catalog.get('endpoint_repairs', []), dict(
+                        date=str(repair_day), metric='PRECIPITATION_MM',
+                        interval_end_utc=str(repair_day + timedelta(days=1)) + 'T00:00:00Z',
+                        policy='fill missing final hourly interval only; sum retained 23 hours plus new interval',
+                        supersedes_catalog_sha256=checksum_path(result.catalog_path),
+                        metadata_sha256=archive.snapshot, evidence_sha256=evidence_hash,
+                        source_coverage_end=catalog['source_coverage_end'],
+                        cells=len(spatial[1]))]
                 catalog['source_epochs'] = sorted(epochs, key=lambda e: e['start_date'])
-                catalog['source_coverage_end'] = max(e['source_coverage_end'] for e in epochs)
+                catalog['source_coverage_end'] = max([e['source_coverage_end'] for e in epochs] +
+                    [e['source_coverage_end'] for e in catalog.get('endpoint_repairs', [])])
                 catalog.pop('source_metadata_sha256', None)
                 catalog.pop('source_evidence_sha256', None)
             publisher.stage_manifest(result.catalog_path, catalog)
-            if owned_cache:
+            if owned_cache or membership is not None:
                 # Validate the actual staged bytes before any final path is replaced.
                 check_weather(publisher.candidate_path(result.catalog_path),
                               _membership=membership, _files=paths)
@@ -447,6 +487,9 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
             log(verbosity, f'Staged files ready after {finalize_seconds:.2f}s finalization; '
                 'publishing hourly, daily and catalog together')
             publish_started = time.perf_counter()
+            if repair_terminal_precipitation:
+                from .endpoint_repair import validate_preserved
+                validate_preserved(retained, paths, repair_day, old_first)
             publisher.publish()
             publish_seconds = time.perf_counter() - publish_started
             if owned_cache:
@@ -523,7 +566,8 @@ def get_weather(start_date=None, end_date=None, variable_list=None, *, study_con
             if any(p.is_symlink() for p in output.iterdir()):
                 raise ValueError('Weather output files must not be symlinks.')
             expected = {'catalog.json', 'meteorology-hourly.parquet', 'meteorology-daily.parquet'}
-            found = {p.name for p in output.iterdir()}
+            from .companions import is_meteorology_companion
+            found = {p.name for p in output.iterdir() if not is_meteorology_companion(p)}
             if found - expected:
                 raise ValueError('Output contains unrelated files; choose a dedicated weather directory.')
             if not rebuild:
@@ -674,7 +718,7 @@ def main():
     """Small date-range CLI for the same API and read-only checks."""
     import argparse
 
-    parser = argparse.ArgumentParser(description='Approved coastal ERA5 weather')
+    parser = argparse.ArgumentParser(description='Coastal Weather, Solar Cycle and Solar Radiation')
     commands = parser.add_subparsers(dest='command', required=True)
     get = commands.add_parser('get')
     get.add_argument('start_date', nargs='?')
@@ -693,9 +737,43 @@ def main():
     check.add_argument('--study-config')
     pre = commands.add_parser('preflight', help='Validate all six run settings without running')
     pre.add_argument('--env-file')
+    solar = commands.add_parser('solar', help='Build the distinct calculated Solar Cycle companion')
+    solar.add_argument('start_date', nargs='?')
+    solar.add_argument('end_date', nargs='?')
+    solar.add_argument('--study-config')
+    solar.add_argument('--output-dir')
+    solar.add_argument('--rebuild', action='store_true')
+    solar.add_argument('--verbose', dest='verbosity', action='store_true')
+    solar_check = commands.add_parser('solar-check', help='Read-only Solar Cycle validation')
+    solar_check.add_argument('catalog_path')
+    solar_check.add_argument('--study-config')
+    radiation = commands.add_parser('radiation', help='Build or append the separate Solar Radiation product')
+    radiation.add_argument('start_date', nargs='?')
+    radiation.add_argument('end_date', nargs='?')
+    radiation.add_argument('--study-config')
+    radiation.add_argument('--output-dir')
+    radiation.add_argument('--cache-dir')
+    radiation.add_argument('--rebuild', action='store_true')
+    radiation.add_argument('--allow-incomplete-final-day', action='store_true')
+    radiation.add_argument('--verbose', dest='verbosity', action='store_true')
+    radiation_check = commands.add_parser('radiation-check', help='Read-only Solar Radiation validation')
+    radiation_check.add_argument('catalog_path')
+    radiation_check.add_argument('--study-config')
     options = vars(parser.parse_args())
     command = options.pop('command')
-    if command == 'preflight':
+    if command == 'radiation':
+        from .radiation import get_solar_radiation
+        print(get_solar_radiation(**options).catalog_path)
+    elif command == 'radiation-check':
+        from .radiation import check_solar_radiation
+        print(json.dumps(check_solar_radiation(**options), indent=2))
+    elif command == 'solar':
+        from .solar import get_solar_cycle
+        print(get_solar_cycle(**options).catalog_path)
+    elif command == 'solar-check':
+        from .solar import check_solar_cycle
+        print(json.dumps(check_solar_cycle(**options), indent=2))
+    elif command == 'preflight':
         from .run_settings import preflight
         first, last, output, verbose, metrics, rebuild = preflight(**options)
         print(json.dumps(dict(START_DATE=first, END_DATE=last, DATA_DIR=str(output),

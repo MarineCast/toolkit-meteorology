@@ -1,11 +1,26 @@
 # Current coastal ERA5 history
 
+## Current status · reviewed 2026-10-29
+
+The delivered catalog now covers **2009-01-01–2026-10-20**. October 19 is the
+last complete all-metric day; October 20 has 23/24 precipitation intervals and
+its daily precipitation remains null. The October 26 refresh repaired October
+10 precipitation and appended ten days, preserving the earlier vintages. The
+recent source cache is retained; original historical payloads remain deleted.
+See the [current reproducibility review and maps](reproducibility.md) for a
+verified installed-wheel replay, prerequisites and limits. The sections below
+describe the original October 16–18 publication and historical verification,
+not the current frontier.
+
+## Original publication · October 16–18
+
 `MarineCast/Data/Meteorology` is the current approved coastal R5 product. It contains
 one hourly Parquet, one daily Parquet and one catalog. The approved shared-study
 configuration supplies exact water-reporting membership; the acquisition rectangle
 supplies atmospheric support only. Nearest quarter-degree source sampling does not
-create independent R5 weather detail. Native compressed objects, checksummed
-regional arrays, source evidence and mapping remain in the private ERA5 caches.
+create independent R5 weather detail. At that publication, native compressed objects, checksummed regional arrays,
+source evidence and mapping were retained in private ERA5 caches; the retention
+change below subsequently removed those original payloads.
 
 The current run reuses the verified 2009-01-01–2026-10-08 rectangle product and
 adds 2026-10-09–2026-10-10 from the current ECMWF geographically chunked store. It preserves
