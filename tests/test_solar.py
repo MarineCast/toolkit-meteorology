@@ -84,8 +84,8 @@ def test_product_exact_support_defaults_noop_and_rebuild(selection):
     before = {p.name: checksum_path(p) for p in options['output_dir'].iterdir()}
     get_solar_cycle('2012-02-29', '2012-02-29', **options)
     assert before == {p.name: checksum_path(p) for p in options['output_dir'].iterdir()}
-    with pytest.raises(ValueError, match='rebuild=True'):
-        get_solar_cycle('2012-02-29', '2012-03-02', **options)
+    get_solar_cycle('2012-02-29', '2012-03-02', **options)
+    assert check_solar_cycle(result.catalog_path)['products']['daily']['rows'] == 4*len(member.cells)
     get_solar_cycle('2012-02-29', '2012-02-29', rebuild=True, **options)
     assert check_solar_cycle(result.catalog_path)['products']['daily']['rows'] == len(member.cells)
 

@@ -60,6 +60,7 @@ def test_preserves_values_and_rejects_source_gap(tmp_path, monkeypatch):
     assert result['products']['daily']['rows'] == 2
     assert result['products']['hourly']['rows'] == 48
     assert len(result['source_epochs']) == 2
+    assert regional.check_weather(tmp_path/'out/catalog.json')['valid']
     assert result['unavailable_interval']['start'] == '2009-01-03'
     table = pq.read_table(tmp_path/'out/meteorology-daily.parquet')
     assert table['H3_INDEX'].to_pylist() == ['b', 'b']

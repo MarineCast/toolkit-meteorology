@@ -22,8 +22,8 @@ import pyarrow.parquet as pq
 from ._version import __version__
 from .artifacts import checksum_path
 from .core.artifacts import TransactionalFamilyPublisher, atomic_write_json
-from .marine_reporting import load_reporting_membership
-from .run_settings import log
+from .marine_reporting import load_reporting_membership, select_reporting_membership, selection_metadata
+from .run_settings import log, resolve_run
 
 METHOD = 'noaa-meeus-geometric-utc-solar-v1'
 PRODUCT = 'solar-cycle'
@@ -196,7 +196,7 @@ def _identity(member):
                    SOLAR_AZIMUTH_DEG='degrees clockwise from true north',
                    SOLAR_PHASE='category', **{name: 'UTC timestamp' for name in EVENTS},
                    **{name: 'hours within UTC day' for name in HOURS}),
-        sources=SOURCES)
+        sources=SOURCES, **selection_metadata(member))
 
 
 def _directory(output):
@@ -208,19 +208,25 @@ def _directory(output):
 
 
 def get_solar_cycle(start_date=None, end_date=None, *, study_config=None, output_dir=None,
-                    rebuild=False, verbosity=False):
+                    rebuild=None, verbosity=None, env_file=None, bbox=None):
     """Build hourly angles and daily phases for inclusive approved UTC dates.
 
-    Dates default to the entire configured study, independently of weather .env
-    settings or the ERA5 frontier. Output defaults to Data/Meteorology/solar-cycle.
-    A validated covered request is a no-op; changing the range requires rebuild.
+    Shared settings supply dates and output. Unconfigured dates use the study
+    range, independently of the ERA5 frontier.
+    A validated covered request is a no-op; append computes missing days only.
     """
+    settings = resolve_run(start_date, end_date, output_dir, verbosity, env_file,
+                           rebuild=rebuild, study_config=study_config, bbox=bbox,
+                           require_dates=False, product=PRODUCT)
+    start_date, end_date, output_dir, verbosity, _, rebuild = settings.weather_options()
+    study_config, bbox = settings.study_config, settings.bbox
     if type(rebuild) is not bool or type(verbosity) is not bool:
         raise ValueError('Solar rebuild and verbosity must be booleans.')
     supplied = [date.fromisoformat(str(d)) if d is not None else None for d in (start_date, end_date)]
     if all(supplied) and supplied[0] > supplied[1]:
         raise ValueError('Solar start_date must be on or before end_date.')
-    member = load_reporting_membership(study_config)
+    base_member = load_reporting_membership(study_config)
+    member = select_reporting_membership(base_member, bbox)
     window = member.study_identity['study_config']['time']
     first = supplied[0] or date.fromisoformat(window['start'])
     last = supplied[1] or date.fromisoformat(window['end_exclusive']) - timedelta(days=1)
@@ -246,16 +252,22 @@ def get_solar_cycle(start_date=None, end_date=None, *, study_config=None, output
     code_hash = checksum_path(Path(__file__))
     with TransactionalFamilyPublisher(control) as publisher:
         _directory(output)
+        retained = None
         if output.exists() and any(output.iterdir()):
-            existing = check_solar_cycle(result.catalog_path, _member=member)
             old = json.loads(result.catalog_path.read_text())
+            old_member = select_reporting_membership(base_member, old.get('selection_bbox_wgs84'))
+            check_solar_cycle(result.catalog_path, _member=old_member if rebuild else member)
             if not rebuild:
-                if (old['code_sha256'] == code_hash and old['start_date'] <= str(first)
-                        and old['end_date'] >= str(last)):
+                if old['code_sha256'] != code_hash:
+                    raise ValueError('Solar code changed; use rebuild=True to replace the product.')
+                if old['start_date'] <= str(first) and old['end_date'] >= str(last):
                     log(verbosity, 'Solar Cycle already covers requested dates; output unchanged.')
                     return result
-                raise ValueError('Solar range or code changed; use rebuild=True to replace the product.')
-            del existing
+                retained = old
+                first = min(first, date.fromisoformat(old['start_date']))
+                last = max(last, date.fromisoformat(old['end_date']))
+                if str(first) < window['start'] or str(last) >= window['end_exclusive']:
+                    raise ValueError('Retained Solar dates exceed approved study support.')
         days = (last - first).days + 1
         estimate = days * len(member.cells) * (24 * 80 + 240)
         if shutil.disk_usage(control).free < estimate + 512 * 1024**2:
@@ -268,6 +280,7 @@ def get_solar_cycle(start_date=None, end_date=None, *, study_config=None, output
         meta = _identity(member)
         paths = {f: publisher.stage_path(getattr(result, f + '_path')) for f in ('hourly', 'daily')}
         counts = {f: dict.fromkeys(_schema(f).names, 0) for f in paths}
+        saved = {f: pq.ParquetFile(output/retained['products'][f]['file']) for f in paths} if retained else {}
         with ExitStack() as stack:
             writers = {f: stack.enter_context(pq.ParquetWriter(paths[f], _schema(f).with_metadata(
                 {b'solar_cycle': json.dumps(meta, sort_keys=True).encode()}), compression='zstd')) for f in paths}
@@ -276,7 +289,12 @@ def get_solar_cycle(start_date=None, end_date=None, *, study_config=None, output
                     if shutil.disk_usage(control).free < 512 * 1024**2:
                         raise ValueError('Solar staging stopped before exhausting disk space.')
                     log(verbosity, f'Solar Cycle {i + 1:,}/{days:,} UTC days')
-                for f, table in _tables(first + timedelta(days=i), member.cells).items():
+                day = first + timedelta(days=i)
+                tables = ({f: q.read_row_group((day-date.fromisoformat(retained['start_date'])).days)
+                           for f, q in saved.items()}
+                          if retained and retained['start_date'] <= str(day) <= retained['end_date']
+                          else _tables(day, member.cells))
+                for f, table in tables.items():
                     writers[f].write_table(table)
                     for name in table.column_names:
                         counts[f][name] += table[name].null_count
@@ -308,6 +326,10 @@ def check_solar_cycle(catalog_path, *, study_config=None, _member=None, _files=N
             or catalog.get('product') != PRODUCT or catalog.get('timezone') != 'UTC'):
         raise ValueError('Unsupported Solar Cycle catalog.')
     member = _member or (load_reporting_membership(study_config) if study_config is not None else None)
+    if member is not None and _member is None:
+        member = select_reporting_membership(member, catalog.get('selection_bbox_wgs84'))
+    if member is not None and any(catalog.get(k) != v for k, v in selection_metadata(member).items()):
+        raise ValueError('Regional selection provenance differs from approved membership.')
     if member is not None and any(catalog.get(k) != v for k, v in _identity(member).items()):
         raise ValueError('Solar catalog differs from approved membership or method conventions.')
     first, last = [date.fromisoformat(catalog[k]) for k in ('start_date', 'end_date')]

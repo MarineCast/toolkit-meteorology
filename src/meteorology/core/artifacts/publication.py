@@ -9,12 +9,10 @@ import re
 import shutil
 import uuid
 from collections.abc import Mapping
-from contextlib import AbstractContextManager, ExitStack, contextmanager
-from dataclasses import asdict, dataclass
+from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
 from typing import Any
 
-from .checksums import checksum_path
 from .contracts import atomic_write_json
 
 
@@ -28,28 +26,6 @@ def _fsync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
-@dataclass(frozen=True)
-class PublishedArtifact:
-    """Metadata captured from a staged artifact before it is promoted."""
-
-    path: Path
-    checksum: str
-    size_bytes: int
-    schema: tuple[dict[str, Any], ...] = ()
-    row_count: int | None = None
-    h3_cell_count: int | None = None
-    h3_cell_set_hash: str | None = None
-    h3_resolutions: tuple[int, ...] = ()
-    spatial_bounds_wgs84: Mapping[str, float] | None = None
-
-    def to_dict(self, *, path: str | None = None) -> dict[str, Any]:
-        payload = asdict(self)
-        payload["path"] = path or str(self.path)
-        payload["schema"] = list(self.schema)
-        payload["h3_resolutions"] = list(self.h3_resolutions)
-        return {key: value for key, value in payload.items() if value not in (None, (), [])}
-
-
 class TransactionalFamilyPublisher(AbstractContextManager["TransactionalFamilyPublisher"]):
     """Stage and recoverably promote a related set of filesystem artifacts.
 
@@ -59,31 +35,6 @@ class TransactionalFamilyPublisher(AbstractContextManager["TransactionalFamilyPu
     """
 
     JOURNAL_SCHEMA_VERSION = 2
-
-    @staticmethod
-    @contextmanager
-    def read_locks(parents):
-        """Pin published families while a consumer reads their files.
-
-        Producers use the same publication lock exclusively. A pending journal
-        requires producer recovery before its files can be consumed.
-        """
-
-        with ExitStack() as stack:
-            for parent in sorted({Path(value).resolve() for value in parents}):
-                lock = parent / ".publication.lock"
-                if not lock.exists():
-                    # A producer creates this file before publishing any family.
-                    raise FileNotFoundError(f"Publication lock is missing: {lock}")
-                handle = stack.enter_context(lock.open("rb"))
-                try:
-                    fcntl.flock(handle.fileno(), fcntl.LOCK_SH | fcntl.LOCK_NB)
-                except BlockingIOError as exc:
-                    raise RuntimeError(f"Publication parent is busy: {parent}") from exc
-                transactions = parent / ".transactions"
-                if transactions.exists() and any(transactions.iterdir()):
-                    raise RuntimeError(f"Publication requires recovery before reading: {parent}")
-            yield
 
     def __init__(self, parent: str | Path, run_id: str | None = None):
         self.parent = Path(parent).resolve()
@@ -96,6 +47,8 @@ class TransactionalFamilyPublisher(AbstractContextManager["TransactionalFamilyPu
         self.transactions = self.parent / ".transactions"
         self.transaction = self.transactions / token
         self.journal = self.transaction / "journal.json"
+        self.staging_owner = self.staging.with_suffix(".owner.json")
+        self.committed = False
         self._items: dict[Path, dict[str, Any]] = {}
         self._ownership = None
 
@@ -126,6 +79,8 @@ class TransactionalFamilyPublisher(AbstractContextManager["TransactionalFamilyPu
                 if private_root.is_symlink():
                     raise ValueError(f"Publication control directory is a symlink: {private_root}")
             self._recover_owned(self.parent)
+            self._recover_staging(self.parent)
+            self._write_journal(self.staging_owner, self._staging_identity(self.parent, self.staging.name))
             self.staging.mkdir(parents=True, exist_ok=False)
             _fsync_directory(self.staging.parent)
             return self
@@ -133,6 +88,44 @@ class TransactionalFamilyPublisher(AbstractContextManager["TransactionalFamilyPu
             self._ownership.__exit__(None, None, None)
             self._ownership = None
             raise
+
+    @staticmethod
+    def _staging_identity(parent, token):
+        return dict(owner='meteorology-publication-staging-v1', control=str(parent), token=token)
+
+    @classmethod
+    def _clean_staging(cls, parent, marker):
+        """Only remove a marked run under the locked control namespace."""
+        token = marker.name.removesuffix('.owner.json')
+        staging = parent / '.staging' / token
+        if (not re.fullmatch(r'[0-9a-f]{32}', token) or marker.is_symlink()
+                or staging.is_symlink() or json.loads(marker.read_text()) != cls._staging_identity(parent, token)):
+            raise RuntimeError(f'Staging ownership mismatch; preserved: {marker}')
+        if staging.exists():
+            shutil.rmtree(staging)
+        marker.unlink()
+        _fsync_directory(marker.parent)
+
+    @classmethod
+    def _recover_staging(cls, parent):
+        # Recovery has already resolved all transactions. Unmarked legacy or
+        # caller-created directories are deliberately not adopted or swept.
+        for marker in sorted((parent / '.staging').glob('*.owner.json')):
+            try:
+                cls._clean_staging(parent, marker)
+            except OSError as error:
+                raise RuntimeError(f'Staging cleanup incomplete; retry recovery: {marker}') from error
+
+    @staticmethod
+    def _clean_transaction(directory):
+        # Keep the durable journal until all backups have been removed. If
+        # deletion fails, the next run still knows whether this was committed.
+        backups = directory / 'backups'
+        if backups.exists():
+            shutil.rmtree(backups)
+        (directory / 'journal.tmp').unlink(missing_ok=True)
+        (directory / 'journal.json').unlink(missing_ok=True)
+        directory.rmdir()
 
     @staticmethod
     def _remove_path(path: Path) -> None:
@@ -173,19 +166,13 @@ class TransactionalFamilyPublisher(AbstractContextManager["TransactionalFamilyPu
                 _fsync_directory(parent)
 
     @classmethod
-    def recover(cls, parent: str | Path) -> None:
-        """Roll back interrupted transactions and clean committed journals."""
-
-        resolved = Path(parent).resolve()
-        with cls._exclusive_parent(resolved):
-            cls._recover_owned(resolved)
-
-    @classmethod
     def _recover_owned(cls, parent: Path) -> None:
         transactions = parent / ".transactions"
         if not transactions.exists():
             return
         for directory in sorted(path for path in transactions.iterdir() if path.is_dir()):
+            if directory.is_symlink():
+                raise RuntimeError(f"Symlinked transaction; preserved: {directory}")
             journal = directory / "journal.json"
             if not journal.exists():
                 # Before the initial journal, no destination rename is allowed.
@@ -214,28 +201,13 @@ class TransactionalFamilyPublisher(AbstractContextManager["TransactionalFamilyPu
                 raise RuntimeError(
                     f"Recovery failed; journal and remaining backups preserved: {directory}"
                 ) from exc
-            shutil.rmtree(directory)
+            cls._clean_transaction(directory)
             _fsync_directory(transactions)
         try:
             transactions.rmdir()
         except OSError:
             pass
         _fsync_directory(parent)
-
-    @classmethod
-    def recover_tree(cls, root: str | Path) -> None:
-        """Recover family transactions nested beneath a bounded artifact root."""
-
-        resolved = Path(root).resolve()
-        if not resolved.exists():
-            return
-        parents = sorted(
-            {transactions.parent for transactions in resolved.rglob(".transactions")},
-            key=lambda path: len(path.parts),
-            reverse=True,
-        )
-        for parent in parents:
-            cls.recover(parent)
 
     def stage_path(self, destination: str | Path, *, terminal: bool = False) -> Path:
         final = Path(destination).resolve()
@@ -261,72 +233,10 @@ class TransactionalFamilyPublisher(AbstractContextManager["TransactionalFamilyPu
         except KeyError as exc:
             raise KeyError(f"Destination has not been staged: {final}") from exc
 
-    def staged_artifact(
-        self,
-        destination: str | Path,
-        *,
-        schema: tuple[dict[str, Any], ...] = (),
-        row_count: int | None = None,
-        h3_cell_count: int | None = None,
-        h3_cell_set_hash: str | None = None,
-        h3_resolutions: tuple[int, ...] = (),
-        spatial_bounds_wgs84: Mapping[str, float] | None = None,
-    ) -> PublishedArtifact:
-        """Capture checksum and structural metadata from a staged artifact once."""
-
-        final = Path(destination).resolve()
-        candidate = self.candidate_path(final)
-        if not candidate.exists():
-            raise FileNotFoundError(candidate)
-        size_bytes = (
-            candidate.stat().st_size
-            if candidate.is_file()
-            else sum(item.stat().st_size for item in candidate.rglob("*") if item.is_file())
-        )
-        return PublishedArtifact(
-            path=final,
-            checksum=checksum_path(
-                candidate,
-                logical_name=final.name if candidate.is_file() else None,
-            ),
-            size_bytes=size_bytes,
-            schema=schema,
-            row_count=row_count,
-            h3_cell_count=h3_cell_count,
-            h3_cell_set_hash=h3_cell_set_hash,
-            h3_resolutions=h3_resolutions,
-            spatial_bounds_wgs84=spatial_bounds_wgs84,
-        )
-
-    def stage_parquet(
-        self,
-        frame: Any,
-        destination: str | Path,
-        *,
-        compression: str = "zstd",
-    ) -> Path:
-        staged = self.stage_path(destination)
-        if hasattr(frame, "to_parquet"):
-            frame.to_parquet(staged, index=False, compression=compression)
-        elif hasattr(frame, "write_parquet"):
-            frame.write_parquet(staged, compression=compression)
-        else:
-            raise TypeError("stage_parquet requires to_parquet() or write_parquet().")
-        return staged
-
     def stage_manifest(self, destination: str | Path, payload: Mapping[str, Any]) -> Path:
         staged = self.stage_manifest_path(destination)
         atomic_write_json(staged, dict(payload), overwrite=True)
         return staged
-
-    def write_manifest(self, destination: str | Path, payload: Mapping[str, Any]) -> Path:
-        """Write a manifest directly for legacy callers already outside promotion.
-
-        New producers should call :meth:`stage_manifest` before :meth:`publish`
-        so the manifest participates in the same transaction and is promoted last.
-        """
-
-        return atomic_write_json(destination, dict(payload), overwrite=True)
 
     def publish(self) -> tuple[Path, ...]:
         if self._ownership is None:
@@ -382,15 +292,22 @@ class TransactionalFamilyPublisher(AbstractContextManager["TransactionalFamilyPu
                 self._write_journal(self.journal, payload)
             payload["phase"] = "committed"
             self._write_journal(self.journal, payload)
-        except Exception:
+            self.committed = True
+        except Exception as error:
             # A failed durable commit checkpoint must be recoverable as an abort.
             payload["phase"] = "promoting"
             if self.journal.exists():
                 self._write_journal(self.journal, payload)
             self._rollback_payload(payload)
-            shutil.rmtree(self.transaction, ignore_errors=True)
+            try:
+                self._clean_transaction(self.transaction)
+            except OSError as cleanup_error:
+                error.add_note(f'Rollback completed, but transaction cleanup is incomplete: {cleanup_error}')
             raise
-        shutil.rmtree(self.transaction, ignore_errors=True)
+        try:
+            self._clean_transaction(self.transaction)
+        except OSError as error:
+            raise RuntimeError('Publication committed; transaction cleanup incomplete. Retry to recover.') from error
         try:
             self.transactions.rmdir()
         except OSError:
@@ -402,12 +319,20 @@ class TransactionalFamilyPublisher(AbstractContextManager["TransactionalFamilyPu
         try:
             # Candidates help disambiguate interrupted renames. Keep them when
             # failed rollback left a transaction requiring later recovery.
-            if not self.transaction.exists():
-                shutil.rmtree(self.staging, ignore_errors=True)
+            if not self.transaction.exists() and self.staging_owner.exists():
+                try:
+                    self._clean_staging(self.parent, self.staging_owner)
+                except (OSError, RuntimeError) as error:
+                    message = ('Publication committed' if self.committed else 'Publication not committed')
+                    message += '; staging cleanup incomplete. Retry to recover.'
+                    if exc is not None:
+                        exc.add_note(message)
+                    else:
+                        raise RuntimeError(message) from error
         finally:
             if self._ownership is not None:
                 self._ownership.__exit__(exc_type, exc, traceback)
                 self._ownership = None
 
 
-__all__ = ["PublishedArtifact", "TransactionalFamilyPublisher"]
+__all__ = ["TransactionalFamilyPublisher"]

@@ -23,9 +23,9 @@ from ._version import __version__
 from .artifacts import checksum_path
 from .compute import mapping
 from .core.artifacts import TransactionalFamilyPublisher, atomic_write_json
-from .marine_reporting import load_reporting_membership
+from .marine_reporting import load_reporting_membership, select_reporting_membership, selection_metadata
 from .regional_source import Archive, URL, utcnow
-from .run_settings import log
+from .run_settings import log, resolve_run
 
 PRODUCT = 'solar-radiation'
 METHOD = 'ecmwf-arco-horizontal-radiation-h3-utc-v1'
@@ -85,10 +85,10 @@ def _source_contract(archive):
 
 
 def _spatial(archive, member, cache):
-    bbox = member.study_identity['study_config']['domain']['bbox_wgs84']
+    bbox = getattr(member, 'selection_bbox_wgs84', None) or member.study_identity['study_config']['domain']['bbox_wgs84']
     grid = dict(coordinates=archive.coords,
                 metadata=dict(grid_hash=hashlib.sha256(archive.coords.tobytes()).hexdigest()))
-    indices, cells, distances, method = mapping(grid, bbox, 'h3', cache/'mapping')
+    indices, cells, distances, method = mapping(grid, bbox, cache/'mapping')
     lookup = {cell: i for i, cell in enumerate(cells)}
     if not set(member.cells) <= lookup.keys():
         raise ValueError('Approved radiation reporting cells extend outside source support.')
@@ -172,13 +172,19 @@ def _native_samples(archive, paths, first, acquired, cells, indices):
 
 def get_solar_radiation(start_date=None, end_date=None, *, study_config=None,
         output_dir=None, cache_dir=None, workers=4, transfer_bytes=8*1024**3,
-        max_seconds=3600, allow_incomplete_final_day=False, rebuild=False, verbosity=False):
+        max_seconds=3600, allow_incomplete_final_day=False, rebuild=None, verbosity=None,
+        env_file=None, bbox=None):
     """Publish the distinct SSRD/FDIR product, preserving retained vintages on append.
 
     Omitted end discovers actual source coordinates and selects complete UTC days.
     Explicit opt-in can include a terminal day lacking only its next-midnight hour.
     Append retains old values, including nulls; rebuild explicitly replaces them.
     """
+    settings = resolve_run(start_date, end_date, output_dir, verbosity, env_file,
+                           rebuild=rebuild, study_config=study_config, bbox=bbox,
+                           require_dates=False, product=PRODUCT)
+    start_date, end_date, output_dir, verbosity, _, rebuild = settings.weather_options()
+    study_config, bbox, env_file = settings.study_config, settings.bbox, settings.env_file
     for value in (allow_incomplete_final_day, rebuild, verbosity):
         if type(value) is not bool:
             raise ValueError('Radiation mode flags must be booleans.')
@@ -188,8 +194,10 @@ def get_solar_radiation(start_date=None, end_date=None, *, study_config=None,
     supplied = [date.fromisoformat(str(d)) if d is not None else None for d in (start_date, end_date)]
     if all(supplied) and supplied[0] > supplied[1]:
         raise ValueError('Radiation start_date must be on or before end_date.')
-    member = load_reporting_membership(study_config)
+    base_member = load_reporting_membership(study_config)
+    member = select_reporting_membership(base_member, bbox)
     study = member.study_identity['study_config']
+    bbox = bbox or study['domain']['bbox_wgs84']
     first = supplied[0] or date.fromisoformat(study['time']['start'])
     limit = date.fromisoformat(study['time']['end_exclusive'])-timedelta(days=1)
     if (str(first) < study['time']['start'] or first > limit
@@ -218,12 +226,16 @@ def get_solar_radiation(start_date=None, end_date=None, *, study_config=None,
         _directory(output)
         old = None
         if output.exists() and any(output.iterdir()):
-            check_solar_radiation(result.catalog_path, _member=member)
             old = json.loads(result.catalog_path.read_text())
+            old_member = select_reporting_membership(base_member, old.get('selection_bbox_wgs84'))
+            check_solar_radiation(result.catalog_path, _member=old_member if rebuild else member)
             if not rebuild and old['code_sha256'] != code:
                 raise ValueError('Radiation code changed; explicit rebuild=True is required.')
             if (not rebuild and supplied[1] and old['start_date'] <= str(first)
                     and old['end_date'] >= str(supplied[1])):
+                if cache.exists():
+                    with TransactionalFamilyPublisher._exclusive_parent(cache):
+                        _clean_cache(cache, output)
                 log(verbosity, 'Radiation request already covered; no acquisition or publication.')
                 return result
         # Bound staging before source access; acquisition also has per-object and
@@ -237,8 +249,9 @@ def get_solar_radiation(start_date=None, end_date=None, *, study_config=None,
             cleanup_status='source payloads retained until full final readback; failed runs resumable'), overwrite=True)
         with TransactionalFamilyPublisher._exclusive_parent(cache):
             _cache_owner(cache, output)
-            archive = Archive(cache, study['domain']['bbox_wgs84'], workers=workers,
-                transfer_bytes=transfer_bytes, max_seconds=max_seconds, parameter_units=PARAMETERS)
+            archive = Archive(cache, bbox, workers=workers,
+                transfer_bytes=transfer_bytes, max_seconds=max_seconds, parameter_units=PARAMETERS,
+                verbosity=verbosity, env_file=env_file)
             _source_contract(archive)
             frontier = pd.Timestamp(archive.times[-1], unit='s', tz='UTC')
             complete_day = frontier.floor('D').date()-timedelta(days=1)
@@ -268,7 +281,7 @@ def get_solar_radiation(start_date=None, end_date=None, *, study_config=None,
             indices, distances, spatial_method = _spatial(archive, member, cache)
             meta = dict(_conventions(), reporting_cell_count=len(member.cells),
                 membership_sha256=member.artifact_sha256, mask_sha256=member.mask_sha256,
-                mask_revision=member.mask_revision)
+                mask_revision=member.mask_revision, **selection_metadata(member))
             paths = {f: publisher.stage_path(getattr(result, f+'_path')) for f in ('hourly', 'daily')}
             saved = {f: pq.ParquetFile(output/retained['products'][f]['file']) for f in paths} if retained else {}
             rows = dict.fromkeys(paths, 0)
@@ -346,6 +359,10 @@ def check_solar_radiation(catalog_path, *, study_config=None, _member=None, _fil
     if catalog.get('schema_version') != 1 or any(catalog.get(k) != v for k, v in _conventions().items()):
         raise ValueError('Unsupported Solar Radiation catalog or quantity conventions.')
     member = _member or (load_reporting_membership(study_config) if study_config is not None else None)
+    if member is not None and _member is None:
+        member = select_reporting_membership(member, catalog.get('selection_bbox_wgs84'))
+    if member is not None and any(catalog.get(k) != v for k, v in selection_metadata(member).items()):
+        raise ValueError('Regional selection provenance differs from approved membership.')
     if member is not None and any(catalog.get(k) != v for k, v in dict(
             membership_sha256=member.artifact_sha256, mask_sha256=member.mask_sha256,
             mask_revision=member.mask_revision, reporting_cell_count=len(member.cells)).items()):

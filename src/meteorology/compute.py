@@ -61,17 +61,9 @@ def series(cube, boundary, parameter, stamps):
     return np.array(values), evidence
 
 
-def mapping(cube, bbox, output, cache):
+def mapping(cube, bbox, cache):
     coordinates = cube["coordinates"]
     w, s, e, n = bbox
-    if output == "native":
-        ids = np.flatnonzero(
-            (coordinates[:, 0] >= s)
-            & (coordinates[:, 0] <= n)
-            & (coordinates[:, 1] >= w)
-            & (coordinates[:, 1] <= e)
-        )
-        return ids, [None] * len(ids), np.zeros(len(ids)), "native_grid_points_inside_bbox_v1"
     polygon = {'type': 'Polygon', 'coordinates': [[(w, s), (e, s), (e, n), (w, n), (w, s)]]}
     cells = sorted(cell for cell in h3.geo_to_cells(polygon, 5)
                    if s <= h3.cell_to_latlng(cell)[0] <= n and w <= h3.cell_to_latlng(cell)[1] <= e)

@@ -14,15 +14,16 @@ def test_precedence_presence_and_secret_redaction(tmp_path, monkeypatch):
     monkeypatch.setenv("CDSAPI_KEY", "ENV_SENTINEL")
     assert resolve_credentials(required=True).key == "ENV_SENTINEL"
     selected = resolve_credentials(env_file=explicit, required=True)
-    assert selected.key == "ALIAS_SENTINEL"
+    assert selected.key == "ENV_SENTINEL"
+    monkeypatch.delenv("CDSAPI_KEY")
+    assert resolve_credentials(env_file=explicit, required=True).key == "ALIAS_SENTINEL"
     assert "SENTINEL" not in repr(selected) and "SENTINEL" not in str(selected.public())
     assert selected.public()["authenticated_access"] == "not_checked"
     explicit.write_text("malformed secret should not be read while planning")
     preview = resolve_credentials(env_file=explicit, inspect_only=True)
     assert preview.public()["configuration_present"] is True
     assert preview.key is None
-    with pytest.raises(ValueError, match="Exactly one"):
-        resolve_credentials(env_file=explicit, required=True)
+    assert resolve_credentials(env_file=explicit, required=True).key == "RC_SENTINEL"
 
 
 def test_bad_endpoint_and_missing_token_are_actionable(tmp_path, monkeypatch):

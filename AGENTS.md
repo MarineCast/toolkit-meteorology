@@ -29,13 +29,15 @@ study_config=...)` is read-only; supply the approved study to verify external
 membership. `validate_product` is a compatibility spelling for catalog checks.
 
 `run_settings.py` resolves explicit arguments > process environment > `.env` in
-CWD for DATA_DIR, START_DATE, END_DATE, VERBOSITY, METRICS and REBUILD. Dates can be omitted when
+CWD for DATA_DIR, START_DATE, END_DATE, VERBOSITY, METRICS, REBUILD,
+MARINECAST_STUDY_CONFIG and MIN/MAX_LAT/LON. All producers share these settings. Dates can be omitted when
 configured; file-relative output paths resolve beside that file. `env_file` /
 `--env-file` selects a file explicitly. No implicit parent search or environment
 mutation. Keep personal `.env` ignored; commit only `.env.example`. Progress is
 stderr (`verbosity=True` / `--verbose`); explicit false / `--no-verbose` silences it.
 `run_settings.preflight` is the single settings gate. CLI/file-backed runs require
-all six effective values; no-file Python API calls retain validated optional defaults.
+Weather dates; optional values retain validated defaults. Bounds select approved
+coastal/water centres only and must be supplied together.
 Check date order, unique allowed metrics, booleans, readable/unique assignments and
 output ancestor permissions before study loading, locks or source access. Report
 all errors together without raw values. `meteorology preflight` checks settings
@@ -55,6 +57,11 @@ The supported API uses owned transient source children, removes payloads only af
 final readback, and embeds receipts/hashes in the catalog. Never sweep caller-owned
 files. Keep staging, journals and stable locks outside the delivery parent under
 `.marinecast-work/meteorology/<destination-hash>`. Failed runs retain resumable inputs.
+Refresh also uses an owned source child under the supplied cache base; successful
+readback removes its payloads, preserving old caller-managed caches. Publication
+recovery cleans only owner-marked staging after resolving transactions. Never sweep
+unmarked staging. Report cleanup failures with commit state, retain recovery markers,
+and keep the original work exception visible when cleanup also fails.
 Default REBUILD=False validates and preserves existing dates, querying only missing
 dates (including bridges for disjoint ranges). A request with covered dates/metrics is a no-op.
 REBUILD=True replaces the requested range/metrics. Both modes build absent outputs.
@@ -89,7 +96,8 @@ and workspace update helpers do not make additional products public interfaces.
 
 ## Scientific and storage constraints
 
-Preserve exact approved membership (currently 463 cells), keys, units, UTC interval
+Preserve selected approved coastal/water membership (463 cells for the full study),
+keys, units, UTC interval
 semantics, null/status accounting, source vintages and provenance. Quarter-degree
 nearest-source sampling does not create independent H3-scale weather information.
 Instantaneous daily support is 00–23 UTC; precipitation uses intervals ending

@@ -12,8 +12,10 @@ Run defaults/explicit options + approved registry/mask + UTC dates + allowed fam
 
 The three production modules are regional.py, regional_source.py and compute.py.
 Credentials, study identity and registry validation are small separate helpers.
-The core/artifacts package retains transactional publication and recovery; its
-name-bound transaction checksums intentionally differ from raw public file SHA256.
+The core/artifacts package retains transactional publication and recovery.
+Public files and source receipts use raw SHA256 via `artifacts.py`.
+`lineage.py` validates inline source evidence and date partitions per metric
+before Weather accepts an existing product or publishes staged files.
 `coastal.py` is retained to reproduce the original multi-epoch publication from
 existing products. It performs no acquisition and is not the primary path.
 
@@ -28,7 +30,7 @@ sources outside delivery; source-vintage orchestration remains explicit.
 An explicit `cache_dir` supplies a work base with an owned child, preserving other
 files. Stable lock inodes remain; successful bulky intermediates do not.
 
-`run_settings.preflight` validates the six local/environment settings together,
+`run_settings.preflight` validates shared local/environment settings together,
 without mutating the process environment or creating directories. `regional.get_weather` owns the output publication lock while
 recovering, inspecting and validating prior files. Append plans the union range;
 `get_data` reads retained day row groups and acquires uncovered dates plus newly
@@ -51,3 +53,12 @@ reductions → separate hourly/daily files/catalog in `Meteorology/solar-radiati
 It reuses the source transport and recoverable publisher, with independent source
 epochs, ownership, validation and successful-cache cleanup. `companions.py` lets
 Weather recognize exactly the two named companions. See [Solar Radiation](solar-radiation.md).
+
+
+Weather's exporter uses focused helpers for query planning, owned-cache claiming,
+metadata construction and key-aligned backfill. The day loop retains streaming
+writes and the same scientific reducers. No new orchestration framework is added.
+Publication ownership markers bind interrupted staging to its control namespace;
+recovery resolves transactions before deleting marked candidates. Refresh uses an
+owned transient source child, with successful readback and cleanup matching the
+normal Weather lifecycle. See [working-data lifecycle](regional-api.md#source-and-working-data-lifecycle).

@@ -2,7 +2,7 @@
 
 Solar Cycle is a distinct calculated product, authorized on 2026-11-01. It
 describes daily solar geometry and light phases, not the Sun's 11-year activity
-cycle. It is independent of ERA5 acquisition and weather settings.
+cycle. It is independent of ERA5 acquisition and shares local run configuration.
 
 ## Run
 
@@ -18,16 +18,18 @@ meteorology solar 2024-06-20 2024-06-21 --study-config /path/to/config/study.v1.
 meteorology solar-check /path/to/Data/Meteorology/solar-cycle/catalog.json --study-config /path/to/config/study.v1.json
 ```
 
-Dates are inclusive UTC dates. Defaults select the entire configured study:
+Dates are inclusive UTC dates. Without configured dates, defaults select the entire approved study:
 currently 2009-01-01 through 2026-12-31. Future astronomical dates are calculated;
 they are not weather forecasts. No credentials, network, external ephemeris or
-additional runtime dependency is required. Weather `.env` values are not read.
+additional runtime dependency is required. Shared [.env settings](regional-api.md#local-run-defaults) supply dates, bounds,
+output root and rebuild mode.
 
 Default output is `Meteorology/solar-cycle/` beneath the selected study's Data
 root. `output_dir` selects a dedicated alternative. A covered request validates
-and preserves the saved bytes. Changing the range or calculation code requires
-explicit `rebuild=True` / `--rebuild`; replacement is recoverable and does not
-append implicitly. Unknown files, symlinks, damaged products, changed registry
+and preserves the saved bytes. Append extends the continuous union of saved and requested dates,
+computing missing days and retaining saved rows. Changing the region or calculation
+code requires explicit `rebuild=True` / `--rebuild`; rebuild replaces the requested
+range through recoverable publication. Unknown files, symlinks, damaged products, changed registry
 membership and changed method conventions fail closed.
 
 ## Files, support and quantities

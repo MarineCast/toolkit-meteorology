@@ -265,3 +265,51 @@ def test_native_zero_signed_roundoff_and_independent_missingness(selection, monk
     assert daily['DOWNWARD_SHORTWAVE_ENERGY_J_M2'][0].as_py() is None
     assert daily['DIRECT_SOLAR_ENERGY_J_M2'][0].as_py() is not None
     assert check_solar_radiation(result.catalog_path)['quality']['negative_hourly_energy']['fdir'] > 0
+
+
+@pytest.mark.parametrize('companions_first', [True, False])
+def test_weather_initialization_and_refresh_preserve_both_companions(
+        selection, weather_options, tmp_path, monkeypatch, companions_first):
+    from meteorology import get_weather, solar, refresh, marine_reporting
+    member, options = selection
+    monkeypatch.setattr(solar, 'load_reporting_membership', lambda _: member)
+    weather_member = marine_reporting.load_reporting_membership('study')
+    monkeypatch.setattr(refresh, 'load_reporting_membership', lambda _: weather_member)
+    output = weather_options['output_dir']
+    weather_options['rebuild'] = False
+    if not companions_first:
+        get_weather('2009-01-01', '2009-01-01', **weather_options)
+    solar.get_solar_cycle('2009-01-01', '2009-01-01', study_config=options['study_config'],
+                          output_dir=output/'solar-cycle')
+    get_solar_radiation('2009-01-01', '2009-01-01',
+                        **{**options, 'output_dir': output/'solar-radiation'})
+    before = {p: p.read_bytes() for child in ('solar-cycle', 'solar-radiation')
+              for p in (output/child).iterdir()}
+    get_weather('2009-01-01', '2009-01-01', **weather_options)
+    refresh.refresh_weather('2009-01-02', study_config='study', output_dir=output,
+                            cache_dir=tmp_path/'refresh-cache')
+    assert all(p.read_bytes() == content for p, content in before.items())
+    assert json.loads((output/'catalog.json').read_text())['end_date'] == '2009-01-02'
+    (output/'unrelated.txt').write_text('preserve')
+    with pytest.raises(ValueError, match='complete weather'):
+        refresh.refresh_weather('2009-01-03', study_config='study', output_dir=output,
+                                cache_dir=tmp_path/'refresh-cache')
+    assert (output/'unrelated.txt').read_text() == 'preserve'
+
+
+def test_radiation_noop_finishes_failed_source_cleanup(selection, monkeypatch):
+    _, options = selection
+    original = radiation._clean_cache
+    caches = []
+    def fail(cache, output):
+        caches.append(cache)
+        raise PermissionError('injected source cleanup failure')
+    monkeypatch.setattr(radiation, '_clean_cache', fail)
+    with pytest.raises(PermissionError, match='cleanup failure'):
+        get_solar_radiation('2009-01-01', '2009-01-01', **options)
+    assert (caches[0]/'objects').exists()
+    monkeypatch.setattr(radiation, '_clean_cache', original)
+    monkeypatch.setattr(radiation, 'Archive', lambda *a, **k: pytest.fail('source accessed'))
+    result = get_solar_radiation('2009-01-01', '2009-01-01', **options)
+    assert check_solar_radiation(result.catalog_path)['valid']
+    assert not (caches[0]/'objects').exists()

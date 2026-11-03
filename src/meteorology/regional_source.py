@@ -1,5 +1,6 @@
 """Bounded, checksummed local archive of ECMWF's geographic ERA5 chunks."""
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -31,9 +32,9 @@ def utcnow():
     return datetime.now(timezone.utc).isoformat()
 
 
-def fetch(name, limit):
+def fetch(name, limit, *, env_file=None):
     """Never send the credential to redirects, proxies or another origin."""
-    key = resolve_credentials(required=True).key
+    key = resolve_credentials(env_file=env_file, required=True).key
     opener = build_opener(ProxyHandler({}), HTTPSHandler(), NoRedirect())
     try:
         with opener.open(Request(URL + '/' + name,
@@ -50,7 +51,7 @@ class Archive:
     """Caller holds the cache writer lock. Metadata and completed objects are pinned."""
 
     def __init__(self, root, bbox, *, workers=4, transfer_bytes=8 * 1024**3,
-                 max_seconds=3600, fetcher=None, verbosity=False, parameter_units=None):
+                 max_seconds=3600, fetcher=None, verbosity=False, parameter_units=None, env_file=None):
         self.parameter_units = dict(UNITS if parameter_units is None else parameter_units)
         supported = dict(UNITS, ssrd='J m**-2', fdir='J m**-2')
         if not self.parameter_units or any(supported.get(p) != u
@@ -59,7 +60,7 @@ class Archive:
         self.verbosity = verbosity
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
-        self.fetcher = fetcher or fetch
+        self.fetcher = fetcher or partial(fetch, env_file=env_file)
         self.workers = workers
         self.cap = transfer_bytes
         self.max_seconds = max_seconds

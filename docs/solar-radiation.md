@@ -23,7 +23,9 @@ The default output is `Data/Meteorology/solar-radiation/`, relative to the selec
 study's Data root. `output_dir` chooses a dedicated alternative. Dates are inclusive
 UTC dates inside the approved study. Omitted start uses the study start; omitted
 end inspects the actual pinned source time coordinates and selects the latest
-complete UTC day. Weather `.env` dates, output and METRICS are not read.
+complete UTC day. These date defaults apply only when dates are not configured. Shared
+[.env settings](regional-api.md#local-run-defaults) supply dates, output root,
+bounds and mode. METRICS controls Weather only; Radiation publishes all its fields.
 
 The live 2026-11-01 inspection found source coordinates ending **2026-10-26
 23:00 UTC** for both fields. Complete daily energy is supported through October

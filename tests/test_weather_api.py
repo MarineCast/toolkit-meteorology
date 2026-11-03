@@ -17,6 +17,7 @@ from .test_coastal import FakeArchive
 
 @pytest.fixture
 def weather(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
     member = SimpleNamespace(cells=('b',), resolution=5, artifact_sha256='membership',
         mask_sha256='mask', mask_revision='revision', study_identity={'study_config': {
             'domain': {'bbox_wgs84': list(regional.DEFAULT_BBOX)},
@@ -564,13 +565,16 @@ def test_failed_run_keeps_owned_downloads(weather, monkeypatch):
 def test_append_preserves_inline_lineage_after_source_cleanup(weather):
     first = get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
     original = json.loads(first.catalog_path.read_text())
-    original['source_evidence_by_sha256']['older-epoch'] = {'objects': {'old': 'receipt'}}
+    import hashlib
+    evidence = {'metadata_sha256': 'old-metadata', 'objects': {'old': 'receipt'}}
+    key = hashlib.sha256(json.dumps(evidence, sort_keys=True).encode()).hexdigest()
+    original['source_evidence_by_sha256'][key] = evidence
     original['source_catalogs_by_sha256'] = {'old-catalog': {'vintage': 'older'}}
     first.catalog_path.write_text(json.dumps(original))
     weather['rebuild'] = False
     second = get_weather('2009-01-02', '2009-01-02', ['temperature'], **weather)
     combined = json.loads(second.catalog_path.read_text())
-    assert combined['source_evidence_by_sha256']['older-epoch'] == {'objects': {'old': 'receipt'}}
+    assert combined['source_evidence_by_sha256'][key] == evidence
     assert combined['source_catalogs_by_sha256'] == original['source_catalogs_by_sha256']
     assert combined['source_payload_retention']['payloads_retained'] is False
     assert check_weather(second.catalog_path)['valid']
@@ -632,3 +636,45 @@ def test_frontier_refresh_repairs_and_appends_idempotently(weather, monkeypatch)
         output_dir=weather['output_dir'], cache_dir=weather['cache_dir'])
     assert checksum_path(result.catalog_path) == digest
     assert check_weather(result.catalog_path)['valid']
+
+
+def test_refresh_cleans_owned_sources_and_preserves_shared_cache(weather, monkeypatch):
+    from meteorology.refresh import refresh_weather
+    get_weather('2009-01-01', '2009-01-01', **weather)
+    shared = weather['cache_dir']
+    (shared/'legacy-source').write_text('preserve caller input')
+    original = FakeArchive.__init__
+    roots = []
+    def archive(self, root, *args, **kwargs):
+        roots.append(root)
+        (root/'objects').mkdir(exist_ok=True)
+        (root/'objects/completed').write_text('download')
+        original(self, root, *args, **kwargs)
+    monkeypatch.setattr(FakeArchive, '__init__', archive)
+    monkeypatch.setattr(FakeArchive, 'fail', True)
+    options = dict(study_config='study', output_dir=weather['output_dir'], cache_dir=shared)
+    with pytest.raises(RuntimeError, match='Simulated'):
+        refresh_weather('2009-01-02', **options)
+    cache = roots[-1]
+    assert cache.parent == shared and cache.name.startswith('refresh-')
+    assert (cache/'objects/completed').exists()
+    monkeypatch.setattr(FakeArchive, 'fail', False)
+    result = refresh_weather('2009-01-02', **options)
+    assert not (cache/'objects').exists() and not (cache/'evidence').exists()
+    assert (shared/'legacy-source').read_text() == 'preserve caller input'
+    assert json.loads(result.catalog_path.read_text())['source_payload_retention']['payloads_retained'] is False
+
+
+def test_validated_noop_retries_failed_source_cleanup(weather, monkeypatch):
+    original = regional._clear_owned_cache
+    def fail(*args):
+        raise PermissionError('injected source cleanup failure')
+    monkeypatch.setattr(regional, '_clear_owned_cache', fail)
+    with pytest.raises(RuntimeError, match='product validated; source cleanup incomplete'):
+        get_weather('2009-01-01', '2009-01-01', **weather)
+    cache = regional.source_root(weather['output_dir'], weather['cache_dir'])
+    assert (cache/'evidence').exists()
+    monkeypatch.setattr(regional, '_clear_owned_cache', original)
+    monkeypatch.setattr(regional, 'Archive', lambda *a, **k: pytest.fail('source accessed'))
+    get_weather('2009-01-01', '2009-01-01', **{**weather, 'rebuild': False})
+    assert not (cache/'evidence').exists()

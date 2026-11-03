@@ -43,7 +43,9 @@ def test_file_environment_and_explicit_precedence(tmp_path, monkeypatch):
     ('DATA_DIR="unterminated', 'line'),
 ])
 def test_invalid_defaults_rejected_before_source(text, match, monkeypatch):
-    Path('.env').write_text('START_DATE=2009-01-01\nEND_DATE=2009-01-02\n'+text+'\n')
+    defaults = [line for line in ('START_DATE=2009-01-01', 'END_DATE=2009-01-02')
+                if line.split('=')[0] not in {v.split('=')[0] for v in text.splitlines()}]
+    Path('.env').write_text('\n'.join(defaults)+'\n'+text+'\n')
     monkeypatch.setattr(regional, 'Archive', lambda *a, **k: pytest.fail('source opened'))
     with pytest.raises(ValueError, match=match):
         regional.get_weather()
@@ -107,7 +109,7 @@ def complete_env():
     return path
 
 
-@pytest.mark.parametrize('key', sorted(KEYS))
+@pytest.mark.parametrize('key', ['START_DATE', 'END_DATE'])
 def test_preflight_requires_each_setting(complete_env, key):
     lines = complete_env.read_text().splitlines()
     complete_env.write_text('\n'.join(line for line in lines if not line.startswith(key+'=')))
@@ -124,7 +126,7 @@ def test_preflight_reports_all_errors_before_pipeline(complete_env, monkeypatch)
     monkeypatch.setattr(regional, 'Archive', lambda *a, **k: pytest.fail('source opened'))
     with pytest.raises(ValueError) as error:
         regional.get_weather()
-    assert all(key in str(error.value) for key in KEYS)
+    assert all(key in str(error.value) for key in ('START_DATE', 'END_DATE'))
     assert not Path('blocked/child').exists()
     assert not list(Path.cwd().glob('.meteorology-*'))
 
@@ -165,19 +167,18 @@ def test_preflight_cli_validates_without_source_or_output(complete_env, monkeypa
     assert not Path('weather').exists()
 
 
-def test_cli_get_requires_complete_settings_without_file(monkeypatch):
-    monkeypatch.setattr(regional, 'get_weather', lambda **k: pytest.fail('pipeline started'))
+def test_cli_get_uses_optional_defaults_without_file(monkeypatch, capsys):
+    monkeypatch.setattr(regional, 'get_weather', lambda **k: SimpleNamespace(catalog_path=Path('out/catalog.json')))
     monkeypatch.setattr('sys.argv', ['meteorology', 'get', '2009-01-01', '2009-01-02'])
-    with pytest.raises(ValueError) as error:
-        regional.main()
-    assert all(key in str(error.value) for key in ['DATA_DIR', 'METRICS', 'REBUILD', 'VERBOSITY'])
+    regional.main()
+    assert capsys.readouterr().out.strip() == 'out/catalog.json'
 
 
 def test_preflight_missing_file_and_explicit_overrides(complete_env):
     complete_env.unlink()
     with pytest.raises(ValueError) as error:
         preflight()
-    assert all(key in str(error.value) for key in KEYS)
+    assert all(key in str(error.value) for key in ('START_DATE', 'END_DATE'))
     result = preflight('2009-01-01', '2009-01-02', 'out', False,
                        variable_list=['temperature'], rebuild=False)
     assert result[4:] == (['temperature'], False)

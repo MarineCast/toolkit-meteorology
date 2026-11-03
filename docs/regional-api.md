@@ -20,24 +20,50 @@ Allowed families: `temperature`, `dewpoint`, `relative_humidity`, `wind`,
 `cloud_cover`, `pressure`, `precipitation`. Omit the list to use configured METRICS, or all families when unset.
 Unknown, duplicate and empty lists reject before source access. Only selected
 source parameters are fetched. Dates are inclusive UTC dates inside the approved
-study. Output is the exact registry, without an intermediate rectangle export.
+study. Output is the selected approved registry membership, without an intermediate rectangle export.
 
 ## Local run defaults
 
-Copy the repository's `.env.example` to `.env` and set `DATA_DIR`, `START_DATE`,
-`END_DATE`, `METRICS`, `VERBOSITY=True` or `False`, and `REBUILD=True` or `False`. The API and `get` CLI read `.env` in
-the current working directory only, including when installed outside the checkout.
-Use `env_file="/path/to/.env"` or `--env-file PATH` to select another file.
-No file is read and no acquisition occurs on import. Only these six run keys
-are read; values are never executed, expanded as shell expressions, or copied to
-the process environment. Quote values containing spaces. Unknown keys are ignored.
+All three producers read the current directory's `.env`, or `--env-file PATH`
+(`env_file=PATH` in Python). No parent directory is searched. Explicit arguments
+override process environment, then the file, then defaults. Values are parsed
+without shell execution or environment mutation. Quote values containing spaces.
 
-Precedence is explicit API/CLI option, process environment, then `.env`. Dates
-may be omitted individually if supplied by configuration. For file-free Python API calls,
-dates remain required, output defaults to `data/meteorology`, verbosity is false, all metrics are selected, and rebuild is false. Relative file-based `DATA_DIR` resolves beside that file; explicit and
-process-environment paths resolve from the working directory. Absolute paths work
-in all cases. Personal `.env` files are ignored and excluded from distributions;
-`.env.example` is the committed template. Study and credentials resolve separately.
+Configure `MIN_LAT`, `MAX_LAT`, `MIN_LON`, `MAX_LON`, `START_DATE`,
+`END_DATE`, `REBUILD`, `DATA_DIR`, `MARINECAST_STUDY_CONFIG` and
+`CDSAPI_KEY`; see the repository's `.env.example`. Optional `VERBOSITY`
+defaults to false and `METRICS` to all Weather families. Weather requires both
+dates. Without configured dates, Solar Cycle uses the study range; Radiation
+uses study start through actual complete source coverage.
+
+Bounds must be supplied together, finite and ordered, inside the approved study
+envelope. They select existing coastal/water H3 R5 cells whose centres are inside
+the closed rectangle; no land cells are added. Empty selections fail. Omitted
+bounds retain the full study. Subset catalogs record the rectangle and parent
+membership hash alongside selected membership hashes. External validators check
+that selection against the approved registry. Changing a saved region requires rebuild.
+
+`DATA_DIR` is the Weather root; solar products append their named subdirectories.
+Explicit `output_dir` always names the exact destination. Output paths and their
+ancestors must not be symlinks, including dangling links and companion
+subdirectories. This is checked before path resolution, study loading or writes. File-relative output
+and study paths resolve beside the file; argument/environment paths resolve from
+the working directory. Without configured output, Weather uses `data/meteorology`
+and companions use the study's Data root. Personal `.env` files are ignored and
+excluded from packages; only `.env.example` is committed.
+
+`REBUILD=false` validates and preserves existing rows and nulls, extending the
+continuous union of saved and requested dates, including intervening gaps.
+Covered requests are no-ops. Weather also backfills new metrics across saved dates.
+`REBUILD=true` replaces the selected product with the requested range after
+staged validation, preserving companions. Solar products retain the existing
+producer-code identity guard: different producer code requires explicit rebuild.
+
+Credentials resolve from process environment, selected file, then `CDSAPI_RC`
+or `~/.cdsapirc`. Prefer `CDSAPI_KEY`; legacy `COPERNICUS_API_KEY` is
+accepted. Empty tokens allow fallback. `CDSAPI_URL` must identify the supported
+official endpoint. Tokens never enter preflight output, run settings or catalogs.
+Solar Cycle needs no credentials. Importing the package performs no acquisition.
 
 ```sh
 meteorology get --cache-dir /path/to/retained-cache
@@ -49,7 +75,7 @@ get_weather()  # dates/output/verbosity/metrics/rebuild from local settings
 get_weather(env_file="/path/to/.env", verbosity=False)
 ```
 
-Verbose progress uses timestamped UTC lines on stderr. It shows the six resolved
+Verbose progress uses timestamped UTC lines on stderr. It shows the resolved nonsecret
 settings (after argument/environment/file precedence), selected settings-file path,
 mode, saved-product validation time, requested and final output ranges/metrics,
 missing-date intervals and new metric backfill. Query plans identify native fields.
@@ -78,12 +104,13 @@ A fresh source vintage may revise values; use scratch outputs for verification.
 ## Preflight
 
 `meteorology preflight` (or `meteorology preflight --env-file PATH`) validates run
-settings only and prints the six resolved values. It performs no study/credential
+settings only and prints the resolved nonsecret values. It performs no study/credential
 loading, directory creation, locking, source access, or publication. The same
 `meteorology.run_settings.preflight` function runs automatically before `get`
 starts work. Its checks cover:
 
-- All six effective settings present and nonempty for CLI/file-backed runs.
+- Required Weather dates present; optional settings use validated defaults.
+- Four bounds supplied together, finite, ordered and within WGS84 limits.
 - Valid ISO calendar dates with START_DATE <= END_DATE.
 - A nonempty, unique list of allowed metric families.
 - True/False verbosity and rebuild flags.
@@ -92,10 +119,7 @@ starts work. Its checks cover:
 
 Errors are collected into one message naming keys and line numbers, without
 printing raw values or unrelated credentials. Overrides retain the documented
-precedence. Explicit Python API calls with no `.env` retain their documented
-optional defaults, which are validated by the same function; a present/selected
-file must supply any values not explicitly provided. CLI get requires all six
-settings even without a file. The preflight is a local configuration check, not
+precedence. The preflight is a local configuration check, not
 proof of future source availability, credentials, free-space sufficiency or
 scientific quality. Study gates, existing-product validation, actual source cutoff,
 and publication-time storage checks still run at their corresponding stages.
@@ -123,6 +147,24 @@ epochs remain explicit. Failed runs retain completed inputs for manual resumptio
 Successful contained requests need no source archive. Future acquisition or a full
 rebuild may download data again and can encounter revised provider values. This
 policy preserves external study grids/masks and caller-owned sources.
+
+### Interrupted runs and cleanup failures
+
+Each new publication records a small owner marker outside its staging directory
+before writing candidates. Under the exclusive output lock, the next run resolves
+transaction journals first and then removes only staging with a matching marker.
+Unmarked legacy staging and unrelated files remain untouched; this is not an age
+sweep or authorization to clean historical caches. Source payloads from failed
+acquisition remain resumable independently of discarded output candidates.
+
+Transaction cleanup retains the commit/rollback journal until backups are removed.
+A deletion failure reports incomplete cleanup and, for a committed transaction,
+explicitly says publication committed. It does not claim a successful cleanup or
+roll back a committed product. Staging cleanup failures preserve their ownership
+marker for recovery. When work already failed, the original exception retains a
+cleanup note instead of being hidden. Validated Weather and Radiation no-op runs
+can retry source cleanup without opening the provider. Small lock/ownership files
+and empty control directories may remain outside delivery.
 
 ## Files and quantities
 
@@ -298,9 +340,12 @@ A fully covered, repaired request is a validated no-op. A repeated request at
 the same pinned partial frontier also leaves the files unchanged when the missing
 next-midnight interval remains unavailable. Failed acquisition retains
 verified cache objects for manual restart; there are no automatic retries. The
-caller-owned cache is retained even after success. Use a fresh cache to discover a
-new provider vintage. This maintenance path neither cleans old sources nor changes
-ordinary `get_weather` source-lifecycle behavior.
+`cache_dir` is now a work base with an owned `refresh-<destination-hash>` child.
+Successful final readback removes its downloaded objects, decoded arrays, mapping
+and temporary evidence. A successful coverage-only probe also removes its payloads.
+Failed acquisition keeps verified objects for resumption; a different work base
+can discover a newer provider vintage. Existing caches made by earlier refresh
+versions are caller-owned: they are neither adopted nor swept.
 
 ### Validated October 26, 2026 refresh
 
@@ -319,3 +364,34 @@ final product checks, source-boundary and daily/hourly accumulation checks, and
 an unchanged same-frontier rerun passed. See the [dated evidence](evidence/frontier-refresh-20261026.json).
 This confirms structural/source consistency, not observational accuracy, ERA5
 revision identity, historical operational availability, or forecast readiness.
+
+
+## Source lineage validation
+
+As of 2026-11-03, `check_weather` verifies the SHA256 of inline source evidence
+using the producer's sorted-key JSON serialization, and binds each epoch's metadata
+identity to that evidence. Single-vintage catalogs use their top-level hashes;
+combined catalogs must have nonempty source epochs. Every delivered hourly/daily
+metric must have exactly one epoch covering each product date, without gaps,
+overlaps, duplicate metric names or out-of-range dates. Metric backfills may overlap
+in time only when their metric scopes are disjoint. Legacy epochs without a metric
+scope apply to all delivered metrics.
+
+Endpoint repair records additionally require matching evidence, an in-range date,
+precipitation metric, next-midnight interval end and the reporting-cell count.
+They supplement the original vintage rather than erase it. Historical catalog
+byte hashes remain receipts; reserializing embedded JSON is not a substitute for
+those original bytes. The checker does not open retained-directory paths or contact
+providers. Legacy catalogs missing inline evidence are not certified by this check;
+recover their actual evidence through an explicitly scoped migration rather than
+inventing receipts. The retained merger carries inline evidence forward and checks lineage before
+promotion; source products without that evidence require explicit reconciliation.
+
+These checks run before covered-date no-ops and append acquisition, and during
+staged/final readback. They validate internal lineage consistency, not provider
+truth, historical operational availability or independent meteorological accuracy.
+
+Weather initialization and explicit refresh recognize the complete named
+`solar-cycle` and `solar-radiation` companions. Either companion may be built first;
+an otherwise absent Weather product is created in normal append mode. Unrelated
+entries, symlinked children and incomplete Weather products remain rejected.

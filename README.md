@@ -18,23 +18,30 @@ check_weather(result.catalog_path, study_config="/path/to/config/study.v1.json")
 For local run defaults, copy `.env.example` to `.env` in the repo root:
 
 ```dotenv
-DATA_DIR=../../Data/Meteorology/
+CDSAPI_KEY=
+MIN_LAT=45.9
+MAX_LAT=51.5
+MIN_LON=-129.7
+MAX_LON=-121.5
 START_DATE=2009-01-01
 END_DATE=2026-10-10
-VERBOSITY=True
-# Available: temperature, dewpoint, relative_humidity, wind, cloud_cover, pressure, precipitation
-METRICS=temperature,dewpoint,relative_humidity,wind,cloud_cover,pressure,precipitation
-REBUILD=False
+REBUILD=false
+DATA_DIR=../../Data/Meteorology
+MARINECAST_STUDY_CONFIG=../../config/study.v1.json
 ```
 
-Run `meteorology get` or `get_weather()` from that directory to use these defaults.
-Explicit arguments override process environment, which overrides `.env`. Relative
-`DATA_DIR` in the file resolves beside the file. `.env` is private and ignored;
-only `.env.example` is committed. Progress goes to stderr; use `--no-verbose` or
-`verbosity=False` to silence it. Verbose messages show resolved settings, missing
-work, cache/API events, retry policy, and query/processing/publication timings. Study configuration and provider credentials are
-still required separately. This example targets the current product directory;
-use a scratch `DATA_DIR` for experiments. Merely editing settings runs no pipeline.
+From the repo, run `meteorology preflight`, then `meteorology get`,
+`meteorology solar` or `meteorology radiation` for the desired product.
+Bounds select approved coastal/water R5 cell centres only. The example preserves
+the full approved region. All commands share dates, bounds and mode; solar products
+use their named subdirectories under DATA_DIR. Changing a saved region requires rebuild.
+Arguments override process environment, then the file. Use `--env-file PATH`
+for another file. File-relative paths resolve beside that file. The private
+`.env` is ignored and excluded from packages. Put the token in `CDSAPI_KEY`;
+an empty value allows credential-file fallback. Optional VERBOSITY defaults to
+false and METRICS to all weather families.
+See [configuration and credentials](docs/regional-api.md#local-run-defaults).
+Editing settings runs no pipeline; use a scratch destination for experiments.
 
 Allowed families: `temperature`, `dewpoint`, `relative_humidity`, `wind`,
 `cloud_cover`, `pressure`, `precipitation`. All seven yield 14 daily and 10 hourly
@@ -59,8 +66,8 @@ meteorology check scratch/weather/catalog.json --study-config /path/to/config/st
 ```
 
 Run `meteorology preflight` to check settings without creating output, loading the
-study, or accessing providers. File-backed runs and CLI `get` require all six
-settings from `.env`, environment, or explicit arguments. One preflight reports
+study, or accessing providers. Weather requires both dates; optional settings
+have validated defaults. One preflight reports
 missing/invalid settings together: dates/order, allowed unique metrics, booleans,
 and usable output path/parent permissions. It runs automatically before work.
 
@@ -91,8 +98,9 @@ check_solar_cycle(solar.catalog_path, study_config="/path/to/config/study.v1.jso
 `meteorology solar --study-config PATH` creates `Data/Meteorology/solar-cycle/`
 with its own catalog, hourly solar elevation/azimuth/light phase, and daily
 sunrise/sunset, civil/nautical/astronomical dawn/dusk and phase durations. It uses
-exact R5 cell centres and configured study dates without downloads or weather
-`.env` settings. Durations partition UTC days; sunset may precede sunrise within
+selected R5 cell centres and configured dates without downloads. Without
+configured dates it uses the study range. Append extends the continuous saved
+range, preserving retained rows; rebuild replaces the requested range. Durations partition UTC days; sunset may precede sunrise within
 one date. These are sea-level unobstructed-horizon calculations. See the
 [Solar Cycle contract](docs/solar-cycle.md) and
 [radiation/waves investigation](docs/radiation-and-waves.md).
@@ -112,3 +120,6 @@ UTC daily totals/means. Explicit `--allow-incomplete-final-day` can retain one
 missing terminal interval as null. Append preserves retained vintages and nulls;
 explicit rebuild replaces the selected range. See the
 [Solar Radiation contract](docs/solar-radiation.md).
+
+Solar Cycle and Solar Radiation retain their producer-code identity guard: saved
+products from different producer code require explicit rebuild before extension.
