@@ -483,7 +483,7 @@ def test_verbose_run_reports_safe_effective_settings_plan_and_timings(weather, m
     result = get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
     output = capsys.readouterr()
     assert output.out == ''
-    for key in ('DATA_DIR', 'START_DATE', 'END_DATE', 'VERBOSITY', 'REBUILD', 'METRICS'):
+    for key in ('OUTPUT_DIRECTORY', 'START_DATE', 'END_DATE', 'VERBOSITY', 'REBUILD', 'METRICS'):
         assert key in output.err
     for message in ('Preflight passed', 'Mode: REBUILD', 'Missing dates: 1 UTC day',
                     'Query plan: UTC 2009-01-01 through 2009-01-01; native fields t2m',
@@ -582,7 +582,7 @@ def test_append_preserves_inline_lineage_after_source_cleanup(weather):
 
 def test_staged_readback_failure_preserves_previous_product(weather, monkeypatch):
     result = get_weather('2009-01-01', '2009-01-01', ['temperature'], **weather)
-    before = {p.name: p.read_bytes() for p in result.catalog_path.parent.iterdir()}
+    before = {p.name: p.read_bytes() for p in result.catalog_path.parent.iterdir() if p.is_file()}
     real_check = regional.check_weather
 
     def check(path, **options):
@@ -594,7 +594,7 @@ def test_staged_readback_failure_preserves_previous_product(weather, monkeypatch
     weather['rebuild'] = False
     with pytest.raises(ValueError, match='staged readback failed'):
         get_weather('2009-01-02', '2009-01-02', ['temperature'], **weather)
-    assert {p.name: p.read_bytes() for p in result.catalog_path.parent.iterdir()} == before
+    assert {p.name: p.read_bytes() for p in result.catalog_path.parent.iterdir() if p.is_file()} == before
     assert (regional.source_root(result.catalog_path.parent, weather['cache_dir'])/'evidence').is_dir()
 
 def test_frontier_refresh_repairs_and_appends_idempotently(weather, monkeypatch):

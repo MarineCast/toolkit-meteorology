@@ -96,8 +96,8 @@ observation archive is downloaded or implied.
 Each UTC day is one Parquet row group; memory is bounded to one day. Code hashes,
 library versions, registry/mask identity and file checksums are retained. Staging
 space is checked before production and free space periodically thereafter.
-The existing transactional publisher stages and journals outside Data under
-`.marinecast-work/meteorology/solar-<destination-hash>`. Both files and their
+The transactional publisher stages and journals under
+`Data/Meteorology/tmp/solar-cycle-<destination-hash>`. Both files and their
 terminal catalog are validated before promotion, then read back. Weather recognizes
 this complete companion and the separate [Solar Radiation](solar-radiation.md)
 directory beside its existing three files.

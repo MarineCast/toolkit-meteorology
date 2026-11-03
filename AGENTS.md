@@ -29,7 +29,7 @@ study_config=...)` is read-only; supply the approved study to verify external
 membership. `validate_product` is a compatibility spelling for catalog checks.
 
 `run_settings.py` resolves explicit arguments > process environment > `.env` in
-CWD for DATA_DIR, START_DATE, END_DATE, VERBOSITY, METRICS, REBUILD,
+CWD for OUTPUT_DIRECTORY, START_DATE, END_DATE, VERBOSITY, METRICS, REBUILD,
 MARINECAST_STUDY_CONFIG and MIN/MAX_LAT/LON. All producers share these settings. Dates can be omitted when
 configured; file-relative output paths resolve beside that file. `env_file` /
 `--env-file` selects a file explicitly. No implicit parent search or environment
@@ -55,8 +55,8 @@ or `MARINECAST_STUDY_CONFIG`; registry/mask inputs are external, not bundled dat
 Use explicit scratch `output_dir` and a scratch `cache_dir` work base in checks.
 The supported API uses owned transient source children, removes payloads only after
 final readback, and embeds receipts/hashes in the catalog. Never sweep caller-owned
-files. Keep staging, journals and stable locks outside the delivery parent under
-`.marinecast-work/meteorology/<destination-hash>`. Failed runs retain resumable inputs.
+files. Keep staging, journals and stable locks under the Meteorology root
+in `tmp/<product>-<destination-hash>`. Never generate data in the toolkit checkout. Failed runs retain resumable inputs.
 Refresh also uses an owned source child under the supplied cache base; successful
 readback removes its payloads, preserving old caller-managed caches. Publication
 recovery cleans only owner-marked staging after resolving transactions. Never sweep

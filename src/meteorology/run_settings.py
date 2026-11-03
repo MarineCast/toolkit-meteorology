@@ -10,7 +10,7 @@ import sys
 VARIABLES = ('temperature', 'dewpoint', 'relative_humidity', 'wind',
              'cloud_cover', 'pressure', 'precipitation')
 BOUNDS = ('MIN_LON', 'MIN_LAT', 'MAX_LON', 'MAX_LAT')
-KEYS = {'DATA_DIR', 'START_DATE', 'END_DATE', 'VERBOSITY', 'METRICS', 'REBUILD',
+KEYS = {'OUTPUT_DIRECTORY', 'DATA_DIR', 'START_DATE', 'END_DATE', 'VERBOSITY', 'METRICS', 'REBUILD',
         'MARINECAST_STUDY_CONFIG', *BOUNDS}
 TOKEN_KEYS = {'CDSAPI_KEY', 'CDSAPI_URL', 'COPERNICUS_API_KEY'}
 
@@ -74,14 +74,19 @@ def resolve_run(start_date=None, end_date=None, output_dir=None, verbosity=None,
                 require_dates=True, product=None):
     """Arguments > process environment > selected .env > optional defaults.
 
-    DATA_DIR is the Meteorology root; companions append their own product name.
+    OUTPUT_DIRECTORY (legacy DATA_DIR) is the Meteorology root; companions append their own product name.
     Explicit output_dir always names the exact destination. Bounds are optional
     for compatibility, but if present must specify all four corners. Missing
     bounds select the approved study envelope. No credentials enter this record.
     """
     path, values = read_env(env_file)
-    file_keys = values.keys() - os.environ.keys()
-    values.update({key: os.environ[key] for key in KEYS if key in os.environ})
+    environment = {key: os.environ[key] for key in KEYS if key in os.environ}
+    # Normalize each layer separately, preserving environment > file precedence.
+    for layer in (values, environment):
+        if 'OUTPUT_DIRECTORY' in layer:
+            layer['DATA_DIR'] = layer['OUTPUT_DIRECTORY']
+    file_keys = values.keys() - environment.keys()
+    values.update(environment)
     explicit = dict(START_DATE=start_date, END_DATE=end_date, DATA_DIR=output_dir,
                     VERBOSITY=verbosity, METRICS=variable_list, REBUILD=rebuild,
                     MARINECAST_STUDY_CONFIG=study_config)
@@ -89,8 +94,6 @@ def resolve_run(start_date=None, end_date=None, output_dir=None, verbosity=None,
     values.setdefault('VERBOSITY', False)
     values.setdefault('METRICS', list(VARIABLES))
     values.setdefault('REBUILD', False)
-    if product is None:
-        values.setdefault('DATA_DIR', 'data/meteorology')
     errors, dates = [], {}
     for key in ('START_DATE', 'END_DATE'):
         value = values.get(key)
@@ -154,20 +157,23 @@ def resolve_run(start_date=None, end_date=None, output_dir=None, verbosity=None,
                 # Inspect the lexical path before resolve() erases symlinks.
                 target = target.absolute()
                 if any(p.is_symlink() for p in (target, *target.parents)):
-                    errors.append('DATA_DIR and its ancestors must not be symlinks.')
+                    errors.append('OUTPUT_DIRECTORY / DATA_DIR and its ancestors must not be symlinks.')
                     continue
             target = target.resolve()
             if key == 'DATA_DIR':
+                from .storage import data_path
+                target = data_path(target)
                 ancestor = target
                 while not ancestor.exists():
                     ancestor = ancestor.parent
                 if not ancestor.is_dir():
-                    errors.append('DATA_DIR or its existing ancestor must be a directory.')
+                    errors.append('OUTPUT_DIRECTORY / DATA_DIR or its existing ancestor must be a directory.')
                 elif not os.access(ancestor, os.W_OK | os.X_OK):
-                    errors.append('DATA_DIR or its existing parent must be writable and searchable.')
+                    errors.append('OUTPUT_DIRECTORY / DATA_DIR or its existing parent must be writable and searchable.')
             paths[key] = target
         except (TypeError, ValueError, OSError, RuntimeError):
-            errors.append(f'{key} must be a usable path.')
+            label = 'OUTPUT_DIRECTORY / DATA_DIR' if key == 'DATA_DIR' else key
+            errors.append(f'{label} must be a usable path.')
     if errors:
         raise ValueError('Meteorology preflight failed:\n- ' + '\n- '.join(errors))
     return RunSettings(dates['START_DATE'], dates['END_DATE'], paths['DATA_DIR'],

@@ -26,7 +26,7 @@ MAX_LON=-121.5
 START_DATE=2009-01-01
 END_DATE=2026-10-10
 REBUILD=false
-DATA_DIR=../../Data/Meteorology
+OUTPUT_DIRECTORY=../../Data/Meteorology
 MARINECAST_STUDY_CONFIG=../../config/study.v1.json
 ```
 
@@ -34,7 +34,7 @@ From the repo, run `meteorology preflight`, then `meteorology get`,
 `meteorology solar` or `meteorology radiation` for the desired product.
 Bounds select approved coastal/water R5 cell centres only. The example preserves
 the full approved region. All commands share dates, bounds and mode; solar products
-use their named subdirectories under DATA_DIR. Changing a saved region requires rebuild.
+use their named subdirectories under OUTPUT_DIRECTORY. Changing a saved region requires rebuild.
 Arguments override process environment, then the file. Use `--env-file PATH`
 for another file. File-relative paths resolve beside that file. The private
 `.env` is ignored and excluded from packages. Put the token in `CDSAPI_KEY`;
@@ -46,11 +46,12 @@ Editing settings runs no pipeline; use a scratch destination for experiments.
 Allowed families: `temperature`, `dewpoint`, `relative_humidity`, `wind`,
 `cloud_cover`, `pressure`, `precipitation`. All seven yield 14 daily and 10 hourly
 fields. The current approved registry has 463 cells. Dates are inclusive UTC days.
-The fast ECMWF geographic chunk archive is staged temporarily outside the delivery parent.
+The fast ECMWF geographic chunk archive is staged temporarily in `Data/Meteorology/tmp/`.
 After final-product readback, owned downloads/arrays are removed; source hashes and
 receipts remain in the catalog. Failed runs retain completed objects for resumption.
-Small persistent locks and journals live under `.marinecast-work/meteorology` beside
-the delivery parent. An explicit `cache_dir` is a work base with an owned child;
+Small persistent locks and recovery records remain under `tmp/` after payload cleanup.
+Without OUTPUT_DIRECTORY, the approved study Data root is used. Data destinations inside
+the toolkit checkout are rejected; the old working area is not migrated automatically. An explicit `cache_dir` is a work base with an owned child;
 existing shared files there are preserved. With `REBUILD=False`
 (the default), runs validate existing files, preserve their dates and acquire
 missing dates and new metrics; a request with all dates/metrics already covered

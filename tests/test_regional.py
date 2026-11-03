@@ -60,7 +60,7 @@ def fake(monkeypatch):
 def test_wide_outputs_and_end_hour_precipitation(tmp_path, fake):
     result = regional.get_data('2009-01-01', '2009-01-01', output_dir=tmp_path / 'public')
     assert {p.name for p in result.catalog_path.parent.iterdir()} == {
-        'meteorology-hourly.parquet', 'meteorology-daily.parquet', 'catalog.json'}
+        'meteorology-hourly.parquet', 'meteorology-daily.parquet', 'catalog.json', 'tmp'}
     hourly = pq.read_table(result.hourly_path)
     daily = pq.read_table(result.daily_path)
     assert hourly.schema.field('DATETIME').type == pa.timestamp('us', tz='UTC')

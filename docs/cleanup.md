@@ -351,3 +351,21 @@ Validation: 233 offline tests passed from source and the installed wheel on Pyth
 3.12.13; lint, strict docs, packaging, dependencies and whitespace checks passed.
 All nine delivered file hashes remained unchanged. No live acquisition or
 production rebuild was run.
+
+
+## Product-local temporary storage — 2026-11-03
+
+User-authorized temporary downloads and processing candidates now default to
+`Data/Meteorology/tmp/`, with separate per-product control directories.
+Weather recognizes this directory beside the unchanged final files and companions.
+Successful readback removes owned payloads and candidates; small locks and recovery
+records remain. Failed sources remain resumable, and unrelated tmp files are preserved.
+The study Data root replaces the checkout-relative Weather fallback; checkout-local
+output and cache paths are rejected. Old work areas are preserved without migration.
+
+Validation: 238 offline tests passed from source and the installed wheel on Python
+3.12.13, including per-product tmp placement, successful cleanup, user-file
+preservation, study-root fallback and checkout/symlink rejection. Lint, strict docs,
+build/package and dependency checks passed. All nine delivered file hashes and
+the private .env were unchanged. No live acquisition, production rebuild, migration
+of old working data or other-Python CI run was performed for this layout change.

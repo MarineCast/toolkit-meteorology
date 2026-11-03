@@ -57,7 +57,7 @@ def test_missing_file_dates_and_default_output(tmp_path):
     with pytest.raises(ValueError, match='env_file'):
         resolve(env_file=tmp_path/'absent')
     assert resolve('2009-01-01', '2009-01-02') == (
-        '2009-01-01', '2009-01-02', tmp_path/'data/meteorology', False, list(VARIABLES), False)
+        '2009-01-01', '2009-01-02', None, False, list(VARIABLES), False)
 
 
 @pytest.mark.parametrize('args,verbose', [([], None), (['--verbose'], True), (['--no-verbose'], False)])
@@ -183,3 +183,23 @@ def test_preflight_missing_file_and_explicit_overrides(complete_env):
                        variable_list=['temperature'], rebuild=False)
     assert result[4:] == (['temperature'], False)
     assert not Path('out').exists()
+
+
+def test_output_directory_alias_precedence_and_relative_paths(tmp_path, monkeypatch):
+    from meteorology.run_settings import resolve_run
+    folder = tmp_path/'settings'
+    folder.mkdir()
+    env = folder/'.env'
+    env.write_text('OUTPUT_DIRECTORY=products\nDATA_DIR=legacy\n')
+    def settings(**kwargs):
+        return resolve_run(env_file=env, require_dates=False, **kwargs)
+    assert settings().output_dir == folder/'products'
+    assert settings(product='solar-cycle').output_dir == folder/'products/solar-cycle'
+    monkeypatch.setenv('DATA_DIR', 'environment-legacy')
+    assert settings().output_dir == tmp_path/'environment-legacy'
+    monkeypatch.setenv('OUTPUT_DIRECTORY', 'environment-new')
+    assert settings().output_dir == tmp_path/'environment-new'
+    assert settings(output_dir=tmp_path/'explicit').output_dir == tmp_path/'explicit'
+    monkeypatch.setenv('OUTPUT_DIRECTORY', '')
+    with pytest.raises(ValueError, match='OUTPUT_DIRECTORY'):
+        settings()

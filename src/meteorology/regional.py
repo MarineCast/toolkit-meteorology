@@ -19,6 +19,7 @@ from .compute import BASE, WIND, day_frames, mapping, series
 from .core.artifacts import TransactionalFamilyPublisher
 from .regional_source import Archive, URL, utcnow
 from .run_settings import VARIABLES, log
+from .storage import data_path, temporary_root, is_temporary_directory
 from .marine_reporting import select_reporting_membership, selection_metadata
 
 DEFAULT_BBOX = (-129.7, 45.9, -121.5, 51.5)
@@ -28,16 +29,14 @@ ALLOWED_VARIABLES = VARIABLES
 
 
 def work_root(output):
-    """Keep persistent lock inodes and transient staging outside the delivery parent."""
-    output = Path(output).expanduser().resolve()
-    identity = hashlib.sha256(str(output).encode()).hexdigest()[:16]
-    return output.parent.parent / '.marinecast-work' / 'meteorology' / identity
+    """Keep staging, sources and stable lock inodes under the product's tmp/."""
+    return temporary_root(output)
 
 
 def source_root(output, cache_dir=None):
     # An explicit cache_dir is a work base, never a shared cache to sweep.
     control = work_root(output)
-    return (Path(cache_dir).expanduser().resolve() / ('weather-' + control.name)
+    return (data_path(cache_dir) / control.name
             if cache_dir is not None else control / 'downloads')
 
 
@@ -258,7 +257,7 @@ def _align_backfill(table, added, names):
     return table
 
 
-def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteorology',
+def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir=None,
              cache_dir=None, workers=4, transfer_bytes=8 * 1024**3, max_seconds=3600,
              allow_incomplete_final_day=False,
              variable_list=None, membership=None, verbosity=False, existing=None, publisher=None,
@@ -277,14 +276,17 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                     for f, specs in selected.items()}
     parameters = sorted({p for specs in selected.values() for spec in specs.values()
                          for p in spec['parameters']})
-    output = Path(output_dir).expanduser().resolve()
+    if output_dir is None:
+        raise ValueError('Internal exporter requires an explicit output_dir.')
+    output = data_path(output_dir)
     control = work_root(output)
     owned_cache = cache_dir is None or _discard_cache
     if owned_cache and cache_dir is not None and Path(cache_dir).is_symlink():
         raise ValueError('Refusing symlinked source workspace.')
-    cache = (Path(cache_dir).expanduser().resolve() if cache_dir is not None
+    cache = (data_path(cache_dir) if cache_dir is not None
              else source_root(output))
-    if output == cache or output in cache.parents or cache in output.parents:
+    cache = data_path(cache)
+    if output == cache or cache in output.parents or (output in cache.parents and not cache.is_relative_to(control)):
         raise ValueError('Output and private cache must be separate directories.')
     # Separate control namespace keeps weather to three files, while
     # all writers to this output share one recoverable publication journal.
@@ -292,7 +294,7 @@ def get_data(start_date, end_date, *, bbox=DEFAULT_BBOX, output_dir='data/meteor
                             output / 'meteorology-daily.parquet', output / 'catalog.json')
     expected = {p.name for p in (result.hourly_path, result.daily_path, result.catalog_path)}
     from .companions import is_meteorology_companion
-    if output.exists() and any(p.name not in expected and not is_meteorology_companion(p)
+    if output.exists() and any(p.name not in expected and not is_meteorology_companion(p) and not is_temporary_directory(p)
                                for p in output.iterdir()):
         raise ValueError('Choose a dedicated output directory; unrelated files are preserved.')
     started = time.perf_counter()
@@ -581,7 +583,7 @@ def get_weather(start_date=None, end_date=None, variable_list=None, *, study_con
     variables = allowed_variables(ALLOWED_VARIABLES if variable_list is None else variable_list)
     settings_file = Path(env_file).expanduser().resolve() if env_file is not None else Path.cwd()/'.env'
     log(verbosity, 'Preflight passed. Resolved settings (arguments > environment > .env):')
-    for key, value in dict(DATA_DIR=str(output_dir), START_DATE=start_date, END_DATE=end_date,
+    for key, value in dict(OUTPUT_DIRECTORY=str(output_dir), START_DATE=start_date, END_DATE=end_date,
                           METRICS=variables, VERBOSITY=verbosity, REBUILD=rebuild).items():
         log(verbosity, f'  {key} = {json.dumps(value)}')
     log(verbosity, 'Settings file: ' + json.dumps(str(settings_file) if settings_file.is_file() else None))
@@ -595,7 +597,7 @@ def get_weather(start_date=None, end_date=None, variable_list=None, *, study_con
                               workers, transfer_bytes, max_seconds)
     if str(first) < study['time']['start'] or str(last) >= study['time']['end_exclusive']:
         raise ValueError('Dates must lie inside the approved study interval.')
-    output = Path(output_dir).resolve()
+    output = data_path(output_dir if output_dir is not None else Path(member.study_identity['resolved_data_root'])/'Meteorology')
     control = work_root(output)
     existing = None
     # Pin recovery, inspection and publication together so two API writers cannot
@@ -609,7 +611,7 @@ def get_weather(start_date=None, end_date=None, variable_list=None, *, study_con
                 raise ValueError('Weather output files must not be symlinks.')
             expected = {'catalog.json', 'meteorology-hourly.parquet', 'meteorology-daily.parquet'}
             from .companions import is_meteorology_companion
-            found = {p.name for p in output.iterdir() if not is_meteorology_companion(p)}
+            found = {p.name for p in output.iterdir() if not is_meteorology_companion(p) and not is_temporary_directory(p)}
             if found - expected:
                 raise ValueError('Output contains unrelated files; choose a dedicated weather directory.')
             if not rebuild and found:
@@ -828,7 +830,7 @@ def main():
         from .run_settings import resolve_run
         settings = resolve_run(**options)
         print(json.dumps(dict(START_DATE=settings.start_date, END_DATE=settings.end_date,
-            DATA_DIR=str(settings.output_dir), REBUILD=settings.rebuild, METRICS=settings.metrics,
+            OUTPUT_DIRECTORY=str(settings.output_dir) if settings.output_dir is not None else None, REBUILD=settings.rebuild, METRICS=settings.metrics,
             VERBOSITY=settings.verbosity, BBOX=settings.bbox,
             MARINECAST_STUDY_CONFIG=str(settings.study_config) if settings.study_config else None), indent=2))
     elif command == 'check':

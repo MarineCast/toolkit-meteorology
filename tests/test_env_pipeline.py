@@ -32,7 +32,7 @@ def configured(tmp_path, monkeypatch):
     env = tmp_path/'.env'
     def configure(start='2009-01-02', end='2009-01-02', rebuild=False, subset=True):
         env.write_text(f'START_DATE={start}\nEND_DATE={end}\nREBUILD={str(rebuild).lower()}\n'
-                       f'DATA_DIR={tmp_path}/output\nMARINECAST_STUDY_CONFIG={study}\n'
+                       f'OUTPUT_DIRECTORY={tmp_path}/output\nMARINECAST_STUDY_CONFIG={study}\n'
                        'CDSAPI_KEY=TEST_TOKEN_DO_NOT_LOG\n'
                        + ('MIN_LAT=48.5\nMAX_LAT=49.5\nMIN_LON=-125.5\nMAX_LON=-124.5\n'
                           if subset else 'MIN_LAT=45.9\nMAX_LAT=51.5\nMIN_LON=-129.7\nMAX_LON=-121.5\n'))
@@ -97,7 +97,7 @@ def test_shared_configuration_paths_precedence_and_redaction(tmp_path, monkeypat
     folder.mkdir()
     env = folder/'.env'
     env.write_text('START_DATE=2009-01-01\nEND_DATE=2009-01-02\nREBUILD=false\n'
-                   'DATA_DIR=products\nMARINECAST_STUDY_CONFIG=study.json\nCDSAPI_KEY=SECRET_SENTINEL\n'
+                   'OUTPUT_DIRECTORY=products\nMARINECAST_STUDY_CONFIG=study.json\nCDSAPI_KEY=SECRET_SENTINEL\n'
                    'MIN_LAT=48\nMAX_LAT=50\nMIN_LON=-126\nMAX_LON=-124\n')
     settings = resolve_run(env_file=env, product='solar-cycle')
     assert settings.output_dir == folder/'products/solar-cycle'
@@ -144,7 +144,7 @@ def test_output_symlinks_fail_before_study_or_writes(tmp_path, monkeypatch, get,
     options = {'env_file': env}
     if source == 'file':
         with env.open('a') as handle:
-            handle.write(f'DATA_DIR={output}\n')
+            handle.write(f'OUTPUT_DIRECTORY={output}\n')
     elif source == 'environment':
         monkeypatch.setenv('DATA_DIR', str(output))
     else:
@@ -168,6 +168,52 @@ def test_configured_companion_destination_symlink_is_rejected(tmp_path, product)
     target.mkdir()
     (root/product).symlink_to(target, target_is_directory=True)
     env = tmp_path/'.env'
-    env.write_text(f'DATA_DIR={root}\n')
+    env.write_text(f'OUTPUT_DIRECTORY={root}\n')
     with pytest.raises(ValueError, match='must not be symlinks'):
         resolve_run(env_file=env, product=product, require_dates=False)
+
+
+@pytest.mark.parametrize('get,product', [(get_weather, 'weather'),
+    (get_solar_cycle, 'solar-cycle'), (get_solar_radiation, 'solar-radiation')])
+def test_product_local_tmp_and_successful_payload_cleanup(configured, get, product):
+    from meteorology.storage import temporary_root
+    _, env, _ = configured
+    result = get(env_file=env)
+    output = result.catalog_path.parent
+    control = temporary_root(output, product)
+    root = output if product == 'weather' else output.parent
+    assert control.parent == root/'tmp' and control.is_dir()
+    assert not list((control/'.staging').glob('*'))
+    assert not list((control/'.transactions').glob('*'))
+    for name in ('objects', 'arrays', 'evidence', 'mapping'):
+        assert not (control/'downloads'/name).exists()
+    # Unrelated temporary files are neither product rows nor cleanup targets.
+    sentinel = root/'tmp'/'user-file'
+    sentinel.write_bytes(b'preserve')
+    get(env_file=env)
+    assert sentinel.read_bytes() == b'preserve'
+
+
+def test_weather_without_data_dir_uses_study_data_root(configured):
+    member, env, _ = configured
+    env.write_text('\n'.join(line for line in env.read_text().splitlines()
+                             if not line.startswith('OUTPUT_DIRECTORY='))+'\n')
+    result = get_weather(env_file=env)
+    from pathlib import Path
+    assert result.catalog_path.parent == Path(member.study_identity['resolved_data_root'])/'Meteorology'
+
+
+def test_storage_rejects_checkout_data_and_symlinked_tmp(tmp_path):
+    from meteorology import storage
+    repo = tmp_path/'toolkit'
+    (repo/'src/meteorology').mkdir(parents=True)
+    (repo/'pyproject.toml').write_text('')
+    with pytest.raises(ValueError, match='outside the toolkit'):
+        storage.data_path(repo/'data')
+    assert not (repo/'data').exists()
+    output = tmp_path/'Meteorology'
+    output.mkdir()
+    (output/'tmp').symlink_to(tmp_path/'missing', target_is_directory=True)
+    with pytest.raises(ValueError, match='symlinks'):
+        storage.temporary_root(output)
+    assert not (tmp_path/'missing').exists()

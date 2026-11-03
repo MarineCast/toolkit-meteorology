@@ -26,6 +26,7 @@ from .core.artifacts import TransactionalFamilyPublisher, atomic_write_json
 from .marine_reporting import load_reporting_membership, select_reporting_membership, selection_metadata
 from .regional_source import Archive, URL, utcnow
 from .run_settings import log, resolve_run
+from .storage import data_path, temporary_root
 
 PRODUCT = 'solar-radiation'
 METHOD = 'ecmwf-arco-horizontal-radiation-h3-utc-v1'
@@ -207,15 +208,15 @@ def get_solar_radiation(start_date=None, end_date=None, *, study_config=None,
     raw_output = Path(output_dir).expanduser().absolute() if output_dir is not None else data_root/'Meteorology'/PRODUCT
     if any(p.is_symlink() for p in (raw_output, *raw_output.parents)):
         raise ValueError('Radiation output ancestors must not be symlinks.')
-    output = raw_output.resolve()
+    output = data_path(raw_output)
     _directory(output)
     token = hashlib.sha256(str(output).encode()).hexdigest()[:16]
-    control = data_root.parent/'.marinecast-work'/'meteorology'/('radiation-'+token)
+    control = temporary_root(output, PRODUCT)
     cache = (Path(cache_dir).expanduser().absolute()/('radiation-'+token)
              if cache_dir is not None else control/'downloads')
     if cache.is_symlink() or output == cache.resolve() or output in cache.resolve().parents or cache.resolve() in output.parents:
         raise ValueError('Radiation source cache and output must be separate.')
-    cache = cache.resolve()
+    cache = data_path(cache)
     if output.is_relative_to(control) or control.is_relative_to(output):
         raise ValueError('Radiation delivery and control directories must be separate.')
     result = RadiationResult(output/'solar-radiation-hourly.parquet',

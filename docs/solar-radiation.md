@@ -99,8 +99,8 @@ replaces the selected range. This is not an automatic revision/repair mechanism.
 Changed producer/source/reduction code also requires explicit rebuild; unknown
 files, damaged products and ownership mismatches fail closed.
 
-Staging, source payloads, locks and journals are outside Data under
-`.marinecast-work/meteorology/radiation-<destination-hash>`. An optional `cache_dir`
+Staging, source payloads, locks and journals are under
+`Data/Meteorology/tmp/solar-radiation-<destination-hash>`. An optional `cache_dir`
 is a work base with an owned destination-specific child; unowned files are not
 adopted or swept. Disk preflight, object/array limits and periodic headroom checks
 bound growth. Successful full final readback removes owned compressed objects,

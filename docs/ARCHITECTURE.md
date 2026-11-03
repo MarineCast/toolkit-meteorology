@@ -24,9 +24,10 @@ modeling, former astronomy or visualization module is needed. The runtime depend
 are h3, numpy, pandas, pyarrow, numcodecs and PyYAML. Source data and generated
 products are outside the installable distribution. Source receipts and hashes are embedded in the catalog; successful runs discard
 owned compressed objects and arrays after readback. Failed runs retain resumable
-sources outside delivery; source-vintage orchestration remains explicit.
+sources under `tmp/`; source-vintage orchestration remains explicit.
 `regional.work_root` places locks, journals and staging under
-`output.parent.parent/.marinecast-work/meteorology/<destination-hash>`.
+`output/tmp/weather-<destination-hash>`. Companion workflows use
+`output.parent/tmp/<product>-<destination-hash>`, sharing the Meteorology root.
 An explicit `cache_dir` supplies a work base with an owned child, preserving other
 files. Stable lock inodes remain; successful bulky intermediates do not.
 

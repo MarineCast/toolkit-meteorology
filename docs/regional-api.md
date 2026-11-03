@@ -26,11 +26,13 @@ study. Output is the selected approved registry membership, without an intermedi
 
 All three producers read the current directory's `.env`, or `--env-file PATH`
 (`env_file=PATH` in Python). No parent directory is searched. Explicit arguments
-override process environment, then the file, then defaults. Values are parsed
+override process environment, then the file, then defaults. The legacy `DATA_DIR`
+name remains supported. Within one source, `OUTPUT_DIRECTORY` wins when both
+are set; environment values still override file values regardless of spelling. Values are parsed
 without shell execution or environment mutation. Quote values containing spaces.
 
 Configure `MIN_LAT`, `MAX_LAT`, `MIN_LON`, `MAX_LON`, `START_DATE`,
-`END_DATE`, `REBUILD`, `DATA_DIR`, `MARINECAST_STUDY_CONFIG` and
+`END_DATE`, `REBUILD`, `OUTPUT_DIRECTORY`, `MARINECAST_STUDY_CONFIG` and
 `CDSAPI_KEY`; see the repository's `.env.example`. Optional `VERBOSITY`
 defaults to false and `METRICS` to all Weather families. Weather requires both
 dates. Without configured dates, Solar Cycle uses the study range; Radiation
@@ -43,13 +45,13 @@ bounds retain the full study. Subset catalogs record the rectangle and parent
 membership hash alongside selected membership hashes. External validators check
 that selection against the approved registry. Changing a saved region requires rebuild.
 
-`DATA_DIR` is the Weather root; solar products append their named subdirectories.
+`OUTPUT_DIRECTORY` is the Weather root; solar products append their named subdirectories.
 Explicit `output_dir` always names the exact destination. Output paths and their
 ancestors must not be symlinks, including dangling links and companion
 subdirectories. This is checked before path resolution, study loading or writes. File-relative output
 and study paths resolve beside the file; argument/environment paths resolve from
-the working directory. Without configured output, Weather uses `data/meteorology`
-and companions use the study's Data root. Personal `.env` files are ignored and
+the working directory. Without configured output, all three producers use the study's Data root
+under `Meteorology/`. The toolkit checkout is never a data destination. Personal `.env` files are ignored and
 excluded from packages; only `.env.example` is committed.
 
 `REBUILD=false` validates and preserves existing rows and nulls, extending the
@@ -114,7 +116,7 @@ starts work. Its checks cover:
 - Valid ISO calendar dates with START_DATE <= END_DATE.
 - A nonempty, unique list of allowed metric families.
 - True/False verbosity and rebuild flags.
-- A usable DATA_DIR, with an existing directory ancestor that is writable/searchable.
+- A usable OUTPUT_DIRECTORY, with an existing directory ancestor that is writable/searchable.
 - Readable UTF-8 settings, well-formed assignments and no repeated known keys.
 
 Errors are collected into one message naming keys and line numbers, without
@@ -131,10 +133,17 @@ meteorology preflight
 
 ## Source and working-data lifecycle
 
-The supported `get_weather` API stores staging/journals and a stable lock outside
-the delivery parent, under
-`output_dir.parent.parent/.marinecast-work/meteorology/<destination-hash>`.
-With the default output `Data/Meteorology`, this is beside `Data`, not inside it.
+The supported `get_weather` API stores downloads, processing candidates, journals
+and stable locks in `output_dir/tmp/weather-<destination-hash>`.
+Solar companions use `output_dir.parent/tmp/<product>-<destination-hash>`.
+Thus configured production runs share `Data/Meteorology/tmp/`.
+The toolkit checkout rejects data destinations. The `tmp/` directory is created
+on demand; no empty directory needs to be committed. Existing work in the former
+`.marinecast-work/meteorology` location is not moved or deleted automatically.
+Finish or recover an older interrupted run with its original version before
+switching storage layouts; do not run old and new versions against one destination.
+Normal successful runs remove owned payloads and staging, retaining only small
+lock, ownership and recovery records. Unrelated files under `tmp/` are preserved.
 Default downloads use an owned child of this work area. An explicit `cache_dir`
 selects a work base with a destination-specific owned child, never permission to
 clear unrelated files. The lower-level compatibility `get_data` preserves an
@@ -164,7 +173,7 @@ roll back a committed product. Staging cleanup failures preserve their ownership
 marker for recovery. When work already failed, the original exception retains a
 cleanup note instead of being hidden. Validated Weather and Radiation no-op runs
 can retry source cleanup without opening the provider. Small lock/ownership files
-and empty control directories may remain outside delivery.
+and empty control directories may remain under `tmp/`.
 
 ## Files and quantities
 
@@ -175,7 +184,7 @@ and empty control directories may remain outside delivery.
 The separate [Solar Cycle](solar-cycle.md) has its own child directory and catalog.
 Weather accepts the recognized complete `solar-cycle/` and
 [Solar Radiation](solar-radiation.md) `solar-radiation/` companions alongside its
-three files; other unrelated entries still reject. Neither adds Weather families.
+three files and the regular `tmp/` directory; other unrelated entries still reject. Neither adds Weather families.
 
 All families yield 10 hourly and 14 daily metric columns. The returned result holds
 hourly_path, daily_path and catalog_path. Unrelated output-directory files cause
@@ -262,13 +271,13 @@ Credentials resolve from CDSAPI_KEY, CDSAPI_RC or ~/.cdsapirc. Tokens go only to
 fixed official HTTPS endpoint; redirects and proxy forwarding are disabled.
 A complete retained-cache replay requires no token or provider request.
 
-Without run settings: output_dir="data/meteorology", sibling private .meteorology-cache,
+Without run settings: output_dir=study Data root / "Meteorology", private tmp workspace,
 workers=4 (allowed 1–4), transfer_bytes=8 GiB, max_seconds=3600 (up to 86400).
 The Python API accepts these keyword options. Objects/arrays are checksummed;
 metadata pins one source vintage. Rerun a failed call to reuse completed objects.
 No automatic transient retry or eviction policy is implemented. A fresh cache
 intentionally discovers a newer vintage, which can revise historical values.
-Source/output paths must be separate. Publication is recoverable across its three
+Source payloads must remain separate from final product files. Publication is recoverable across its three
 files; readers should verify catalog hashes and retry during replacement.
 
 Dates beyond cached source support fail. Default rainfall needs next midnight.

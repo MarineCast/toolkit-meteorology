@@ -7,7 +7,6 @@ integrate threshold crossings over the UTC day, including light at midnight.
 from contextlib import ExitStack
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
-import hashlib
 import json
 from pathlib import Path
 import platform
@@ -24,6 +23,7 @@ from .artifacts import checksum_path
 from .core.artifacts import TransactionalFamilyPublisher, atomic_write_json
 from .marine_reporting import load_reporting_membership, select_reporting_membership, selection_metadata
 from .run_settings import log, resolve_run
+from .storage import data_path, temporary_root
 
 METHOD = 'noaa-meeus-geometric-utc-solar-v1'
 PRODUCT = 'solar-cycle'
@@ -242,10 +242,9 @@ def get_solar_cycle(start_date=None, end_date=None, *, study_config=None, output
     raw_output = Path(output_dir).expanduser().absolute() if output_dir is not None else data_root/'Meteorology'/PRODUCT
     if any(p.is_symlink() for p in (raw_output, *raw_output.parents)):
         raise ValueError('Solar output ancestors must not be symlinks.')
-    output = raw_output.resolve()
+    output = data_path(raw_output)
     _directory(output)
-    identity = hashlib.sha256(str(output).encode()).hexdigest()[:16]
-    control = data_root.parent/'.marinecast-work'/'meteorology'/('solar-' + identity)
+    control = temporary_root(output, PRODUCT)
     if control.is_relative_to(output) or output.is_relative_to(control):
         raise ValueError('Solar delivery and working directories must be separate.')
     result = SolarResult(output/'solar-cycle-hourly.parquet', output/'solar-cycle-daily.parquet', output/'catalog.json')
