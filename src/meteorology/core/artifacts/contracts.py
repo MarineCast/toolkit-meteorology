@@ -29,21 +29,3 @@ def atomic_write_json(
         Path(temporary).unlink(missing_ok=True)
         raise
     return destination
-
-
-def atomic_write_text(
-    path: str | Path, text: str, *, overwrite: bool = False, encoding: str = "utf-8"
-) -> Path:
-    destination = Path(path)
-    if destination.exists() and not overwrite:
-        raise FileExistsError(f"Artifact already exists: {destination}")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(prefix=f".{destination.name}.", dir=destination.parent)
-    try:
-        with os.fdopen(fd, "w", encoding=encoding) as handle:
-            handle.write(text)
-        os.replace(temporary, destination)
-    except Exception:
-        Path(temporary).unlink(missing_ok=True)
-        raise
-    return destination

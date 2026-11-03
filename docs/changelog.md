@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased — Solar Radiation (2026-11-01)
+
+Add separate `get_solar_radiation` / `check_solar_radiation` and `radiation` /
+`radiation-check` commands. Preserve source SSRD/FDIR horizontal energy, derive
+hourly/full-day mean irradiance with explicit interval-end support, and validate
+every reduction. Discover the actual frontier, retain source epochs on append,
+and preserve missingness, existing Weather and Solar Cycle. See the
+[contract](solar-radiation.md) for opt-in partial endpoints, cache ownership,
+recoverable publication and successful-source cleanup.
+
+## Unreleased — Solar Cycle (2026-11-01)
+
+Add independent `get_solar_cycle` / `check_solar_cycle` and `solar` / `solar-check`
+commands. The separate coastal R5 product contains hourly geometric solar angles
+and daily UTC sunrise, sunset, twilight events and exclusive phase durations.
+Preserve split-midnight durations, absent-crossing nulls and existing weather files.
+No additional runtime dependency or network acquisition is required. See the
+[contract and current verification](solar-cycle.md) and
+[radiation/waves investigation](radiation-and-waves.md).
+
 ## Unreleased — verbose run diagnostics
 
 Show timestamped resolved settings and output/query plans, missing dates/metrics,

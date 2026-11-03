@@ -1,0 +1,219 @@
+{
+  "catalog": "/Users/tylerstevenson/Documents/Code_Repos/MarineCast/Data/Meteorology/catalog.json",
+  "start_date": "2009-01-01",
+  "end_date": "2026-10-20",
+  "latest_complete_all_metric_day": "2026-10-19",
+  "products": {
+    "daily": {
+      "bytes": 188169981,
+      "rows": 3010426,
+      "sha256": "3a026d1163d5bda4056b84cb2a9a490435f5dab7d4485e512c465b7b4a479bf1",
+      "value_status_counts": {
+        "DEWPOINT_2M_C_MEAN": {
+          "COMPLETE": 3010426
+        },
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN": {
+          "COMPLETE": 3010426
+        },
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MIN": {
+          "COMPLETE": 3010426
+        },
+        "PRECIPITATION_MM": {
+          "COMPLETE": 3009963,
+          "PARTIAL": 463
+        },
+        "RELATIVE_HUMIDITY_2M_PCT_MEAN": {
+          "COMPLETE": 3001663,
+          "OUTSIDE_SUPPORTED_RH_DOMAIN": 8763
+        },
+        "TEMPERATURE_2M_C_MAX": {
+          "COMPLETE": 3010426
+        },
+        "TEMPERATURE_2M_C_MEAN": {
+          "COMPLETE": 3010426
+        },
+        "TEMPERATURE_2M_C_MIN": {
+          "COMPLETE": 3010426
+        },
+        "TOTAL_CLOUD_COVER_PCT_MEAN": {
+          "COMPLETE": 3010426
+        },
+        "U_WIND_10M_MS_MEAN": {
+          "COMPLETE": 3010426
+        },
+        "V_WIND_10M_MS_MEAN": {
+          "COMPLETE": 3010426
+        },
+        "WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR": {
+          "COMPLETE": 3010426
+        },
+        "WIND_SPEED_10M_MS_MAX": {
+          "COMPLETE": 3010426
+        },
+        "WIND_SPEED_10M_MS_MEAN": {
+          "COMPLETE": 3010426
+        }
+      }
+    },
+    "hourly": {
+      "bytes": 2631571533,
+      "rows": 72250224,
+      "sha256": "3ce967b95a6789675f109bdc8899aa45ce8e05723241df16dffa2398aa91782a",
+      "value_status_counts": {
+        "DEWPOINT_2M_C": {
+          "COMPLETE": 72250224
+        },
+        "MEAN_SEA_LEVEL_PRESSURE_HPA": {
+          "COMPLETE": 72250224
+        },
+        "PRECIPITATION_MM": {
+          "COMPLETE": 72249761,
+          "UNAVAILABLE": 463
+        },
+        "RELATIVE_HUMIDITY_2M_PCT": {
+          "COMPLETE": 72240070,
+          "OUTSIDE_SUPPORTED_RH_DOMAIN": 10154
+        },
+        "TEMPERATURE_2M_C": {
+          "COMPLETE": 72250224
+        },
+        "TOTAL_CLOUD_COVER_PCT": {
+          "COMPLETE": 72250224
+        },
+        "U_WIND_10M_MS": {
+          "COMPLETE": 72250224
+        },
+        "V_WIND_10M_MS": {
+          "COMPLETE": 72250224
+        },
+        "WIND_DIRECTION_10M_DEG_FROM": {
+          "COMPLETE": 72250224
+        },
+        "WIND_SPEED_10M_MS": {
+          "COMPLETE": 72250224
+        }
+      }
+    }
+  },
+  "acquisition": {
+    "requests": 441,
+    "response_bytes": 269095962
+  },
+  "endpoint_repairs": [
+    {
+      "cells": 463,
+      "date": "2026-10-10",
+      "evidence_sha256": "05e3a2efaed3366f36e1777f00e6681a26732e5409249e4dbba935c921c15c32",
+      "interval_end_utc": "2026-10-11T00:00:00Z",
+      "metadata_sha256": "108d519568b070d442864b744b76f7969ed3b88a6cdcdf7ec9de775ad3267c7e",
+      "metric": "PRECIPITATION_MM",
+      "policy": "fill missing final hourly interval only; sum retained 23 hours plus new interval",
+      "source_coverage_end": "2026-10-20T23:00:00",
+      "supersedes_catalog_sha256": "f9bfc8a900943439518907502532eef3b55f68c6894b2195a6308ca7ad0e6048"
+    }
+  ],
+  "partial_metric_coverage": [
+    {
+      "date": "2026-10-20",
+      "expected_hours": 24,
+      "metric": "PRECIPITATION_MM",
+      "missing_interval_end_utc": "2026-10-21T00:00:00Z",
+      "valid_hours": 23,
+      "value_status": "PARTIAL"
+    }
+  ],
+  "live_repair_boundary_matches_source_exactly": true,
+  "validation_acquisition_requests": 0,
+  "day_checks": [
+    {
+      "date": "2026-10-10",
+      "daily_precipitation_nulls": 0,
+      "hourly_precipitation_nulls": 0,
+      "sum_of_hourly_matches_daily": true
+    },
+    {
+      "date": "2026-10-11",
+      "daily_precipitation_nulls": 0,
+      "hourly_precipitation_nulls": 0,
+      "sum_of_hourly_matches_daily": true
+    },
+    {
+      "date": "2026-10-12",
+      "daily_precipitation_nulls": 0,
+      "hourly_precipitation_nulls": 0,
+      "sum_of_hourly_matches_daily": true
+    },
+    {
+      "date": "2026-10-13",
+      "daily_precipitation_nulls": 0,
+      "hourly_precipitation_nulls": 0,
+      "sum_of_hourly_matches_daily": true
+    },
+    {
+      "date": "2026-10-14",
+      "daily_precipitation_nulls": 0,
+      "hourly_precipitation_nulls": 0,
+      "sum_of_hourly_matches_daily": true
+    },
+    {
+      "date": "2026-10-15",
+      "daily_precipitation_nulls": 0,
+      "hourly_precipitation_nulls": 0,
+      "sum_of_hourly_matches_daily": true
+    },
+    {
+      "date": "2026-10-16",
+      "daily_precipitation_nulls": 0,
+      "hourly_precipitation_nulls": 0,
+      "sum_of_hourly_matches_daily": true
+    },
+    {
+      "date": "2026-10-17",
+      "daily_precipitation_nulls": 0,
+      "hourly_precipitation_nulls": 0,
+      "sum_of_hourly_matches_daily": true
+    },
+    {
+      "date": "2026-10-18",
+      "daily_precipitation_nulls": 0,
+      "hourly_precipitation_nulls": 0,
+      "sum_of_hourly_matches_daily": true
+    },
+    {
+      "date": "2026-10-19",
+      "daily_precipitation_nulls": 0,
+      "hourly_precipitation_nulls": 0,
+      "sum_of_hourly_matches_daily": true
+    },
+    {
+      "date": "2026-10-20",
+      "daily_precipitation_nulls": 463,
+      "hourly_precipitation_nulls": 463,
+      "sum_of_hourly_matches_daily": true
+    }
+  ],
+  "before_publication": "check_weather staged plus exact comparison of every retained row, except authorized repaired nulls",
+  "after_publication": "check_weather full product and approved membership",
+  "limitation": "Structural/source-consistency validation, not independent observational accuracy or forecast qualification",
+  "idempotence": {
+    "same_frontier_rerun": "validated no-op; partial remains truthful",
+    "catalog_sha256": "a3aa9b6c26307fb5e4077c2d43dc6aea17bbbf6c4fe483073ede0a7176235cd0",
+    "all_product_sizes_and_mtimes_unchanged": true,
+    "elapsed_seconds": 75.17985475000751
+  },
+  "validation_date_utc": "2026-10-26",
+  "offline_checks": {
+    "source_tests_passed": 143,
+    "installed_wheel_tests_passed": 143,
+    "ruff": "passed",
+    "docs": "strict passed",
+    "build": "passed",
+    "twine": "passed",
+    "pip_check": "passed",
+    "cli_smoke": "passed",
+    "git_diff_check": "passed"
+  },
+  "downloaded_bytes_including_coordinates_and_metadata": 269353914,
+  "retained_source_cache": "/Users/tylerstevenson/Documents/Code_Repos/MarineCast/.marinecast-work/meteorology/frontier-20261026",
+  "retained_source_cache_approx_mib": 669
+}

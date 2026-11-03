@@ -264,3 +264,90 @@ Application/Modeling Python source search found no direct imports of the removed
 toolkit interfaces; this is not exhaustive external-client qualification. Private
 ad hoc scripts using removed getters require migration. The original two-epoch
 source caches and offline merger are retained.
+
+
+## Correctness and unused helpers — 2026-11-03
+
+Weather now validates inline evidence and metric-scoped epoch coverage, accepts
+initialization after named companions, and permits those companions during explicit
+refresh. See the [API contract](regional-api.md#source-lineage-validation).
+
+Removed helpers had no callers in the repository: `atomic_write_text`,
+`PublishedArtifact`/`staged_artifact`, `read_locks`, `recover_tree` and its
+unused `recover` wrapper, `stage_parquet`,
+`write_manifest`, `reject_study_selection`, and the native-output branch of
+`compute.mapping`. The now-unused name-bound checksum module was removed too.
+Transactional locking, staged manifests, rollback/recovery, the retained coastal
+merger, endpoint repair and hourly/daily parity coverage remain. No runtime
+dependency was added. Workspace application/modeling searches found no imports of
+these Meteorology helpers; unknown external callers are not certified.
+
+Source cleanup changes the `compute.py` hash recorded by Solar Radiation. Its
+existing strict code-identity rule therefore requires explicit rebuild for future
+production against a catalog made with the earlier source; read-only validation
+remains available. No radiation rebuild or delivered-data migration is part of
+this change.
+
+Validation on Python 3.12.13: 188 offline tests passed in the source checkout and
+against the installed wheel outside the checkout; focused publication and merger
+checks also passed after final cleanup. Ruff, strict MkDocs, wheel/sdist builds,
+Twine, installed CLI/resources, dependency checks and whitespace checks passed.
+All nine delivered Meteorology file SHA256 hashes match the pre-change baseline.
+The delivered Weather catalog passed the new lineage check without opening source
+archives. No live acquisition, full delivered-value scan, historical reconstruction,
+other Python version or application integration was run.
+
+
+## Intermediate cleanup and readability — 2026-11-03
+
+New runs mark staging ownership before creating candidates. Recovery resolves
+transactions first, then removes only matching marked staging. Unmarked legacy
+staging and caller files are preserved. Deletion failures retain recovery evidence
+and report whether publication committed; an existing work error keeps a cleanup
+note. Backups are removed before their journal, so interrupted cleanup is retryable.
+
+Refresh now downloads into an owned child of the supplied cache base and removes
+its payloads after successful readback. Failed acquisition retains resumable objects.
+Validated Weather and Radiation no-ops retry leftover source cleanup without
+acquisition. Old caller-managed refresh caches are not migrated or deleted.
+Query planning, cache claiming, metadata and backfill alignment now have named
+Weather helpers. Metric schemas, UTC keys, units, values and append semantics are
+unchanged: narrower requests do not silently discard retained metrics.
+
+Validation: 196 tests passed from source and the installed wheel outside the
+checkout on Python 3.12.13, including actual subprocess termination, cleanup
+failure injection, ownership mismatch, recovery, and refresh source lifecycle.
+Ruff, strict docs, wheel/sdist builds, Twine, installed CLI/resources, dependency
+and whitespace checks passed. All nine delivered file SHA256 hashes remain equal
+to the pre-change baseline. No live acquisition, full historical rebuild, full
+value scan, other Python version or application integration was run.
+
+
+## Shared configuration and run modes — 2026-11-03
+
+All three producers now use repository-local configuration with approved
+coastal/water-only rectangle selection. Solar Cycle supports append as well as
+rebuild. See the [configuration contract](regional-api.md#local-run-defaults)
+for precedence, credentials, selection and replacement behavior.
+
+204 offline tests passed from source and the installed wheel on Python 3.12.13,
+including subset validation, covered no-ops, retained-row append, region-change
+rejection, rebuild and credential redaction. Ruff, strict MkDocs, package build,
+Twine and dependency checks passed. All nine delivered file hashes were unchanged;
+the configured default selection still has 463 cells. No live acquisition, full
+regional rebuild, other Python version or application integration was run.
+Producer-code rebuild guards for existing solar products remain in force.
+
+
+## Output symlink protection — 2026-11-03
+
+Shared settings now reject output and ancestor symlinks before resolving paths,
+including configured companion subdirectories and dangling links. Regression
+tests cover all three producers through file, environment and explicit argument
+configuration, with rejection before study access and no changes to target files.
+This closes the path-resolution bypass identified in the final configuration review.
+
+Validation: 233 offline tests passed from source and the installed wheel on Python
+3.12.13; lint, strict docs, packaging, dependencies and whitespace checks passed.
+All nine delivered file hashes remained unchanged. No live acquisition or
+production rebuild was run.

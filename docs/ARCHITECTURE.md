@@ -1,6 +1,6 @@
 # Architecture
 
-The supported path is:
+The weather path is:
 
 ```text
 Run defaults/explicit options + approved registry/mask + UTC dates + allowed families
@@ -12,13 +12,15 @@ Run defaults/explicit options + approved registry/mask + UTC dates + allowed fam
 
 The three production modules are regional.py, regional_source.py and compute.py.
 Credentials, study identity and registry validation are small separate helpers.
-The core/artifacts package retains transactional publication and recovery; its
-name-bound transaction checksums intentionally differ from raw public file SHA256.
+The core/artifacts package retains transactional publication and recovery.
+Public files and source receipts use raw SHA256 via `artifacts.py`.
+`lineage.py` validates inline source evidence and date partitions per metric
+before Weather accepts an existing product or publishes staged files.
 `coastal.py` is retained to reproduce the original multi-epoch publication from
 existing products. It performs no acquisition and is not the primary path.
 
 The package imports no sibling or application code. No HRRR, GRIB/CDS planner,
-modeling, astronomy or visualization module is needed. The runtime dependencies
+modeling, former astronomy or visualization module is needed. The runtime dependencies
 are h3, numpy, pandas, pyarrow, numcodecs and PyYAML. Source data and generated
 products are outside the installable distribution. Source receipts and hashes are embedded in the catalog; successful runs discard
 owned compressed objects and arrays after readback. Failed runs retain resumable
@@ -28,7 +30,7 @@ sources outside delivery; source-vintage orchestration remains explicit.
 An explicit `cache_dir` supplies a work base with an owned child, preserving other
 files. Stable lock inodes remain; successful bulky intermediates do not.
 
-`run_settings.preflight` validates the six local/environment settings together,
+`run_settings.preflight` validates shared local/environment settings together,
 without mutating the process environment or creating directories. `regional.get_weather` owns the output publication lock while
 recovering, inspecting and validating prior files. Append plans the union range;
 `get_data` reads retained day row groups and acquires uncovered dates plus newly
@@ -37,3 +39,26 @@ keys, stages
 the combined product, and records separate metric-scoped source epochs. Rebuild discards no
 prior files until replacement is ready. Empty targets use the same producer in
 either mode; complete contained append requests need no source archive.
+
+The distinct Solar Cycle path is approved registry + dates → `solar.py` vectorized
+NOAA/Meeus positions and UTC threshold integration → hourly/daily Parquets and a
+separate catalog under `Meteorology/solar-cycle`. It reuses transactional publication
+and external registry checks, with no ERA5, network, credential or extra runtime
+stack. See [Solar Cycle](solar-cycle.md). Solar changes do not restore the former
+astronomy interface or imply wave acquisition.
+
+The separate Solar Radiation path is approved registry + dates → selected native
+`ssrd`/`fdir` contract in `regional_source.Archive` → `radiation.py` complete UTC
+reductions → separate hourly/daily files/catalog in `Meteorology/solar-radiation`.
+It reuses the source transport and recoverable publisher, with independent source
+epochs, ownership, validation and successful-cache cleanup. `companions.py` lets
+Weather recognize exactly the two named companions. See [Solar Radiation](solar-radiation.md).
+
+
+Weather's exporter uses focused helpers for query planning, owned-cache claiming,
+metadata construction and key-aligned backfill. The day loop retains streaming
+writes and the same scientific reducers. No new orchestration framework is added.
+Publication ownership markers bind interrupted staging to its control namespace;
+recovery resolves transactions before deleting marked candidates. Refresh uses an
+owned transient source child, with successful readback and cleanup matching the
+normal Weather lifecycle. See [working-data lifecycle](regional-api.md#source-and-working-data-lifecycle).

@@ -1,5 +1,5 @@
 """Verify exact approved coastal registry membership and mask witnesses."""
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import hashlib
 from pathlib import Path
 import h3
@@ -17,6 +17,8 @@ class ReportingMembership:
     canonical_membership_sha256: str
     mask_sha256: str
     mask_revision: str
+    selection_bbox_wgs84: tuple[float, ...] | None = None
+    parent_membership_sha256: str | None = None
 
 
 def _parse_membership_ids(raw: bytes) -> tuple[str, ...]:
@@ -135,3 +137,30 @@ def load_reporting_membership(
         mask_hash,
         registry["mask_revision"],
     )
+
+
+def select_reporting_membership(member, bbox):
+    """Select approved coastal cells by centre, never manufacture a water mask."""
+    if bbox is None:
+        return member
+    w, s, e, n = bbox
+    approved = member.study_identity['study_config']['domain']['bbox_wgs84']
+    if list(bbox) == list(approved):
+        return member
+    if not (approved[0] <= w < e <= approved[2] and approved[1] <= s < n <= approved[3]):
+        raise ValueError('Collection bounds must lie within the approved coastal registry envelope.')
+    cells = tuple(c for c in member.cells if s <= h3.cell_to_latlng(c)[0] <= n
+                  and w <= h3.cell_to_latlng(c)[1] <= e)
+    if not cells:
+        raise ValueError('Collection bounds select no approved coastal H3 cells.')
+    digest = hashlib.sha256(('\n'.join(cells)+'\n').encode()).hexdigest()
+    return replace(member, cells=cells, artifact_sha256=digest,
+                   canonical_membership_sha256=digest, selection_bbox_wgs84=tuple(bbox),
+                   parent_membership_sha256=member.artifact_sha256)
+
+
+def selection_metadata(member):
+    bbox = getattr(member, 'selection_bbox_wgs84', None)
+    return (dict(selection_bbox_wgs84=list(bbox),
+                 parent_membership_sha256=member.parent_membership_sha256)
+            if bbox is not None else {})

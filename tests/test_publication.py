@@ -85,3 +85,94 @@ def test_atomic_product_publisher_recovers_interrupted_transaction(tmp_path: Pat
         pass
     assert destination.read_text() == "canonical-before-crash"
     assert not transaction.exists()
+
+
+def test_abrupt_exit_reclaims_only_marked_staging(tmp_path):
+    import subprocess
+    import sys
+    control = tmp_path/'control'
+    unowned = control/'.staging/legacy'
+    unowned.mkdir(parents=True)
+    (unowned/'keep').write_text('user file')
+    script = '''
+import os,sys
+from pathlib import Path
+from meteorology.core.artifacts import TransactionalFamilyPublisher
+root=Path(sys.argv[1])
+with TransactionalFamilyPublisher(root/'control') as publisher:
+    publisher.stage_path(root/'out/data').write_text('intermediate')
+    os._exit(17)
+'''
+    result = subprocess.run([sys.executable, '-c', script, str(tmp_path)])
+    assert result.returncode == 17
+    markers = list((control/'.staging').glob('*.owner.json'))
+    assert len(markers) == 1
+    candidate = markers[0].with_name(markers[0].name.removesuffix('.owner.json'))
+    assert candidate.is_dir()
+    with TransactionalFamilyPublisher(control) as publisher:
+        assert not markers[0].exists() and not candidate.exists()
+        publisher.stage_path(tmp_path/'out/data').write_text('final')
+        publisher.publish()
+    assert (tmp_path/'out/data').read_text() == 'final'
+    assert (unowned/'keep').read_text() == 'user file'
+    assert list((control/'.staging').iterdir()) == [unowned]
+
+
+@pytest.mark.parametrize('target', ['staging', 'backups'])
+def test_cleanup_failure_reports_commit_and_recovers(tmp_path, monkeypatch, target):
+    from meteorology.core.artifacts import publication
+    output = tmp_path/'out/data'
+    output.parent.mkdir()
+    output.write_text('old')
+    original = publication.shutil.rmtree
+    def fail(path, *args, **kwargs):
+        path = Path(path)
+        if (target == 'staging' and path.parent.name == '.staging') or path.name == target:
+            raise PermissionError('injected deletion failure')
+        return original(path, *args, **kwargs)
+    monkeypatch.setattr(publication.shutil, 'rmtree', fail)
+    with pytest.raises(RuntimeError, match='committed; .*cleanup incomplete'):
+        with TransactionalFamilyPublisher(tmp_path/'control') as publisher:
+            publisher.stage_path(output).write_text('new')
+            publisher.publish()
+    assert output.read_text() == 'new'
+    if target == 'backups':
+        assert json.loads(publisher.journal.read_text())['phase'] == 'committed'
+    assert publisher.staging_owner.exists()
+    monkeypatch.setattr(publication.shutil, 'rmtree', original)
+    with TransactionalFamilyPublisher(tmp_path/'control'):
+        assert not publisher.transaction.exists()
+        assert not publisher.staging.exists()
+    assert output.read_text() == 'new'
+
+
+def test_staging_cleanup_does_not_hide_original_failure(tmp_path, monkeypatch):
+    from meteorology.core.artifacts import publication
+    original = publication.shutil.rmtree
+    def fail(path, *args, **kwargs):
+        if Path(path).parent.name == '.staging':
+            raise PermissionError('injected deletion failure')
+        return original(path, *args, **kwargs)
+    monkeypatch.setattr(publication.shutil, 'rmtree', fail)
+    with pytest.raises(ValueError, match='original failure') as error:
+        with TransactionalFamilyPublisher(tmp_path/'control') as publisher:
+            publisher.stage_path(tmp_path/'data').write_text('candidate')
+            raise ValueError('original failure')
+    assert any('staging cleanup incomplete' in note for note in error.value.__notes__)
+    assert publisher.staging_owner.exists()
+
+
+def test_mismatched_staging_owner_is_preserved(tmp_path):
+    control = tmp_path/'control'
+    token = 'a'*32
+    candidate = control/'.staging'/token
+    candidate.mkdir(parents=True)
+    (candidate/'keep').write_text('preserve')
+    marker = candidate.with_suffix('.owner.json')
+    marker.write_text(json.dumps(dict(owner='meteorology-publication-staging-v1',
+                                      control=str(tmp_path/'different'), token=token)))
+    with pytest.raises(RuntimeError, match='ownership mismatch'):
+        with TransactionalFamilyPublisher(control):
+            pass
+    assert (candidate/'keep').read_text() == 'preserve'
+    assert marker.exists()

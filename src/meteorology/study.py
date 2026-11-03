@@ -238,12 +238,3 @@ def validate_study_identity(identity):
     for name in ("raw_file_sha256", "schema_sha256"):
         if not re.fullmatch("[0-9a-f]{64}", identity.get(name, "")):
             raise ValueError(f"embedded shared study {name} is invalid")
-
-
-def reject_study_selection(command):
-    """Input-bound utilities cannot apply a selected study; fail before any I/O."""
-    identity = load_study_config(planning=True)
-    if identity is not None:
-        raise ValueError(
-            f"{command} does not support study selection; use pinned input manifests without a selector"
-        )

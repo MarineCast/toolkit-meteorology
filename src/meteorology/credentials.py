@@ -31,45 +31,36 @@ class Credential:
 
 
 def resolve_credentials(*, env_file=None, inspect_only=False, required=False):
-    """Explicit alias file > CDSAPI_KEY/URL > CDSAPI_RC or ~/.cdsapirc.
+    """Process environment > selected .env > CDSAPI_RC / ~/.cdsapirc.
 
-    Planning reports mechanism/presence without opening secret files. Execution
-    resolves that same mechanism; only the official CDS endpoint is supported.
+    Tokens are never printed or injected into the process environment.
     """
+    from .run_settings import read_env, TOKEN_KEYS
+
     rc = Path(os.environ.get("CDSAPI_RC", str(Path.home() / ".cdsapirc"))).expanduser()
-    key = os.environ.get("CDSAPI_KEY")
-    endpoint = os.environ.get("CDSAPI_URL", API).rstrip("/")
-    if env_file is not None:
-        rc = Path(env_file).expanduser()
-        mechanism = "explicit_alias_file"
-        key = None
-        if not inspect_only:
-            try:
-                entries = [
-                    line.split("=", 1)[1].strip().strip("\"'")
-                    for line in rc.read_text().splitlines()
-                    if line.strip().startswith("COPERNICUS_API_KEY=")
-                ]
-            except OSError:
-                raise ValueError(
-                    "Cannot read explicit ERA5 credential file; path/details redacted."
-                ) from None
-            if len(entries) != 1:
-                raise ValueError("Exactly one COPERNICUS_API_KEY alias required.")
-            key = entries[0]
-    elif key:
-        mechanism = "CDSAPI_KEY"
-    else:
-        mechanism = "CDSAPI_RC" if "CDSAPI_RC" in os.environ else "default_cdsapirc"
+    selected_file = Path(env_file).expanduser() if env_file is not None else Path.cwd()/'.env'
+    key = os.environ.get('CDSAPI_KEY')
+    endpoint = os.environ.get('CDSAPI_URL', API).rstrip('/')
+    mechanism = 'CDSAPI_KEY' if key else 'absent'
+    if inspect_only and selected_file.is_file():
+        if endpoint != API:
+            raise ValueError('Only the official HTTPS CDS API endpoint is supported; address redacted.')
+        return Credential(key, endpoint, 'env_file', True)
+    _, values = read_env(env_file, keys=TOKEN_KEYS)
+    if not key:
+        key = values.get('CDSAPI_KEY') or values.get('COPERNICUS_API_KEY')
+        if key:
+            mechanism = 'env_file'
+    endpoint = os.environ.get('CDSAPI_URL', values.get('CDSAPI_URL') or API).rstrip('/')
+    if not key:
+        mechanism = 'CDSAPI_RC' if 'CDSAPI_RC' in os.environ else 'default_cdsapirc'
         if rc.is_file() and not inspect_only:
             try:
                 value = yaml.safe_load(rc.read_text())
-                key = value.get("key")
-                endpoint = os.environ.get("CDSAPI_URL", value.get("url", API)).rstrip("/")
+                key = value.get('key')
+                endpoint = os.environ.get('CDSAPI_URL', values.get('CDSAPI_URL') or value.get('url', API)).rstrip('/')
             except Exception:
-                raise ValueError(
-                    "Malformed ERA5 credential configuration; details redacted."
-                ) from None
+                raise ValueError('Malformed ERA5 credential configuration; details redacted.') from None
     if endpoint != API:
         raise ValueError("Only the official HTTPS CDS API endpoint is supported; address redacted.")
     if key is not None and (
@@ -80,4 +71,4 @@ def resolve_credentials(*, env_file=None, inspect_only=False, required=False):
         raise ValueError(
             "Configure CDSAPI_KEY or CDSAPI_RC / ~/.cdsapirc and accept ERA5 terms manually."
         )
-    return Credential(key, endpoint, mechanism, rc.is_file())
+    return Credential(key, endpoint, mechanism, selected_file.is_file() or rc.is_file())

@@ -1,0 +1,309 @@
+{
+  "review_date": "2026-10-29",
+  "installed_module": "/tmp/meteorology-review-20261029/installed/meteorology/__init__.py",
+  "elapsed_seconds": 0.546503167017363,
+  "acquisition": {
+    "requests": 0,
+    "response_bytes": 0
+  },
+  "days": [
+    "2026-10-19",
+    "2026-10-20"
+  ],
+  "comparison": {
+    "daily": {
+      "rows": 926,
+      "cells": 463,
+      "exact_key_value_null_parity": true,
+      "nulls": {
+        "H3_INDEX": 0,
+        "DATE": 0,
+        "TEMPERATURE_2M_C_MEAN": 0,
+        "TEMPERATURE_2M_C_MIN": 0,
+        "TEMPERATURE_2M_C_MAX": 0,
+        "DEWPOINT_2M_C_MEAN": 0,
+        "RELATIVE_HUMIDITY_2M_PCT_MEAN": 7,
+        "U_WIND_10M_MS_MEAN": 0,
+        "V_WIND_10M_MS_MEAN": 0,
+        "WIND_SPEED_10M_MS_MEAN": 0,
+        "WIND_SPEED_10M_MS_MAX": 0,
+        "WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR": 0,
+        "TOTAL_CLOUD_COVER_PCT_MEAN": 0,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN": 0,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MIN": 0,
+        "PRECIPITATION_MM": 463
+      },
+      "statistics": {
+        "TEMPERATURE_2M_C_MEAN": {
+          "min": 1.0320106506347884,
+          "max": 13.137398020426454,
+          "mean": 9.814076214509553
+        },
+        "TEMPERATURE_2M_C_MIN": {
+          "min": -4.543920898437477,
+          "max": 12.598962402343773,
+          "mean": 7.675163773275113
+        },
+        "TEMPERATURE_2M_C_MAX": {
+          "min": 7.144097900390648,
+          "max": 18.900354003906273,
+          "mean": 12.884427914712157
+        },
+        "DEWPOINT_2M_C_MEAN": {
+          "min": -2.9153719584146907,
+          "max": 10.140138244628929,
+          "mean": 6.905567295796779
+        },
+        "RELATIVE_HUMIDITY_2M_PCT_MEAN": {
+          "min": 66.75858090520386,
+          "max": 95.04772193937437,
+          "mean": 82.85420230094276
+        },
+        "U_WIND_10M_MS_MEAN": {
+          "min": -3.1486288706461587,
+          "max": 3.7169717152913413,
+          "mean": -0.07509645856139124
+        },
+        "V_WIND_10M_MS_MEAN": {
+          "min": -7.246618270874023,
+          "max": 0.8049360911051432,
+          "mean": -1.423973021016351
+        },
+        "WIND_SPEED_10M_MS_MEAN": {
+          "min": 0.5339194295353711,
+          "max": 7.411317572567152,
+          "mean": 2.346403613293451
+        },
+        "WIND_SPEED_10M_MS_MAX": {
+          "min": 0.8952036256993419,
+          "max": 9.816037580806624,
+          "mean": 3.598450595526806
+        },
+        "WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR": {
+          "min": 0.2739878216280642,
+          "max": 359.5616917048873,
+          "mean": 155.87395264182254
+        },
+        "TOTAL_CLOUD_COVER_PCT_MEAN": {
+          "min": 0.011952718098958334,
+          "max": 98.67604573567708,
+          "mean": 52.72317547176793
+        },
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN": {
+          "min": 1014.3118229166668,
+          "max": 1021.9604687500001,
+          "mean": 1017.3171607271418
+        },
+        "MEAN_SEA_LEVEL_PRESSURE_HPA_MIN": {
+          "min": 1012.943125,
+          "max": 1019.92625,
+          "mean": 1015.2548940334773
+        },
+        "PRECIPITATION_MM": {
+          "min": 0.0,
+          "max": 4.1790008544921875,
+          "mean": 0.5140520841462566
+        }
+      }
+    },
+    "hourly": {
+      "rows": 22224,
+      "cells": 463,
+      "exact_key_value_null_parity": true,
+      "nulls": {
+        "H3_INDEX": 0,
+        "DATETIME": 0,
+        "TEMPERATURE_2M_C": 0,
+        "DEWPOINT_2M_C": 0,
+        "RELATIVE_HUMIDITY_2M_PCT": 7,
+        "U_WIND_10M_MS": 0,
+        "V_WIND_10M_MS": 0,
+        "WIND_SPEED_10M_MS": 0,
+        "WIND_DIRECTION_10M_DEG_FROM": 0,
+        "TOTAL_CLOUD_COVER_PCT": 0,
+        "MEAN_SEA_LEVEL_PRESSURE_HPA": 0,
+        "PRECIPITATION_MM": 463
+      },
+      "statistics": {
+        "TEMPERATURE_2M_C": {
+          "min": -4.543920898437477,
+          "max": 18.900354003906273,
+          "mean": 9.814076214509551
+        },
+        "DEWPOINT_2M_C": {
+          "min": -6.131842041015602,
+          "max": 10.876245117187523,
+          "mean": 6.9055672957967795
+        },
+        "RELATIVE_HUMIDITY_2M_PCT": {
+          "min": 39.59852341075959,
+          "max": 100.0071691231677,
+          "mean": 82.89508790641227
+        },
+        "U_WIND_10M_MS": {
+          "min": -5.2862701416015625,
+          "max": 4.709014892578125,
+          "mean": -0.07509645856139126
+        },
+        "V_WIND_10M_MS": {
+          "min": -9.627197265625,
+          "max": 6.712066650390625,
+          "mean": -1.4239730210163508
+        },
+        "WIND_SPEED_10M_MS": {
+          "min": 0.0007370168869466139,
+          "max": 9.816037580806624,
+          "mean": 2.346403613293451
+        },
+        "WIND_DIRECTION_10M_DEG_FROM": {
+          "min": 0.04763602691566676,
+          "max": 359.9725055944051,
+          "mean": 179.9555698167957
+        },
+        "TOTAL_CLOUD_COVER_PCT": {
+          "min": 0.0,
+          "max": 100.0,
+          "mean": 52.723175471767924
+        },
+        "MEAN_SEA_LEVEL_PRESSURE_HPA": {
+          "min": 1012.943125,
+          "max": 1024.45,
+          "mean": 1017.3171607271419
+        },
+        "PRECIPITATION_MM": {
+          "min": 0.0,
+          "max": 0.7004737854003906,
+          "mean": 0.010993308559957823
+        }
+      }
+    }
+  },
+  "limitations": [
+    "Two-day recent-vintage replay, not full historical reconstruction",
+    "No live acquisition; transfer cap 1 byte forces missing source requests to fail"
+  ],
+  "git_head": "bd40b908406f4ed194ce35077706409fdb45794c",
+  "working_tree_had_preexisting_changes": true,
+  "python": "3.12.13 | packaged by conda-forge | (main, Mar  5 2026, 17:06:14) [Clang 19.1.7 ]",
+  "platform": "macOS-27.0.1-arm64-arm-64bit",
+  "dependencies": {
+    "numpy": "2.3.5",
+    "pandas": "3.0.3",
+    "pyarrow": "23.0.1",
+    "h3": "4.4.2",
+    "numcodecs": "0.17.0",
+    "PyYAML": "6.0.3",
+    "matplotlib": "3.10.8"
+  },
+  "source_sha256": {
+    "src/meteorology/__init__.py": "c4a26d1fe17395639356b9e7be4057957b3483548534d5af2530847833a2a593",
+    "src/meteorology/__main__.py": "f38fd2f2c920c29c828645e87ed64743d567aaaef7fba7a15d2c7d7f8094f91f",
+    "src/meteorology/_version.py": "f9516ae2fae8cc3460305c1b87284ff3b95e5fdc1b4d51c171a71042ba2ba9ed",
+    "src/meteorology/artifacts.py": "8ef969e9cd685ef92617bec6cacd4185b82be3aa9a11e4592d77e5fc8e05e381",
+    "src/meteorology/cli.py": "07a89ee7e11c4a34441bbc1415bb961676b26d3a870eafe99c149baa99a47c3b",
+    "src/meteorology/coastal.py": "6084c99d305c7888f484e0ebd92b553167488023262aab74a8b0605e694d9e88",
+    "src/meteorology/compute.py": "932e5c9e8857cd201f92008762087c4d65ca017ef0621f62da5729011d3d7250",
+    "src/meteorology/core/__init__.py": "1c9370866759d03230252599f6fa9b8fda366be592960bb913c2b89e52a1b6f4",
+    "src/meteorology/core/artifacts/__init__.py": "44df4709f812b6f6a91d446b14d488aedbce1968dd3aa5aebd192f1d1086a36e",
+    "src/meteorology/core/artifacts/checksums.py": "07323b1a86dd54af727ffd914dd6420347ad4fa8663b35e505ceef1bae5d2935",
+    "src/meteorology/core/artifacts/contracts.py": "0ca4237e73467363d434aee327bb5e5b2aff2561ec318bdd71de588c346f7491",
+    "src/meteorology/core/artifacts/publication.py": "feed6ae9fe3f1bc0bc7832b7f30bbde2b0e576045c227b23cb93a1f090a4a16e",
+    "src/meteorology/credentials.py": "b0cccea60269ba371f257d0eb183ddb5c07565aae2cdd5fb2c5d27b858e9c609",
+    "src/meteorology/endpoint_repair.py": "deb48a47df9c68164a2a084036eb903c1fbad5a3cd3c47d06c68484b57924407",
+    "src/meteorology/marine_reporting.py": "e631fae9e621ec45f7db9f8f3e2b06fb9810c974cd5269a502e705bbc183038f",
+    "src/meteorology/refresh.py": "ebb91d428610c55cf4e7225ac56eb3e9564237f8524e58e3020ed28e21c077e3",
+    "src/meteorology/regional.py": "a68e7fbe9b9f97703cca00784adf9fe64a98db7c047b234195ecaf822a3a00df",
+    "src/meteorology/regional_source.py": "b8260e51a4c8e981b3ac3f9285d71a36e07306246c3f24fe87613a9e42cabe06",
+    "src/meteorology/run_settings.py": "b586f0f72c566c0b91e4cddf7f8133fb87f7f885eecb5d22e91ab4f3275f56a6",
+    "src/meteorology/study.py": "279866935d43da816ab49c22f30f038999ab432223e58ace94293583cf454caa"
+  },
+  "catalog_sha256": "a3aa9b6c26307fb5e4077c2d43dc6aea17bbbf6c4fe483073ede0a7176235cd0",
+  "delivered_products": {
+    "daily": {
+      "rows": 3010426,
+      "bytes": 188169981,
+      "sha256": "3a026d1163d5bda4056b84cb2a9a490435f5dab7d4485e512c465b7b4a479bf1"
+    },
+    "hourly": {
+      "rows": 72250224,
+      "bytes": 2631571533,
+      "sha256": "3ce967b95a6789675f109bdc8899aa45ce8e05723241df16dffa2398aa91782a"
+    }
+  },
+  "checks": {
+    "source_tests": "143 passed",
+    "installed_wheel_tests": "143 passed",
+    "ruff": "passed",
+    "build": "wheel and sdist passed",
+    "twine": "passed",
+    "pip_check": "passed",
+    "installed_cli_full_product_check": "passed",
+    "cli_help": "passed",
+    "strict_docs": "passed",
+    "git_diff_check": "passed",
+    "saved_replay_example": "passed, independent new scratch destination, zero requests"
+  },
+  "maps": {
+    "rendered_and_inspected": true,
+    "daily_layers": 14,
+    "extra_partial_day": true
+  },
+  "staging_manifest": {
+    "owner": "Meteorology reproducibility review 2026-10-29",
+    "path": "/tmp/meteorology-review-20261029",
+    "purpose": "wheel, installed package, two-day replay, bounded logs and map drafts",
+    "expected_size": "under 100 MiB after owned source clone cleaned by successful API; peak logical clone 669 MiB",
+    "source_cache": "MarineCast/.marinecast-work/meteorology/frontier-20261026 (preserved)",
+    "delivery": "MarineCast/Data/Meteorology (read-only)",
+    "cleanup_status": "API removed owned scratch source clone; review artifacts retained for handoff; no user source deletion",
+    "additional_path": "/tmp/meteorology-review-example-20261029",
+    "actual_retained_size": "5.2 MiB primary review staging + 1.2 MiB saved-example replay"
+  },
+  "full_product_validation": {
+    "valid": true,
+    "method": "era5-retained-exact-coastal-r5-v1",
+    "start_date": "2009-01-01",
+    "end_date": "2026-10-20",
+    "reporting_cell_count": 463,
+    "membership_verified": true,
+    "products": {
+      "daily": {
+        "rows": 3010426,
+        "metrics": 14,
+        "null_counts": {
+          "TEMPERATURE_2M_C_MEAN": 0,
+          "TEMPERATURE_2M_C_MIN": 0,
+          "TEMPERATURE_2M_C_MAX": 0,
+          "DEWPOINT_2M_C_MEAN": 0,
+          "RELATIVE_HUMIDITY_2M_PCT_MEAN": 8763,
+          "U_WIND_10M_MS_MEAN": 0,
+          "V_WIND_10M_MS_MEAN": 0,
+          "WIND_SPEED_10M_MS_MEAN": 0,
+          "WIND_SPEED_10M_MS_MAX": 0,
+          "WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR": 0,
+          "TOTAL_CLOUD_COVER_PCT_MEAN": 0,
+          "MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN": 0,
+          "MEAN_SEA_LEVEL_PRESSURE_HPA_MIN": 0,
+          "PRECIPITATION_MM": 463
+        }
+      },
+      "hourly": {
+        "rows": 72250224,
+        "metrics": 10,
+        "null_counts": {
+          "TEMPERATURE_2M_C": 0,
+          "DEWPOINT_2M_C": 0,
+          "RELATIVE_HUMIDITY_2M_PCT": 10154,
+          "U_WIND_10M_MS": 0,
+          "V_WIND_10M_MS": 0,
+          "WIND_SPEED_10M_MS": 0,
+          "WIND_DIRECTION_10M_DEG_FROM": 0,
+          "TOTAL_CLOUD_COVER_PCT": 0,
+          "MEAN_SEA_LEVEL_PRESSURE_HPA": 0,
+          "PRECIPITATION_MM": 463
+        }
+      }
+    }
+  },
+  "wheel_sha256": "6b984363dd96090e2750d96613ed90af81a5492590e19103b61c6092b3d3f643"
+}

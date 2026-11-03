@@ -16,6 +16,7 @@ import pyarrow.parquet as pq
 from .artifacts import checksum_path
 from .core.artifacts import TransactionalFamilyPublisher
 from .marine_reporting import load_reporting_membership
+from .lineage import validate_lineage
 from .regional_source import utcnow
 
 
@@ -139,6 +140,14 @@ def publish_coastal(sources, study_config, output_dir, control_dir):
         # No single vintage hash describes the concatenated history.
         catalog.pop('source_metadata_sha256', None)
         catalog.pop('source_evidence_sha256', None)
+        catalog.pop('source_evidence', None)
+        evidence = {}
+        for _, source in catalogs:
+            evidence.update(source.get('source_evidence_by_sha256', {}))
+            if 'source_evidence' in source:
+                evidence[source['source_evidence_sha256']] = source['source_evidence']
+        catalog['source_evidence_by_sha256'] = evidence
+        validate_lineage(catalog)
         publisher.stage_manifest(output/'catalog.json', catalog)
         publisher.publish()
     return catalog

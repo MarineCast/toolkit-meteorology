@@ -1,0 +1,92 @@
+{
+  "2026-10-19/TEMPERATURE_2M_C_MEAN": {
+    "rows": 463,
+    "nulls": 0,
+    "min": 2.724409993489606,
+    "max": 13.013391113281273
+  },
+  "2026-10-19/TEMPERATURE_2M_C_MIN": {
+    "rows": 463,
+    "nulls": 0,
+    "min": -0.7140869140624773,
+    "max": 12.598962402343773
+  },
+  "2026-10-19/TEMPERATURE_2M_C_MAX": {
+    "rows": 463,
+    "nulls": 0,
+    "min": 7.144097900390648,
+    "max": 16.757745361328148
+  },
+  "2026-10-19/DEWPOINT_2M_C_MEAN": {
+    "rows": 463,
+    "nulls": 0,
+    "min": -1.469236755371071,
+    "max": 10.140138244628929
+  },
+  "2026-10-19/U_WIND_10M_MS_MEAN": {
+    "rows": 463,
+    "nulls": 0,
+    "min": -1.6975282033284504,
+    "max": 1.932395299275716
+  },
+  "2026-10-19/V_WIND_10M_MS_MEAN": {
+    "rows": 463,
+    "nulls": 0,
+    "min": -2.491593678792318,
+    "max": 0.14667129516601562
+  },
+  "2026-10-19/WIND_SPEED_10M_MS_MEAN": {
+    "rows": 463,
+    "nulls": 0,
+    "min": 0.5339194295353711,
+    "max": 5.993851177600697
+  },
+  "2026-10-19/WIND_SPEED_10M_MS_MAX": {
+    "rows": 463,
+    "nulls": 0,
+    "min": 0.8952036256993419,
+    "max": 9.544253913513979
+  },
+  "2026-10-19/WIND_DIRECTION_10M_DEG_FROM_MEAN_VECTOR": {
+    "rows": 463,
+    "nulls": 0,
+    "min": 1.6679569225186537,
+    "max": 359.41473044864944
+  },
+  "2026-10-19/RELATIVE_HUMIDITY_2M_PCT_MEAN": {
+    "rows": 463,
+    "nulls": 1,
+    "min": 69.3914170544835,
+    "max": 95.04772193937437
+  },
+  "2026-10-19/TOTAL_CLOUD_COVER_PCT_MEAN": {
+    "rows": 463,
+    "nulls": 0,
+    "min": 61.66496276855469,
+    "max": 98.67604573567708
+  },
+  "2026-10-19/MEAN_SEA_LEVEL_PRESSURE_HPA_MEAN": {
+    "rows": 463,
+    "nulls": 0,
+    "min": 1014.3118229166668,
+    "max": 1016.5428645833334
+  },
+  "2026-10-19/MEAN_SEA_LEVEL_PRESSURE_HPA_MIN": {
+    "rows": 463,
+    "nulls": 0,
+    "min": 1012.943125,
+    "max": 1014.9525
+  },
+  "2026-10-19/PRECIPITATION_MM": {
+    "rows": 463,
+    "nulls": 0,
+    "min": 0.0,
+    "max": 4.1790008544921875
+  },
+  "2026-10-20/PRECIPITATION_MM": {
+    "rows": 463,
+    "nulls": 463,
+    "min": null,
+    "max": null
+  }
+}
